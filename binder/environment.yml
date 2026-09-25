@@ -1,0 +1,20 @@
+# The software the online version of Comfy-gmx lite runs on.
+#
+# Binder (mybinder.org, or any BinderHub) reads this folder when it builds the
+# online copy, and so does repo2docker, the program Binder uses underneath.
+# Everything here comes from conda-forge; conda installs it into one
+# environment, and the editor, GROMACS and Python all run from there.
+name: comfy-gmx-lite
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  # GROMACS 2026.3 for processors only: no MPI and no graphics card, which is
+  # what an online session has.
+  - gromacs=2026.3=nompi_*
+  # The area-per-lipid step of the Martini tutorial and the ice counter need numpy.
+  - numpy
+  # Lets the Jupyter server that Binder starts hand a web address over to the
+  # Comfy-gmx editor. postBuild, in this folder, tells it how.
+  - jupyter-server-proxy

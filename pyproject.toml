@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfy-gmx-lite"
+version = "0.1.0"
+description = "A teaching version of Comfy-gmx: molecular dynamics with GROMACS as blocks wired together in a browser"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Can M. Karakurt" }]
+keywords = ["molecular-dynamics", "gromacs", "martini", "coarse-grained", "workflow"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Chemistry",
+]
+# The server itself needs nothing but the standard library. GROMACS is an
+# external program that Comfy-gmx finds, or is told where to find.
+dependencies = []
+
+[project.scripts]
+comfy-gmx-lite = "comfygmx.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/CWoodkid/comfy-gmx-lite"
+
+[tool.setuptools.packages.find]
+include = ["comfygmx*"]
+
+[tool.setuptools.package-data]
+comfygmx = ["web/**/*", "mdp/*.mdp", "data/*.json"]

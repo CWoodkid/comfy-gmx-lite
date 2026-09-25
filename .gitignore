@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Comfy-gmx runtime state (runs, caches, uploads, saved workflows)
+.comfy-gmx/
+.comfy-gmx-lite/
+runs/
+*.log
+
+# GROMACS leftovers, in case anyone runs a job inside the checkout
+\#*\#
+*.trr
+*.xtc
+*.edr
+*.cpt
+*.tpr
+step*.pdb
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

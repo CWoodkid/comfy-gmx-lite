@@ -1,0 +1,664 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "note_what",
+      "type": "util.note",
+      "pos": [
+        0,
+        499
+      ],
+      "params": {
+        "text": "A bilayer that builds itself\n\n128 lipids are dropped into a box at random, water is poured in around\nthem, and then nothing else is done. Over the next 30 nanoseconds they\nfind each other, tails inward, heads out, and a membrane appears.\n\nThat is worth watching once, because it is the clearest demonstration in\nthe whole Martini set that the model is doing physics rather than being\ntold the answer. Nobody says 'make a bilayer'. The tails dislike water,\nthe heads like it, and a bilayer is what that adds up to.\n\nIt is also not guaranteed. Sometimes you get a micelle that never opens\nout, or a bilayer with a water pore through it. Both are real\nintermediates and worth seeing. If it happens, run it again -- the\nstarting arrangement is random. And the bilayer forms facing whichever\nway chance picks -- usually not flat. 'Turn the membrane flat' checks,\nand turns it, as the tutorial says to.\n\nAfter that comes a second run with three settings changed, and those\nthree changes are the real lesson of the page. The note by the second\nset of run settings says what they are and why each one matters."
+      }
+    },
+    {
+      "id": "lipid",
+      "type": "io.fetch_url",
+      "pos": [
+        300,
+        55
+      ],
+      "params": {
+        "url": "https://cgmartini-library.s3.ca-central-1.amazonaws.com/1_Downloads/ff_parameters/martini2/lipidome/pc/dppc/DPPC-em.gro",
+        "output": "DSPC-em.gro",
+        "extract": false
+      }
+    },
+    {
+      "id": "rename",
+      "type": "util.edit_text",
+      "pos": [
+        600,
+        -105
+      ],
+      "params": {
+        "rules": "replace: DPPC => DSPC",
+        "output": "lipid.gro"
+      }
+    },
+    {
+      "id": "note_scatter",
+      "type": "util.note",
+      "pos": [
+        600,
+        394
+      ],
+      "params": {
+        "text": "1. THROW THEM IN AND SEE\n\nOne lipid, copied 128 times into a 7.5 nm box at random positions and\nrandom angles, each copy rejected and retried if it lands on top of one\nalready there.\n\n'How close is too close' is 0.21 nm here, not the 0.105 nm GROMACS uses\nby default. That default is an atom's radius; a Martini bead stands for\nabout four heavy atoms and is roughly twice as wide. Leave it at the\ndefault and the lipids are packed far too tightly to minimise.\n\nThe structure is the Martini 2 DPPC one, saved under the name DSPC. The\ntwo have the same beads in the same places; what tells a C-16 tail from a\nC-18 tail in Martini 3 is in the topology, not in the coordinates."
+      }
+    },
+    {
+      "id": "scatter",
+      "type": "gmx.insert_molecules",
+      "pos": [
+        900,
+        55
+      ],
+      "params": {
+        "nmol": 128,
+        "box": "7.5 7.5 7.5",
+        "radius": 0.21,
+        "try_count": 500,
+        "output": "128_noW.gro"
+      }
+    },
+    {
+      "id": "water",
+      "type": "io.fetch_url",
+      "pos": [
+        300,
+        1067
+      ],
+      "params": {
+        "url": "https://cgmartini-library.s3.ca-central-1.amazonaws.com/1_Downloads/example_applications/solvent_systems/water.gro",
+        "output": "water.gro",
+        "extract": false
+      }
+    },
+    {
+      "id": "note_water",
+      "type": "util.note",
+      "pos": [
+        600,
+        1067
+      ],
+      "params": {
+        "text": "2. NOT VERY MUCH WATER\n\n768 water beads, which is six per lipid. One Martini water bead stands\nfor four real ones, so that is 24 real waters a lipid -- thin. A real\nmembrane simulation would use several times more.\n\nIt is deliberate. With little water the lipids cannot get far from each\nother, and a bilayer forms more reliably and sooner. It also means part\nof the box starts out with no water in it at all, which is not realistic.\n\nWorth trying: raise 'Most solvent molecules' and see whether you still\nget a bilayer in 30 ns, or a micelle instead.\n\nThe same 0.21 nm bead size is used again, so water is not poured into\ngaps a Martini bead could not actually fit into."
+      }
+    },
+    {
+      "id": "wet",
+      "type": "gmx.solvate",
+      "pos": [
+        1200,
+        1067
+      ],
+      "params": {
+        "maxsol": 768,
+        "radius": 0.21,
+        "output": "waterbox.gro"
+      }
+    },
+    {
+      "id": "note_top",
+      "type": "util.note",
+      "pos": [
+        0,
+        1984
+      ],
+      "params": {
+        "text": "3. WHAT THE MOLECULES ARE\n\nFour files, and the order they go in matters.\n\n  martini_v3.0.0.itp                    what every bead type is\n  martini_v3.0.0_ffbonded_v2.itp        how lipid bonds behave\n  martini_v3.0.0_phospholipids_PC_v2.itp  the lipids themselves\n  martini_v3.0.0_solvents_v1.itp        water\n\nBead types first, because everything below refers to them. General bond\nbehaviour before the specific lipids that use it.\n\nThe lipid files come from a separate place from the rest: the 2025 lipid\nupdate lives in its own repository and is not in the Martini 3 release\narchive. Both are downloaded here.\n\nThe counts -- 128 lipids, however many waters solvate managed to fit --\nare read off the structure rather than typed. The tutorial asks you to\nscroll back through the solvate output and find the number by eye."
+      }
+    },
+    {
+      "id": "ff",
+      "type": "io.fetch_url",
+      "pos": [
+        300,
+        1540
+      ],
+      "params": {
+        "url": "https://cgmartini-library.s3.ca-central-1.amazonaws.com/1_Downloads/ff_parameters/martini3/martini_v300.zip",
+        "output": "martini_v300.zip",
+        "extract": true,
+        "member": "martini_v300/martini_v3.0.0.itp\nmartini_v300/martini_v3.0.0_solvents_v1.itp\n"
+      }
+    },
+    {
+      "id": "lipid_itp",
+      "type": "io.fetch_url",
+      "pos": [
+        300,
+        2521
+      ],
+      "params": {
+        "url": "https://github.com/Martini-Force-Field-Initiative/M3-Lipid-Parameters/archive/refs/heads/main.zip",
+        "output": "m3-lipids.zip",
+        "extract": true,
+        "member": "M3-Lipid-Parameters-main/ITPs/martini_v3.0.0_ffbonded_v2.itp\nM3-Lipid-Parameters-main/ITPs/martini_v3.0.0_phospholipids_PC_v2.itp\n"
+      }
+    },
+    {
+      "id": "top",
+      "type": "martini.merge_top",
+      "pos": [
+        900,
+        1540
+      ],
+      "params": {
+        "defines": "",
+        "includes": "",
+        "itp_files": "martini_v3.0.0.itp\nmartini_v3.0.0_ffbonded_v2.itp\nmartini_v3.0.0_phospholipids_PC_v2.itp\nmartini_v3.0.0_solvents_v1.itp\n",
+        "system_name": "DSPC bilayer self-assembly",
+        "molecules": "DSPC @DSPC\nW @W\n",
+        "output": "dspc.top"
+      }
+    },
+    {
+      "id": "min_mdp",
+      "type": "util.mdp",
+      "pos": [
+        1200,
+        2521
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; Minimisation, Martini 3.\n; Walk downhill until nothing is pushing hard any more. No time passes.\nintegrator               = steep\nnsteps                   = 10000\n\nnstxout                  = 0\nnstvout                  = 0\nnstfout                  = 0\n\ncutoff-scheme            = Verlet\nnstlist                  = 20\nnsttcouple               = 20\nnstpcouple               = 20\nrlist                    = 1.35\nverlet-buffer-tolerance  = -1\npbc                      = xyz\n\ncoulombtype              = reaction-field\nrcoulomb                 = 1.1\nepsilon_r                = 15\nepsilon_rf               = 0\nvdw_type                 = cutoff\nvdw-modifier             = Potential-shift-verlet\nrvdw                     = 1.1\n\nconstraints              = none\nconstraint_algorithm     = Lincs\nlincs_order              = 8\nlincs_warnangle          = 90\nlincs_iter               = 2\n",
+        "filename": "minimization.mdp"
+      }
+    },
+    {
+      "id": "min_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        1500,
+        2521
+      ],
+      "params": {
+        "maxwarn": 1,
+        "output": "min.tpr"
+      }
+    },
+    {
+      "id": "min",
+      "type": "gmx.mdrun",
+      "pos": [
+        1800,
+        2521
+      ],
+      "params": {
+        "deffnm": "minimized"
+      }
+    },
+    {
+      "id": "sa_mdp",
+      "type": "util.mdp",
+      "pos": [
+        1200,
+        3382
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; Self-assembly, Martini 3. 30 ns at 20 fs a step.\n;\n; The pressure is the same in every direction (isotropic), which is right\n; while there is no membrane yet -- the box has no special direction to\n; treat differently. Once a bilayer has formed this becomes wrong, and the\n; next run fixes it.\nintegrator               = md\ndt                       = 0.02\nnsteps                   = 1500000\n\ncomm-mode                = Linear\nnstcomm                  = 100\ncomm-grps                = System\n\nnstxout                  = 0\nnstvout                  = 0\nnstfout                  = 0\nnstlog                   = 10000\nnstenergy                = 1000\nnstxout-compressed       = 1000\ncompressed-x-precision   = 100\n\ncutoff-scheme            = Verlet\nnstlist                  = 20\nnsttcouple               = 20\nnstpcouple               = 20\nrlist                    = 1.35\nverlet-buffer-tolerance  = -1\npbc                      = xyz\n\ncoulombtype              = reaction-field\nrcoulomb                 = 1.1\nepsilon_r                = 15\nepsilon_rf               = 0\nvdw_type                 = cutoff\nvdw-modifier             = Potential-shift-verlet\nrvdw                     = 1.1\n\nconstraints              = none\nconstraint_algorithm     = Lincs\nlincs_order              = 8\nlincs_warnangle          = 90\nlincs_iter               = 2\n\ntcoupl                   = v-rescale\ntc-grps                  = System\ntau_t                    = 1.0\nref_t                    = 340\n\ngen_vel                  = yes\ngen_temp                 = 340\ngen_seed                 = 20130607\n\nPcoupl                   = c-rescale\nPcoupltype               = isotropic\ntau_p                    = 4.0\nref_p                    = 1.0\ncompressibility          = 3e-4\n",
+        "filename": "martini_md.mdp"
+      }
+    },
+    {
+      "id": "sa_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        1500,
+        3382
+      ],
+      "params": {
+        "maxwarn": 1,
+        "output": "dspc-md.tpr"
+      }
+    },
+    {
+      "id": "sa",
+      "type": "gmx.mdrun",
+      "pos": [
+        1800,
+        3382
+      ],
+      "params": {
+        "deffnm": "dspc-md"
+      }
+    },
+    {
+      "id": "flat",
+      "type": "build.lay_flat",
+      "pos": [
+        2100,
+        3382
+      ],
+      "params": {
+        "beads": "PO4",
+        "output": "dspc-flat.gro"
+      }
+    },
+    {
+      "id": "note_equil",
+      "type": "util.note",
+      "pos": [
+        0,
+        4243
+      ],
+      "params": {
+        "text": "4. THE THREE SETTINGS THAT MATTER\n\nThe run above used one pressure for all three directions, which was right\nwhile there was no membrane. Now there is one, and a membrane has a\ndirection: it is a sheet in the xy plane with water above and below --\nturned that way, if it formed standing up, by the block just before.\n\nSEMI-ISOTROPIC PRESSURE lets the area of the sheet and the height of the\nbox change independently. Keep them tied together and the membrane is\nstretched or squeezed sideways by whatever the water column is doing, and\nthe area per lipid -- the number everyone quotes -- comes out wrong.\n\nTWO THERMOSTATS, one for the lipids and one for the water. Heat crosses\nthe boundary between them slowly. With a single thermostat the water can\nsit too warm and the membrane too cold while the average looks perfect.\n\nTWO DRIFT GROUPS, for the same reason: the membrane can slide sideways\nagainst the water, and correcting the box as a whole hides it.\n\nRead the settings on the node -- all three are near the bottom, and the\ncomments in the file say the same as this note. Comparing it against the\nself-assembly settings above is the exercise the tutorial sets.\n\nThis run is 10 ns, a third of the tutorial's 30, so that both runs fit\nin a lesson. The area per lipid drops within the first nanosecond and\nthen keeps drifting slowly downwards: 10 ns does not settle it, which\nis worth saying whenever the number is quoted."
+      }
+    },
+    {
+      "id": "eq_mdp",
+      "type": "util.mdp",
+      "pos": [
+        1200,
+        4243
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; Equilibration of the bilayer, Martini 3. 10 ns at 20 fs a step: a\n; third of the tutorial's 30 ns, so that both runs fit in a lesson. The area\n; per lipid drops within the first nanosecond and then keeps drifting slowly\n; downwards: 10 ns does not settle it, and the tutorial's 30 ns settles it\n; further.\n;\n; Four things differ from the self-assembly settings, and they are the whole\n; exercise on this page of the tutorial:\n;\n;   Pcoupltype = semi-isotropic. The box may now change its area and its\n;     height independently. With one pressure for all three directions a\n;     bilayer is squeezed or stretched sideways by whatever the height is\n;     doing, and its area per lipid settles at the wrong value.\n;\n;   tc-grps = DSPC W, two thermostats instead of one. Heat crosses the\n;     membrane-water boundary slowly, so with a single thermostat one side\n;     can sit warm while the other sits cold and the average looks right.\n;\n;   comm-grps = DSPC W, likewise. The membrane can drift sideways against\n;     the water; correcting the whole box as one hides that.\n;\n;   gen_vel = no, continuation = yes. The velocities come from the run\n;     before -- through the structure file, which carries them -- rather\n;     than being drawn fresh.\nintegrator               = md\ndt                       = 0.02\nnsteps                   = 500000\n\ncomm-mode                = Linear\nnstcomm                  = 100\ncomm-grps                = DSPC W\n\nnstxout                  = 0\nnstvout                  = 0\nnstfout                  = 0\nnstlog                   = 10000\nnstenergy                = 1000\nnstxout-compressed       = 1000\ncompressed-x-precision   = 100\n\ncutoff-scheme            = Verlet\nnstlist                  = 20\nnsttcouple               = 20\nnstpcouple               = 20\nrlist                    = 1.35\nverlet-buffer-tolerance  = -1\npbc                      = xyz\n\ncoulombtype              = reaction-field\nrcoulomb                 = 1.1\nepsilon_r                = 15\nepsilon_rf               = 0\nvdw_type                 = cutoff\nvdw-modifier             = Potential-shift-verlet\nrvdw                     = 1.1\n\nconstraints              = none\nconstraint_algorithm     = Lincs\nlincs_order              = 8\nlincs_warnangle          = 90\nlincs_iter               = 2\n\ntcoupl                   = v-rescale\ntc-grps                  = DSPC W\ntau_t                    = 1.0 1.0\nref_t                    = 340 340\n\ngen_vel                  = no\ncontinuation             = yes\n\nPcoupl                   = c-rescale\nPcoupltype               = semi-isotropic\ntau_p                    = 4.0\nref_p                    = 1.0 1.0\ncompressibility          = 3e-4 3e-4\n",
+        "filename": "equilibration.mdp"
+      }
+    },
+    {
+      "id": "eq_ndx",
+      "type": "gmx.index",
+      "pos": [
+        1200,
+        5104
+      ],
+      "params": {
+        "commands": "q\n",
+        "output": "index.ndx",
+        "how": "by typing make_ndx commands"
+      }
+    },
+    {
+      "id": "eq_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        1500,
+        4243
+      ],
+      "params": {
+        "maxwarn": 2,
+        "output": "equil.tpr"
+      }
+    },
+    {
+      "id": "eq",
+      "type": "gmx.mdrun",
+      "pos": [
+        1800,
+        4243
+      ],
+      "params": {
+        "deffnm": "equil"
+      }
+    },
+    {
+      "id": "note_read",
+      "type": "util.note",
+      "pos": [
+        0,
+        5264
+      ],
+      "params": {
+        "text": "5. THREE THINGS TO MEASURE\n\nDENSITY ALONG Z is the check that it worked. A bilayer gives water high\nat both ends, a deep trough in the middle where the tails are, and the\nwhole thing symmetric about the centre. One flat line means no membrane.\nTwo humps and no trough means a micelle.\n\nAREA PER LIPID is the number to compare against experiment: the area of\nthe box divided by half the lipids, since there are two leaflets. DSPC in\nthe fluid phase is about 0.65 nm2. Look at the curve as well as the\naverage -- the part at the start where it is still shrinking has not\nequilibrated and should be left out.\n\nHOW FAR A LIPID WANDERS, in the plane only. A lipid does not cross to the\nother leaflet on this timescale, so counting the z direction would halve\nthe answer for no reason. The trajectory has to be unwrapped first, or a\nlipid that leaves one side of the box and comes back on the other looks\nas though it moved a whole box length in one step."
+      }
+    },
+    {
+      "id": "centre",
+      "type": "gmx.trjconv",
+      "pos": [
+        2100,
+        5264
+      ],
+      "params": {
+        "pbc": "whole",
+        "ur": "compact",
+        "center": false,
+        "groups": "System\n",
+        "output": "whole.xtc"
+      }
+    },
+    {
+      "id": "dens",
+      "type": "gmx.measure",
+      "pos": [
+        2400,
+        5264
+      ],
+      "params": {
+        "d": "Z",
+        "sl": 100,
+        "center": true,
+        "groups": "DSPC\nSystem\n",
+        "output": "density.xvg",
+        "measure": "Density profile along an axis (density)"
+      }
+    },
+    {
+      "id": "boxsize",
+      "type": "gmx.energy",
+      "pos": [
+        2100,
+        5916
+      ],
+      "params": {
+        "terms": "Box-X\nBox-Y\n",
+        "output": "box-xy.xvg"
+      }
+    },
+    {
+      "id": "area",
+      "type": "analysis.area_per_lipid",
+      "pos": [
+        2400,
+        5916
+      ],
+      "params": {
+        "lipids": 128,
+        "expected": 0.65,
+        "expected_label": "DSPC in the fluid phase, from experiment",
+        "output": "area_per_lipid.xvg"
+      }
+    },
+    {
+      "id": "nojump",
+      "type": "gmx.trjconv",
+      "pos": [
+        2100,
+        6338
+      ],
+      "params": {
+        "pbc": "nojump",
+        "ur": "",
+        "center": false,
+        "groups": "System\n",
+        "output": "nojump.xtc"
+      }
+    },
+    {
+      "id": "msd",
+      "type": "gmx.measure",
+      "pos": [
+        2400,
+        6338
+      ],
+      "params": {
+        "lateral": "z",
+        "trestart": 200.0,
+        "groups": "DSPC\n",
+        "output": "msd.xvg",
+        "measure": "How far things wander (msd)"
+      }
+    }
+  ],
+  "links": [
+    {
+      "from_node": "lipid",
+      "from_port": "file",
+      "to_node": "rename",
+      "to_port": "file"
+    },
+    {
+      "from_node": "rename",
+      "from_port": "out",
+      "to_node": "scatter",
+      "to_port": "insert"
+    },
+    {
+      "from_node": "scatter",
+      "from_port": "structure",
+      "to_node": "wet",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "water",
+      "from_port": "file",
+      "to_node": "wet",
+      "to_port": "solvent_box"
+    },
+    {
+      "from_node": "ff",
+      "from_port": "file",
+      "to_node": "top",
+      "to_port": "ff"
+    },
+    {
+      "from_node": "lipid_itp",
+      "from_port": "file",
+      "to_node": "top",
+      "to_port": "itp"
+    },
+    {
+      "from_node": "wet",
+      "from_port": "structure",
+      "to_node": "top",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "wet",
+      "from_port": "structure",
+      "to_node": "min_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "top",
+      "from_port": "topology",
+      "to_node": "min_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "min_mdp",
+      "from_port": "mdp",
+      "to_node": "min_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "min_pp",
+      "from_port": "tpr",
+      "to_node": "min",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "min",
+      "from_port": "structure",
+      "to_node": "sa_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "top",
+      "from_port": "topology",
+      "to_node": "sa_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "sa_mdp",
+      "from_port": "mdp",
+      "to_node": "sa_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "sa_pp",
+      "from_port": "tpr",
+      "to_node": "sa",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "sa",
+      "from_port": "structure",
+      "to_node": "flat",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "flat",
+      "from_port": "structure",
+      "to_node": "eq_ndx",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "flat",
+      "from_port": "structure",
+      "to_node": "eq_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "top",
+      "from_port": "topology",
+      "to_node": "eq_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "eq_mdp",
+      "from_port": "mdp",
+      "to_node": "eq_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "eq_ndx",
+      "from_port": "index",
+      "to_node": "eq_pp",
+      "to_port": "index"
+    },
+    {
+      "from_node": "eq_pp",
+      "from_port": "tpr",
+      "to_node": "eq",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "eq",
+      "from_port": "traj",
+      "to_node": "centre",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "eq_pp",
+      "from_port": "tpr",
+      "to_node": "centre",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "centre",
+      "from_port": "traj",
+      "to_node": "dens",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "eq_pp",
+      "from_port": "tpr",
+      "to_node": "dens",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "eq_ndx",
+      "from_port": "index",
+      "to_node": "dens",
+      "to_port": "index"
+    },
+    {
+      "from_node": "eq",
+      "from_port": "edr",
+      "to_node": "boxsize",
+      "to_port": "edr"
+    },
+    {
+      "from_node": "boxsize",
+      "from_port": "xvg",
+      "to_node": "area",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "eq",
+      "from_port": "traj",
+      "to_node": "nojump",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "eq_pp",
+      "from_port": "tpr",
+      "to_node": "nojump",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "nojump",
+      "from_port": "traj",
+      "to_node": "msd",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "eq_pp",
+      "from_port": "tpr",
+      "to_node": "msd",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "eq_ndx",
+      "from_port": "index",
+      "to_node": "msd",
+      "to_port": "index"
+    }
+  ],
+  "groups": [
+    {
+      "title": "1. Lipids and water in a box",
+      "color": "#b58b2a",
+      "nodes": [
+        "lipid",
+        "rename",
+        "scatter",
+        "water",
+        "wet"
+      ]
+    },
+    {
+      "title": "2. What the molecules are",
+      "color": "#4a4a4a",
+      "nodes": [
+        "ff",
+        "lipid_itp",
+        "top"
+      ]
+    },
+    {
+      "title": "3. Minimise, then let it assemble",
+      "color": "#a1309b",
+      "nodes": [
+        "min_mdp",
+        "min_pp",
+        "min",
+        "sa_mdp",
+        "sa_pp",
+        "sa",
+        "flat"
+      ]
+    },
+    {
+      "title": "4. Let the membrane find its own area",
+      "color": "#3f789e",
+      "nodes": [
+        "eq_mdp",
+        "eq_ndx",
+        "eq_pp",
+        "eq"
+      ]
+    },
+    {
+      "title": "5. Is it a membrane, and what is it like",
+      "color": "#b06634",
+      "nodes": [
+        "centre",
+        "dens",
+        "boxsize",
+        "area",
+        "nojump",
+        "msd"
+      ]
+    }
+  ]
+}

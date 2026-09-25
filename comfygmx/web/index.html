@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comfy-gmx lite</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='9' cy='9' r='5' fill='%234f9dd8'/><circle cx='23' cy='23' r='5' fill='%237ac0a0'/><path d='M12 12 L20 20' stroke='%23888' stroke-width='2'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">Comfy<span>-gmx</span> lite</div>
+
+  <div class="toolgroup">
+    <button id="btn-run" class="primary" title="Run the whole graph (Ctrl+Enter)">Run</button>
+    <button id="btn-run-selected" title="Run the selected nodes and everything they depend on">Run selected</button>
+    <button id="btn-cancel" class="danger" disabled>Cancel</button>
+    <!-- Only there while a run is actually being held at a node. -->
+    <button id="btn-continue" class="primary hidden">Continue</button>
+    <!-- What Run would do, beside the button that would do it. -->
+    <span id="forecast-line" class="forecast hidden"></span>
+  </div>
+
+  <div class="toolgroup">
+    <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶</button>
+    <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
+  </div>
+
+  <div class="toolgroup">
+    <button id="btn-validate" title="Check the graph without running anything">Check</button>
+    <button id="btn-save">Save</button>
+    <button id="btn-load">Open</button>
+    <button id="btn-export">Export JSON</button>
+    <button id="btn-export-scripts" title="Write this workflow out as shell scripts you can move to another machine">Export scripts</button>
+    <button id="btn-import">Import JSON</button>
+    <button id="btn-clear">New</button>
+  </div>
+
+  <div class="spacer"></div>
+  <div id="run-status" class="status-pill">idle</div>
+  <button id="btn-setup" class="hidden primary" title="Install what this machine is missing">Set up</button>
+  <button id="btn-env" title="Software and environments">Environments</button>
+  <button id="btn-settings" title="Settings">Settings</button>
+  <button id="btn-help" title="Keyboard shortcuts and help">?</button>
+</header>
+
+<div id="sessionbar">
+  <div id="session-tabs"></div>
+  <div class="spacer"></div>
+  <button id="session-output" class="session-output" title="Where this session writes its runs">default run folder</button>
+  <button id="btn-open-folder" class="small"
+          title="Open this tab's folder in the desktop file manager">Open folder</button>
+  <button id="btn-session-new" class="small" title="New session (Ctrl+Shift+N)">New session</button>
+</div>
+
+<div id="layout">
+
+  <aside id="palette">
+    <div class="panel-head">
+      <input id="palette-search" type="search" placeholder="Search nodes and chunks…" autocomplete="off">
+    </div>
+    <div class="tabs" id="palette-tabs">
+      <button class="tab active" data-tab="nodes">Nodes</button>
+      <button class="tab" data-tab="chunks">Chunks</button>
+      <button class="tab" data-tab="tutorials">Tutorials</button>
+    </div>
+    <div id="palette-nodes" class="palette-body"></div>
+    <div id="palette-chunks" class="palette-body hidden"></div>
+    <div id="palette-tutorials" class="palette-body hidden"></div>
+    <div class="palette-hint">Click to add at the centre, or drag onto the canvas.</div>
+  </aside>
+
+  <main id="canvas-wrap">
+    <div id="canvas">
+      <div id="world">
+        <!-- Groups sit behind everything: they are a backdrop you draw on, not
+             something you click through the graph to reach. -->
+        <div id="groups"></div>
+        <svg id="wires" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="nodes"></div>
+      </div>
+    </div>
+    <div id="minimap-info">
+      <span id="zoom-level">100%</span>
+      <button id="btn-tidy" title="Push apart any nodes that sit on top of each other, column by column (T)">Tidy</button>
+      <button id="btn-fit" title="Fit the graph in view (F)">Fit</button>
+      <button id="btn-reset-zoom" title="Reset zoom">1:1</button>
+    </div>
+    <div id="marquee" class="hidden"></div>
+
+    <!-- Find a node in a fifty-node graph. Over the canvas rather than in the
+         palette: what it searches is this graph, not the catalogue. -->
+    <div id="canvas-find" class="hidden">
+      <input id="find-input" type="search" placeholder="Find a node — title, type, or a value"
+             autocomplete="off" spellcheck="false">
+      <span id="find-count">0</span>
+      <button id="find-prev" class="small" title="Previous (Shift+Enter)">↑</button>
+      <button id="find-next" class="small" title="Next (Enter)">↓</button>
+      <button id="find-close" class="small" title="Close (Esc)">×</button>
+    </div>
+
+    <!-- A transcript of the run, under the graph rather than beside it: what
+         is happening is a property of the whole run, not of whichever node
+         you last clicked. -->
+    <!-- The handle sits on the edge the drawer comes out of, rather than in the
+         toolbar with things that open dialogs. It carries the run status, so a
+         closed drawer still says whether anything is happening. -->
+    <button id="terminal-handle" title="Show what is running (Ctrl+`)">
+      <span id="handle-dot" class="t-dot"></span>
+      <span id="handle-label">Terminal</span>
+    </button>
+    <section id="terminal" class="hidden">
+      <div id="terminal-grip" title="Drag to resize"></div>
+      <header>
+        <span id="terminal-dot" class="t-dot"></span>
+        <span id="terminal-status">idle</span>
+        <span class="spacer"></span>
+        <label class="check"><input type="checkbox" id="terminal-follow" checked> follow</label>
+        <button id="terminal-copy" class="small">Copy</button>
+        <button id="terminal-clear" class="small">Clear</button>
+        <button id="terminal-close" class="small" title="Hide (Ctrl+`)">▾</button>
+      </header>
+      <pre id="terminal-body"></pre>
+      <!-- The typing line. A command that stops to ask a question gets its
+           answer here, and Ctrl+C stops the run the way it does in a real
+           terminal. -->
+      <div id="terminal-input-row">
+        <span id="terminal-prompt" title="What you type goes to the running command">&gt;</span>
+        <input id="terminal-input" type="text" autocomplete="off" spellcheck="false"
+               placeholder="type here to answer a command  ·  Ctrl+C stops the run  ·  Ctrl+D closes its input">
+        <button id="terminal-eof" class="small" title="Close the command's input (Ctrl+D)">EOF</button>
+        <button id="terminal-stop" class="small danger" title="Stop the run (Ctrl+C). Press again to kill it outright">Stop</button>
+      </div>
+    </section>
+  </main>
+
+  <aside id="inspector">
+    <div class="tabs" id="inspector-tabs">
+      <button class="tab active" data-tab="log">Log</button>
+      <button class="tab" data-tab="problems">Problems<span id="problems-badge" class="tab-badge hidden">0</span></button>
+      <button class="tab" data-tab="command">Command</button>
+      <button class="tab" data-tab="files">Files</button>
+      <button class="tab" data-tab="viewer">Viewer</button>
+      <button class="tab" data-tab="plot">Plot</button>
+    </div>
+
+    <section id="tab-log" class="inspector-body">
+      <div class="inspector-head">
+        <span id="log-title">no node selected</span>
+        <label class="check"><input type="checkbox" id="log-follow" checked> follow</label>
+      </div>
+      <pre id="log-output"></pre>
+    </section>
+
+    <section id="tab-problems" class="inspector-body hidden">
+      <div class="inspector-head">
+        <span id="problems-title">nothing checked yet</span>
+        <button id="btn-recheck" class="small">Check again</button>
+      </div>
+      <div id="problems-list"></div>
+    </section>
+
+    <section id="tab-command" class="inspector-body hidden">
+      <div class="inspector-head">
+        <span id="command-title">no node selected</span>
+        <button id="btn-copy-command" class="small">Copy</button>
+      </div>
+      <div id="command-notes"></div>
+      <pre id="command-output"></pre>
+    </section>
+
+    <section id="tab-files" class="inspector-body hidden">
+      <div class="inspector-head">
+        <span id="files-title">run files</span>
+        <span class="spacer"></span>
+        <button id="btn-files-runs" class="small"
+                title="Every run folder, its size, and what is safe to delete">Runs…</button>
+        <button id="btn-files-mode" class="small"
+                title="Walk the filesystem: copy a path, make a folder, drag a file onto the canvas">Browse</button>
+        <button id="btn-refresh-files" class="small">Refresh</button>
+      </div>
+      <div id="files-bar" class="hidden">
+        <button id="btn-files-up" class="small" title="Up one folder">↑</button>
+        <input id="files-path" type="text" spellcheck="false" placeholder="/path/to/folder">
+        <button id="btn-files-copy" class="small" title="Copy this folder's path">⧉</button>
+        <button id="btn-files-newfile" class="small" title="Create a file here">+ file</button>
+        <button id="btn-files-newdir" class="small" title="Create a folder here">+ folder</button>
+      </div>
+      <!-- Tick rows to choose them, then act on the lot. Copy and move never
+           write over anything, and Delete puts things in the trash inside the
+           data folder rather than getting rid of them. -->
+      <div id="files-actions" class="row wrap hidden">
+        <span id="files-chosen" class="hint"></span>
+        <button id="btn-files-cut" class="small" title="Choose these to be moved">Cut</button>
+        <button id="btn-files-copysel" class="small" title="Choose these to be copied">Copy</button>
+        <button id="btn-files-paste" class="small" disabled
+                title="Put what you cut or copied into this folder">Paste</button>
+        <button id="btn-files-rename" class="small" title="Rename the one you ticked">Rename</button>
+        <button id="btn-files-trash" class="small danger"
+                title="Move these to the trash inside the data folder">Delete</button>
+        <span class="spacer"></span>
+        <button id="btn-files-none" class="small" title="Untick everything">Clear</button>
+      </div>
+      <!-- Filters what is on screen as you type; the button looks in every
+           folder underneath as well, which is where a run puts its results. -->
+      <div id="files-search" class="row">
+        <input id="files-filter" type="search" spellcheck="false" autocomplete="off"
+               placeholder="Filter by name — Enter to look in sub-folders too">
+        <button id="btn-files-deep" class="small"
+                title="Look in this folder and everything under it">Search below</button>
+        <button id="btn-files-clear" class="small hidden" title="Show everything again">×</button>
+      </div>
+      <div id="files-jump" class="row wrap hidden"></div>
+      <div id="files-list"></div>
+    </section>
+
+    <section id="tab-viewer" class="inspector-body hidden">
+      <div class="inspector-head">
+        <span id="viewer-title">no structure loaded</span>
+        <select id="viewer-style">
+          <option value="auto">auto</option>
+          <option value="points">points</option>
+          <option value="trace">backbone trace</option>
+          <option value="both">both</option>
+        </select>
+        <select id="viewer-color">
+          <option value="element">by element</option>
+          <option value="chain">by chain</option>
+          <option value="depth">by depth</option>
+          <option value="bfactor">by conservation / B-factor</option>
+        </select>
+        <button id="btn-viewer-save" class="small" title="Save or download this structure">⤓</button>
+      </div>
+      <canvas id="viewer-canvas"></canvas>
+      <div id="viewer-info"></div>
+    </section>
+
+    <section id="tab-plot" class="inspector-body hidden">
+      <div class="inspector-head">
+        <span id="plot-title">no data loaded</span>
+        <button id="btn-plot-csv" class="small">Copy as CSV</button>
+      </div>
+      <canvas id="plot-canvas"></canvas>
+      <div id="plot-legend"></div>
+      <div id="plot-stats"></div>
+    </section>
+  </aside>
+</div>
+
+<div id="statusbar">
+  <span id="status-message">ready</span>
+  <span class="spacer"></span>
+  <button id="status-problems" class="status-problems hidden" title="Open the Problems tab"></button>
+  <span id="status-nodes"></span>
+  <span id="status-run"></span>
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<div id="modal-backdrop" class="modal-backdrop hidden">
+  <div id="modal" class="modal-panel">
+    <header>
+      <button id="modal-back" class="modal-back hidden" title="Back">&#8592;</button>
+      <span id="modal-title"></span>
+      <button id="modal-close" class="modal-close">×</button>
+    </header>
+    <div id="modal-body" class="modal-body"></div>
+    <footer id="modal-footer"></footer>
+  </div>
+</div>
+
+<!-- A second dialog, for the one opened from inside another: the file browser
+     called from a box in a form. There is nowhere for the first dialog to go
+     while the second is open, and re-drawing it afterwards is not the same
+     thing -- a half-filled form cannot be re-drawn from anything, because what
+     is in it has not been saved anywhere yet. So the second one sits on top and
+     the first is left alone underneath, untouched. -->
+<div id="submodal-backdrop" class="modal-backdrop hidden">
+  <div id="submodal" class="modal-panel">
+    <header>
+      <span id="submodal-title"></span>
+      <button id="submodal-close" class="modal-close">×</button>
+    </header>
+    <div id="submodal-body" class="modal-body"></div>
+    <footer id="submodal-footer"></footer>
+  </div>
+</div>
+
+<div id="drop-overlay" class="hidden">
+  <div class="drop-card">
+    <div class="drop-icon">⤓</div>
+    <div id="drop-message">Drop to add it here</div>
+    <div class="drop-hint">structures, topologies, mdp files, trajectories — or a workflow .json</div>
+  </div>
+</div>
+
+<div id="context-menu" class="hidden"></div>
+<div id="toast-stack"></div>
+
+<script src="js/api.js"></script>
+<script src="js/plots.js"></script>
+<script src="js/files.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/forms.js"></script>
+<script src="js/graph.js"></script>
+<script src="js/sessions.js"></script>
+<script src="js/terminal.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

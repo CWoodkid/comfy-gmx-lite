@@ -1,0 +1,574 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "note_what",
+      "type": "util.note",
+      "pos": [
+        0,
+        0
+      ],
+      "params": {
+        "text": "AN ICE CUBE MELTING\n\nIce is water whose molecules have stopped tumbling past each other\nand locked into a pattern. Every molecule holds on to four\nneighbours, and together they make a honeycomb of six-sided rings.\nMelting is that pattern breaking up.\n\nHere you build a tiny ice cube -- 768 water molecules, 3 nanometres\nacross; ten million of them side by side would make one cube for a\ndrink -- let it float in empty space, and see what heat does to it.\nTwice: once at room temperature, once colder than any freezer.\n\nPress Run. Everything takes a few minutes; read the notes while it\nworks."
+      }
+    },
+    {
+      "id": "note_build",
+      "type": "util.note",
+      "pos": [
+        0,
+        901
+      ],
+      "params": {
+        "text": "1. BUILD THE CUBE\n\n'Ice crystal' puts every molecule where ice puts it. Each oxygen\n(red) points its two hydrogens (white) at two of its four\nneighbours. Those hydrogen bonds are what hold ice together.\n\nThe water model is TIP4P/Ice: a water molecule drawn as four points\n-- an oxygen, two hydrogens, and one invisible point that carries the\nnegative charge. Its numbers were chosen so that its ice melts at\nthe right temperature: 272 K, where real ice melts at 273 K,\n0 degrees C.\n\n'Define box' puts the cube in the middle of a 5.5 nm box of empty\nspace. Simulation boxes repeat in every direction, so the box has to\nbe big enough that the cube never feels the copy of itself next door."
+      }
+    },
+    {
+      "id": "ice",
+      "type": "build.ice",
+      "pos": [
+        300,
+        457
+      ],
+      "params": {
+        "cells_x": 6,
+        "cells_y": 4,
+        "cells_z": 4,
+        "seed": 1
+      }
+    },
+    {
+      "id": "box",
+      "type": "gmx.editconf",
+      "pos": [
+        600,
+        457
+      ],
+      "params": {
+        "box_type": "cubic",
+        "box": "5.5 5.5 5.5",
+        "center": true,
+        "output": "cube.gro"
+      }
+    },
+    {
+      "id": "look",
+      "type": "view.structure",
+      "pos": [
+        900,
+        457
+      ],
+      "params": {}
+    },
+    {
+      "id": "em_mdp",
+      "type": "util.mdp",
+      "pos": [
+        300,
+        1374
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; Minimisation: let every molecule settle into place.\n;\n; A crystal built from a recipe is never quite right -- a hydrogen a little\n; too close to a neighbour here, a molecule a little twisted there. This walks\n; every molecule downhill in energy until nothing is pushing hard any more.\n; No time passes, and nothing moves afterwards: the cube is standing\n; perfectly still, which is what 0 K, absolute zero, means.\nintegrator      = steep\nemtol           = 100       ; stop when no force is bigger than this\nnsteps          = 5000      ; or after this many tries\n\ncutoff-scheme   = Verlet\ncoulombtype     = PME       ; every charge feels every other charge\nrcoulomb        = 1.0       ; nm\nvdwtype         = cut-off   ; molecules further apart than rvdw ignore each other's size\nrvdw            = 1.0       ; nm\npbc             = xyz       ; the box repeats in every direction\n",
+        "filename": "minimise.mdp"
+      }
+    },
+    {
+      "id": "em_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        600,
+        1374
+      ],
+      "params": {
+        "output": "em.tpr"
+      }
+    },
+    {
+      "id": "em",
+      "type": "gmx.mdrun",
+      "pos": [
+        900,
+        1374
+      ],
+      "params": {
+        "deffnm": "em"
+      }
+    },
+    {
+      "id": "note_warm",
+      "type": "util.note",
+      "pos": [
+        0,
+        3096
+      ],
+      "params": {
+        "text": "2. WARM: 300 K, 27 DEGREES C\n\nEvery molecule is given a speed that matches 300 K, and a thermostat\nkeeps it there. Then 100 picoseconds pass: 50,000 steps of 2\nfemtoseconds each. A femtosecond is a millionth of a billionth of a\nsecond.\n\nWhat happens: the corners go first, then the edges, then the faces\n-- melting starts at the surface. Within about 30 ps the honeycomb\nis gone, and the liquid pulls itself into a round drop. Why round:\nsurface tension. A ball is the shape with the least surface.\n\ngrompp warns once about stopping the cube from spinning. That is\nexpected, and allowed: see the last lines of the run settings."
+      }
+    },
+    {
+      "id": "warm_mdp",
+      "type": "util.mdp",
+      "pos": [
+        300,
+        2235
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; The ice cube at 300 K, which is 27 degrees C: room temperature.\n;\n; To try another temperature, change ref_t and gen_temp below -- both of\n; them, to the same number -- and press Run again.\nintegrator           = md\ndt                   = 0.002     ; one step is 2 femtoseconds (0.002 ps)\nnsteps               = 50000     ; 50,000 steps: 100 picoseconds\n\nnstxout-compressed   = 250       ; save a picture every 250 steps (0.5 ps)\nnstenergy            = 500       ; and the energies, every 1 ps\nnstlog               = 5000\n\ncutoff-scheme        = Verlet\ncoulombtype          = PME\nrcoulomb             = 1.0\nvdwtype              = cut-off\nrvdw                 = 1.0\npbc                  = xyz\n\n; The thermostat: it keeps the temperature at ref_t, by speeding the\n; molecules up or slowing them down a little at every step.\ntcoupl               = v-rescale\ntc-grps              = System\ntau_t                = 0.1       ; how quickly it corrects, in ps\nref_t                = 300\n\n; Give every molecule a speed to start with, picked at random the way\n; speeds are spread at this temperature.\ngen_vel              = yes\ngen_temp             = 300\ngen_seed             = 2026\n\n; No pressure control: around the cube there is nothing but empty space.\npcoupl               = no\n\n; Keep the cube in the middle of the picture: take away any drift and any\n; spin it picks up. Safe only for a single lump that never touches the edge\n; of the box -- which is what this is, and why grompp warns about it and is\n; allowed one warning.\ncomm-mode            = angular\n",
+        "filename": "warm.mdp"
+      }
+    },
+    {
+      "id": "warm_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        600,
+        2235
+      ],
+      "params": {
+        "maxwarn": 1,
+        "output": "warm.tpr"
+      }
+    },
+    {
+      "id": "warm",
+      "type": "gmx.mdrun",
+      "pos": [
+        900,
+        2235
+      ],
+      "params": {
+        "deffnm": "warm"
+      }
+    },
+    {
+      "id": "warm_count",
+      "type": "analysis.ice_count",
+      "pos": [
+        1200,
+        2235
+      ],
+      "params": {
+        "output": "ice_warm.xvg"
+      }
+    },
+    {
+      "id": "warm_count_plot",
+      "type": "view.plot",
+      "pos": [
+        1500,
+        2235
+      ],
+      "params": {}
+    },
+    {
+      "id": "warm_size",
+      "type": "gmx.measure",
+      "pos": [
+        1200,
+        2781
+      ],
+      "params": {
+        "sel": "Oxygens",
+        "tu": "ps",
+        "output": "size_warm.xvg",
+        "measure": "Radius of gyration: how spread out it is (gyrate)"
+      }
+    },
+    {
+      "id": "warm_size_plot",
+      "type": "view.plot",
+      "pos": [
+        1500,
+        2781
+      ],
+      "params": {}
+    },
+    {
+      "id": "warm_watch",
+      "type": "view.trajectory",
+      "pos": [
+        1824,
+        2235
+      ],
+      "params": {
+        "mode": "every Nth",
+        "skip": 2,
+        "sel": "Oxygens",
+        "pbc": "mol",
+        "center": true
+      }
+    },
+    {
+      "id": "note_cold",
+      "type": "util.note",
+      "pos": [
+        0,
+        4414
+      ],
+      "params": {
+        "text": "3. COLD: 200 K, MINUS 73 DEGREES C\n\nThe same cube and the same settings, except the temperature. 200 K\nis colder than any freezer: about as cold as the coldest nights in\nAntarctica. The molecules shiver in place, but the honeycomb holds.\n\nThe outermost layer does loosen a little. The surface of ice is\nslightly wet even well below freezing, which is part of why ice is\nslippery.\n\nTry it: set ref_t and gen_temp in the cold run's settings to 250\n(minus 23 degrees C) and run it again. Tiny crystals melt at lower\ntemperatures than big ones, so this cube starts to melt even there\n-- slowly."
+      }
+    },
+    {
+      "id": "cold_mdp",
+      "type": "util.mdp",
+      "pos": [
+        300,
+        3553
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; The ice cube at 200 K, which is -73 degrees C: colder than any freezer.\n;\n; To try another temperature, change ref_t and gen_temp below -- both of\n; them, to the same number -- and press Run again.\nintegrator           = md\ndt                   = 0.002     ; one step is 2 femtoseconds (0.002 ps)\nnsteps               = 50000     ; 50,000 steps: 100 picoseconds\n\nnstxout-compressed   = 250       ; save a picture every 250 steps (0.5 ps)\nnstenergy            = 500       ; and the energies, every 1 ps\nnstlog               = 5000\n\ncutoff-scheme        = Verlet\ncoulombtype          = PME\nrcoulomb             = 1.0\nvdwtype              = cut-off\nrvdw                 = 1.0\npbc                  = xyz\n\n; The thermostat: it keeps the temperature at ref_t, by speeding the\n; molecules up or slowing them down a little at every step.\ntcoupl               = v-rescale\ntc-grps              = System\ntau_t                = 0.1       ; how quickly it corrects, in ps\nref_t                = 200\n\n; Give every molecule a speed to start with, picked at random the way\n; speeds are spread at this temperature.\ngen_vel              = yes\ngen_temp             = 200\ngen_seed             = 2026\n\n; No pressure control: around the cube there is nothing but empty space.\npcoupl               = no\n\n; Keep the cube in the middle of the picture: take away any drift and any\n; spin it picks up. Safe only for a single lump that never touches the edge\n; of the box -- which is what this is, and why grompp warns about it and is\n; allowed one warning.\ncomm-mode            = angular\n",
+        "filename": "cold.mdp"
+      }
+    },
+    {
+      "id": "cold_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        600,
+        3553
+      ],
+      "params": {
+        "maxwarn": 1,
+        "output": "cold.tpr"
+      }
+    },
+    {
+      "id": "cold",
+      "type": "gmx.mdrun",
+      "pos": [
+        900,
+        3553
+      ],
+      "params": {
+        "deffnm": "cold"
+      }
+    },
+    {
+      "id": "cold_count",
+      "type": "analysis.ice_count",
+      "pos": [
+        1200,
+        3553
+      ],
+      "params": {
+        "output": "ice_cold.xvg"
+      }
+    },
+    {
+      "id": "cold_count_plot",
+      "type": "view.plot",
+      "pos": [
+        1500,
+        3553
+      ],
+      "params": {}
+    },
+    {
+      "id": "cold_size",
+      "type": "gmx.measure",
+      "pos": [
+        1200,
+        4099
+      ],
+      "params": {
+        "sel": "Oxygens",
+        "tu": "ps",
+        "output": "size_cold.xvg",
+        "measure": "Radius of gyration: how spread out it is (gyrate)"
+      }
+    },
+    {
+      "id": "cold_size_plot",
+      "type": "view.plot",
+      "pos": [
+        1500,
+        4099
+      ],
+      "params": {}
+    },
+    {
+      "id": "cold_watch",
+      "type": "view.trajectory",
+      "pos": [
+        1824,
+        3553
+      ],
+      "params": {
+        "mode": "every Nth",
+        "skip": 2,
+        "sel": "Oxygens",
+        "pbc": "mol",
+        "center": true
+      }
+    },
+    {
+      "id": "note_read",
+      "type": "util.note",
+      "pos": [
+        2148,
+        2235
+      ],
+      "params": {
+        "text": "4. WHAT THE THREE PICTURES SAY\n\nCOUNT THE ICE: how many molecules still sit in the honeycomb, frame\nby frame. It starts well below 768, because a molecule on the\nsurface has too few neighbours to pass the test. Within half a\npicosecond it drops in both runs: once the molecules shiver, some\nfail the strict test even though the crystal is still there. After\nthat, the cold line stays nearly flat and the warm line falls to\nzero. That fall is the melting.\n\nSIZE: the radius of gyration, roughly how far the molecules are\nfrom the middle, on average. The warm one shrinks, for two reasons:\na ball is more compact than a cube, and liquid water packs its\nmolecules closer together than ice does. That is why ice floats,\nand why a full bottle of water bursts in a freezer.\n\nTHE MOVIE: one dot per molecule, its oxygen. Press play; drag to\nturn it. Look straight down the z axis of the cold cube to see the\nsix-sided channels running through the ice."
+      }
+    }
+  ],
+  "links": [
+    {
+      "from_node": "ice",
+      "from_port": "structure",
+      "to_node": "box",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "box",
+      "from_port": "structure",
+      "to_node": "look",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "em_mdp",
+      "from_port": "mdp",
+      "to_node": "em_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "box",
+      "from_port": "structure",
+      "to_node": "em_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "topology",
+      "to_node": "em_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "em_pp",
+      "from_port": "tpr",
+      "to_node": "em",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "warm_mdp",
+      "from_port": "mdp",
+      "to_node": "warm_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "em",
+      "from_port": "structure",
+      "to_node": "warm_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "topology",
+      "to_node": "warm_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "warm_pp",
+      "from_port": "tpr",
+      "to_node": "warm",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "warm",
+      "from_port": "traj",
+      "to_node": "warm_count",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "warm_pp",
+      "from_port": "tpr",
+      "to_node": "warm_count",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "warm_count",
+      "from_port": "xvg",
+      "to_node": "warm_count_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "warm",
+      "from_port": "traj",
+      "to_node": "warm_size",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "warm_pp",
+      "from_port": "tpr",
+      "to_node": "warm_size",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "index",
+      "to_node": "warm_size",
+      "to_port": "index"
+    },
+    {
+      "from_node": "warm_size",
+      "from_port": "xvg",
+      "to_node": "warm_size_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "warm",
+      "from_port": "traj",
+      "to_node": "warm_watch",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "warm_pp",
+      "from_port": "tpr",
+      "to_node": "warm_watch",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "index",
+      "to_node": "warm_watch",
+      "to_port": "index"
+    },
+    {
+      "from_node": "cold_mdp",
+      "from_port": "mdp",
+      "to_node": "cold_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "em",
+      "from_port": "structure",
+      "to_node": "cold_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "topology",
+      "to_node": "cold_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "cold_pp",
+      "from_port": "tpr",
+      "to_node": "cold",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "cold",
+      "from_port": "traj",
+      "to_node": "cold_count",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "cold_pp",
+      "from_port": "tpr",
+      "to_node": "cold_count",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "cold_count",
+      "from_port": "xvg",
+      "to_node": "cold_count_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "cold",
+      "from_port": "traj",
+      "to_node": "cold_size",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "cold_pp",
+      "from_port": "tpr",
+      "to_node": "cold_size",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "index",
+      "to_node": "cold_size",
+      "to_port": "index"
+    },
+    {
+      "from_node": "cold_size",
+      "from_port": "xvg",
+      "to_node": "cold_size_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "cold",
+      "from_port": "traj",
+      "to_node": "cold_watch",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "cold_pp",
+      "from_port": "tpr",
+      "to_node": "cold_watch",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "index",
+      "to_node": "cold_watch",
+      "to_port": "index"
+    }
+  ],
+  "groups": [
+    {
+      "title": "1. An ice cube in empty space",
+      "color": "#b58b2a",
+      "nodes": [
+        "ice",
+        "box",
+        "look"
+      ]
+    },
+    {
+      "title": "Let it settle",
+      "color": "#3f6d7d",
+      "nodes": [
+        "em_mdp",
+        "em_pp",
+        "em"
+      ]
+    },
+    {
+      "title": "2. Warm: 300 K",
+      "color": "#a1309b",
+      "nodes": [
+        "warm_mdp",
+        "warm_pp",
+        "warm",
+        "warm_count",
+        "warm_count_plot",
+        "warm_size",
+        "warm_size_plot",
+        "warm_watch"
+      ]
+    },
+    {
+      "title": "3. Cold: 200 K",
+      "color": "#3f789e",
+      "nodes": [
+        "cold_mdp",
+        "cold_pp",
+        "cold",
+        "cold_count",
+        "cold_count_plot",
+        "cold_size",
+        "cold_size_plot",
+        "cold_watch"
+      ]
+    }
+  ]
+}

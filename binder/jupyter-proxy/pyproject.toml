@@ -1,0 +1,21 @@
+# A plug-in for jupyter-server-proxy, installed by ../postBuild. It tells the
+# Jupyter server of an online session how to start the Comfy-gmx editor, and
+# that it lives at <session address>/comfygmx/ -- with a "Comfy-gmx lite" tile
+# in JupyterLab's launcher as well.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfygmx-jupyter-proxy"
+version = "0.1.0"
+description = "Starts Comfy-gmx lite behind a Jupyter server"
+requires-python = ">=3.9"
+
+# jupyter-server-proxy looks up every plug-in in this group when the Jupyter
+# server starts. The name on the left is the address it gets: /comfygmx/.
+[project.entry-points.jupyter_serverproxy_servers]
+comfygmx = "comfygmx_jupyter_proxy:server"
+
+[tool.setuptools]
+py-modules = ["comfygmx_jupyter_proxy"]

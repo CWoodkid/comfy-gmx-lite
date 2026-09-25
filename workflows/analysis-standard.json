@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "pbc",
+      "type": "gmx.trjconv",
+      "pos": [
+        0,
+        0
+      ],
+      "params": {
+        "pbc": "mol",
+        "ur": "compact",
+        "center": true,
+        "groups": "Protein\nSystem\n"
+      }
+    },
+    {
+      "id": "fit",
+      "type": "gmx.trjconv",
+      "pos": [
+        300,
+        0
+      ],
+      "params": {
+        "pbc": "none",
+        "fit": "rot+trans",
+        "center": false,
+        "output": "traj_fit.xtc",
+        "groups": "Backbone\nSystem\n"
+      }
+    },
+    {
+      "id": "rms",
+      "type": "gmx.measure",
+      "pos": [
+        624,
+        0
+      ],
+      "params": {
+        "groups": "Backbone\nBackbone\n",
+        "measure": "RMSD: how far it moved from the start (rms)"
+      }
+    },
+    {
+      "id": "plot_rms",
+      "type": "view.plot",
+      "pos": [
+        924,
+        0
+      ],
+      "params": {}
+    },
+    {
+      "id": "rmsf",
+      "type": "gmx.measure",
+      "pos": [
+        624,
+        546
+      ],
+      "params": {
+        "groups": "Backbone\n",
+        "res": true,
+        "measure": "RMSF: how much each part wobbles (rmsf)"
+      }
+    },
+    {
+      "id": "plot_rmsf",
+      "type": "view.plot",
+      "pos": [
+        924,
+        546
+      ],
+      "params": {}
+    },
+    {
+      "id": "rg",
+      "type": "gmx.measure",
+      "pos": [
+        624,
+        1092
+      ],
+      "params": {
+        "sel": "Protein",
+        "tu": "ns",
+        "measure": "Radius of gyration: how spread out it is (gyrate)"
+      }
+    },
+    {
+      "id": "plot_rg",
+      "type": "view.plot",
+      "pos": [
+        924,
+        1092
+      ],
+      "params": {}
+    },
+    {
+      "id": "dens",
+      "type": "gmx.measure",
+      "pos": [
+        0,
+        1252
+      ],
+      "params": {
+        "d": "Z",
+        "sl": 100,
+        "groups": "System\n",
+        "measure": "Density profile along an axis (density)"
+      }
+    },
+    {
+      "id": "plot_dens",
+      "type": "view.plot",
+      "pos": [
+        300,
+        1252
+      ],
+      "params": {}
+    },
+    {
+      "id": "pi",
+      "type": "gmx.measure",
+      "pos": [
+        0,
+        1798
+      ],
+      "params": {
+        "pi": true,
+        "groups": "Protein\n",
+        "measure": "Closest approach of two groups (mindist)"
+      }
+    },
+    {
+      "id": "plot_pi",
+      "type": "view.plot",
+      "pos": [
+        300,
+        1798
+      ],
+      "params": {}
+    },
+    {
+      "id": "energy",
+      "type": "gmx.energy",
+      "pos": [
+        0,
+        2344
+      ],
+      "params": {
+        "terms": "Potential\nTemperature\nPressure\nBox-Z\n"
+      }
+    },
+    {
+      "id": "plot_energy",
+      "type": "view.plot",
+      "pos": [
+        300,
+        2344
+      ],
+      "params": {}
+    }
+  ],
+  "links": [
+    {
+      "from_node": "pbc",
+      "from_port": "traj",
+      "to_node": "fit",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "fit",
+      "from_port": "traj",
+      "to_node": "rms",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "fit",
+      "from_port": "traj",
+      "to_node": "rmsf",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "fit",
+      "from_port": "traj",
+      "to_node": "rg",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "pbc",
+      "from_port": "tpr",
+      "to_node": "fit",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "fit",
+      "from_port": "tpr",
+      "to_node": "rms",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "fit",
+      "from_port": "tpr",
+      "to_node": "rmsf",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "fit",
+      "from_port": "tpr",
+      "to_node": "rg",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "rms",
+      "from_port": "xvg",
+      "to_node": "plot_rms",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "rmsf",
+      "from_port": "xvg",
+      "to_node": "plot_rmsf",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "rg",
+      "from_port": "xvg",
+      "to_node": "plot_rg",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "dens",
+      "from_port": "xvg",
+      "to_node": "plot_dens",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "pi",
+      "from_port": "xvg",
+      "to_node": "plot_pi",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "energy",
+      "from_port": "xvg",
+      "to_node": "plot_energy",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "pbc",
+      "from_port": "traj",
+      "to_node": "dens",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "pbc",
+      "from_port": "tpr",
+      "to_node": "dens",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "pbc",
+      "from_port": "traj",
+      "to_node": "pi",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "pbc",
+      "from_port": "tpr",
+      "to_node": "pi",
+      "to_port": "tpr"
+    }
+  ],
+  "groups": [
+    {
+      "title": "Standard analysis",
+      "color": "#b06634",
+      "nodes": [
+        "pbc",
+        "fit",
+        "rms",
+        "rmsf",
+        "rg",
+        "plot_rms",
+        "plot_rmsf",
+        "plot_rg"
+      ]
+    },
+    {
+      "title": "Membrane checks",
+      "color": "#b06634",
+      "nodes": [
+        "dens",
+        "pi",
+        "energy",
+        "plot_dens",
+        "plot_pi",
+        "plot_energy"
+      ]
+    }
+  ]
+}
