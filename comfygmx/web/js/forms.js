@@ -2,9 +2,9 @@
    questions instead.
 
    Several boxes in this program do not want a value, they want a sentence in
-   somebody else's language. "lipid:POPC:7 leaflet:lower hole:circle:cx:0:cy:0"
-   is exact and it is also unguessable, and a colon in the wrong place is found
-   by the program that reads it -- after it has started, sometimes minutes in.
+   somebody else's language. "r 1-40 & a CA" is exact and it is also
+   unguessable, and a character in the wrong place is found by the program
+   that reads it -- after it has started, sometimes minutes in.
 
    So a box can name a form. The form asks the same thing with dropdowns and
    numbers, shows the exact text it is about to write while you change it, and
@@ -241,11 +241,11 @@ const Forms = {
 const STANDARD_GROUPS = [
   ['System', 'everything in the file'],
   ['Protein', 'every protein chain, all of them together'],
-  ['Backbone', 'the protein backbone only. In Martini that is the BB beads'],
+  ['Backbone', 'the protein backbone only: N, C-alpha and C of every residue'],
   ['C-alpha', 'one atom per residue. All-atom files only'],
   ['MainChain', 'backbone plus the carbonyl oxygens'],
   ['SideChain', 'everything hanging off the backbone'],
-  ['non-Protein', 'everything that is not protein: lipids, water, ions'],
+  ['non-Protein', 'everything that is not protein: water, ions'],
   ['Water', 'water only'],
   ['SOL', 'water, by its residue name'],
   ['non-Water', 'everything except water. Usually what you want to keep'],
@@ -350,65 +350,16 @@ Forms.registerField('files.list', {
 });
 
 
-Forms.registerField('top.molecules', {
-  title: 'What the system is made of',
-  build(ctx) {
-    const F = Forms.ui;
-    const rows = ctx.value.split('\n').map((l) => l.trim()).filter(Boolean)
-      .filter((l) => !l.startsWith(';'))
-      .map((line) => {
-        const parts = line.split(/\s+/);
-        return { name: parts[0] || '', count: parts.slice(1).join(' ') || '1' };
-      });
-    const body = UI.el('div', { class: 'form-body' });
-    body.appendChild(F.hint(
-      'Leave this empty and the block is copied from the topology wired in, '
-      + 'which is what you want when a builder wrote one. Fill it in when nothing '
-      + 'wrote one -- after packing molecules in with insert-molecules, say.'));
-    body.appendChild(F.hint(
-      'A count can be a number, or @NAME to have the molecules of that name '
-      + 'counted in the structure on the "count from" port. @NAME/12 divides by '
-      + 'twelve, for a builder that gives every bead its own residue number.'));
-    const cards = UI.el('div');
-    const preview = F.preview('The exact text this writes');
-    const line = (r) => `${r.name.padEnd(12)}${r.count}`;
-    const redraw = () => preview.set(rows.filter((r) => r.name).map(line).join('\n'));
-    const paint = () => {
-      cards.innerHTML = '';
-      rows.forEach((row, index) => {
-        cards.appendChild(UI.el('div', { class: 'row' }, [
-          F.input(row.name, (value) => { row.name = value; redraw(); },
-            { placeholder: 'molecule name, e.g. POPC' }),
-          F.input(row.count, (value) => { row.count = value; redraw(); },
-            { placeholder: 'how many, or @POPC' }),
-          UI.el('button', { class: 'small', text: '×', title: 'remove this line',
-            onclick: () => { rows.splice(index, 1); paint(); } }),
-        ]));
-      });
-      redraw();
-    };
-    body.appendChild(cards);
-    body.appendChild(UI.el('div', { class: 'row form-actions' }, [
-      F.button('Add a molecule', () => { rows.push({ name: '', count: '1' }); paint(); }),
-      F.button('Empty it (copy from the builder)', () => { rows.length = 0; paint(); }),
-    ]));
-    body.appendChild(preview.el);
-    paint();
-    return { body, read: () => rows.filter((r) => r.name).map(line).join('\n') };
-  },
-});
-
-
 /* ====================================================================
    make_ndx: making a group of your own
    ==================================================================== */
 
 const NDX_KINDS = [
   { value: 'a', label: 'atoms with these names', hint:
-    'Wildcards work: P* takes every bead whose name starts with P, which in a '
-    + 'Martini membrane is the phosphates.', example: 'a P*' },
+    'Wildcards work: H* takes every atom whose name starts with H, which in a '
+    + 'protein is the hydrogens.', example: 'a H*' },
   { value: 'r', label: 'these residues', hint:
-    'By name or by number: r POPC, or r 1-50.', example: 'r POPC' },
+    'By name or by number: r SOL, or r 1-50.', example: 'r SOL' },
   { value: 'name', label: 'give a group a name', hint:
     'The number comes from the list the tool prints. New groups are added at '
     + 'the end, so the first one you make is one past the last of the standard '
@@ -598,8 +549,7 @@ const ENERGY_TERMS = [
     + 'equilibration is done'],
   ['Box-X', 'the box across'],
   ['Box-Y', 'the box along'],
-  ['Box-Z', 'the box up. For a membrane this and the area per lipid are what '
-    + 'you watch'],
+  ['Box-Z', 'the box up'],
   ['LJ (SR)', 'how strongly things stick to and push off each other nearby'],
   ['Coulomb (SR)', 'the charges pushing and pulling nearby'],
   ['Bond', 'the springs holding pairs of beads together'],
@@ -665,16 +615,17 @@ Forms.registerField('gmx.terms', {
    ==================================================================== */
 
 const SELECT_RECIPES = [
-  ['name BB', 'the Martini backbone beads'],
-  ['name PO4', 'the phosphate bead of every lipid -- the usual stand-in for '
-    + 'where the surface of the membrane is'],
-  ['resname POPC POPE', 'every atom of the named residues'],
-  ['resid 520 to 555', 'a stretch of residues by number'],
-  ['resid 520 to 555 and name BB', 'the backbone of that stretch only'],
-  ['within 0.6 of resname POPC', 'everything within 0.6 nm of any POPC'],
+  ['name CA', 'the C-alpha atoms: one per amino acid, the usual way to follow '
+    + 'the shape of a protein'],
+  ['name OW', 'the oxygen of every water molecule: one point per water'],
+  ['resname NA CL', 'every atom of the named residues: here, the ions'],
+  ['resid 1 to 40', 'a stretch of residues by number'],
+  ['resid 1 to 40 and name CA', 'the C-alphas of that stretch only'],
+  ['name OW and within 0.5 of group "Protein"',
+   'the water oxygens within 0.5 nm of the protein'],
   ['group "Protein" and z > 4', 'part of a group, cut at a height in nm'],
-  ['resname CHOL and same residue as within 0.7 of group "Protein"',
-   'whole cholesterol molecules, any part of which comes near the protein'],
+  ['resname SOL and same residue as within 0.35 of group "Protein"',
+   'whole water molecules, any part of which touches the protein'],
 ];
 
 Forms.registerField('gmx.select', {
@@ -728,132 +679,6 @@ Forms.registerField('gmx.select', {
     body.appendChild(preview.el);
     redraw();
     return { body, read: line };
-  },
-});
-
-
-Forms.registerField('top.includes', {
-  title: 'Files to pull into the topology',
-  build(ctx) {
-    const F = Forms.ui;
-    const rows = (ctx.value || '').split('\n').map((l) => l.trim()).filter(Boolean)
-      .map((line) => {
-        const match = /#include\s+"([^"]+)"/.exec(line);
-        return match ? match[1] : line;
-      });
-    if (!rows.length) rows.push('');
-    const body = UI.el('div', { class: 'form-body' });
-    body.appendChild(F.hint('Each of these becomes a #include line at the top of the '
-      + 'topology: the force field first, then anything the molecules need. Order '
-      + 'matters -- a molecule cannot be described before the force field that '
-      + 'gives its beads meaning.'));
-    const cards = UI.el('div');
-    const preview = F.preview('The exact text this writes');
-    const line = (path) => `#include "${path.trim()}"`;
-    const redraw = () => preview.set(rows.filter((r) => r.trim()).map(line).join('\n'));
-    const paint = () => {
-      cards.innerHTML = '';
-      rows.forEach((value, index) => {
-        const box = F.file(value, (path) => { rows[index] = path; redraw(); },
-          'ff/martini_v3.0.0.itp');
-        box.appendChild(UI.el('button', { class: 'small', text: '×',
-          title: 'remove this one', onclick: () => { rows.splice(index, 1); paint(); } }));
-        cards.appendChild(box);
-      });
-      redraw();
-    };
-    body.appendChild(cards);
-    body.appendChild(UI.el('div', { class: 'row form-actions' }, [
-      F.button('Add a file', () => { rows.push(''); paint(); }),
-    ]));
-    body.appendChild(preview.el);
-    paint();
-    return { body, read: () => rows.filter((r) => r.trim()).map(line).join('\n') };
-  },
-});
-
-/* The switches a Martini topology reads. Each is a word that turns on a block
-   of the topology that is otherwise dead text. */
-const TOP_DEFINES = [
-  ['GO_VIRT', 'the Go network: the extra pulls that hold a coarse-grained '
-    + 'protein in the shape it was folded into. Without this the protein '
-    + 'slowly falls apart'],
-  ['WBIAS', 'the water bias that goes with a Go network'],
-  ['POSRES', 'position restraints: pins the heavy atoms in place. Used while '
-    + 'the water settles around a protein'],
-  ['POSRES_FC=1000', 'how hard the pins hold, in kJ per mol per nm²'],
-  ['FLEXIBLE', 'lets bonds that are normally rigid stretch. Needed for '
-    + 'minimisation with some water models'],
-];
-
-Forms.registerField('top.defines', {
-  title: 'Switches to turn on',
-  build(ctx) {
-    const F = Forms.ui;
-    const chosen = new Set((ctx.value || '').split('\n').map((l) => l.trim()).filter(Boolean));
-    const extra = [...chosen].filter((name) => !TOP_DEFINES.some(([sym]) => sym === name));
-    const body = UI.el('div', { class: 'form-body' });
-    const preview = F.preview('The exact text this writes');
-    const list = () => TOP_DEFINES.map(([sym]) => sym).filter((sym) => chosen.has(sym))
-      .concat(extra.filter((sym) => chosen.has(sym)));
-    const redraw = () => preview.set(list().join('\n'));
-    body.appendChild(F.hint('A topology can carry parts that only take effect when a '
-      + 'word is switched on. Ticking one here writes that word at the top of the '
-      + 'file; leaving it off means the part stays dead text.'));
-    for (const [sym, why] of TOP_DEFINES) {
-      body.appendChild(UI.el('div', {}, [
-        F.check(sym, chosen.has(sym), (on) => {
-          if (on) chosen.add(sym); else chosen.delete(sym);
-          redraw();
-        }),
-        F.hint(why),
-      ]));
-    }
-    body.appendChild(preview.el);
-    redraw();
-    return { body, read: () => list().join('\n') };
-  },
-});
-
-Forms.registerField('top.rename', {
-  title: 'Molecules to rename',
-  build(ctx) {
-    const F = Forms.ui;
-    const rows = (ctx.value || '').split('\n').map((l) => l.trim()).filter(Boolean)
-      .map((line) => {
-        const parts = line.split(/\s+/);
-        return { from: parts[0] || '', to: parts[1] || '' };
-      });
-    const body = UI.el('div', { class: 'form-body' });
-    body.appendChild(F.hint('Two programs can call the same molecule by two '
-      + 'names. grompp then says a molecule is not defined. This is where the two '
-      + 'names are made to agree.'));
-    const cards = UI.el('div');
-    const preview = F.preview('The exact text this writes');
-    const redraw = () => preview.set(rows.filter((r) => r.from && r.to)
-      .map((r) => `${r.from} ${r.to}`).join('\n'));
-    const paint = () => {
-      cards.innerHTML = '';
-      rows.forEach((row, index) => {
-        cards.appendChild(UI.el('div', { class: 'row' }, [
-          F.field('called this now', F.input(row.from,
-            (value) => { row.from = value; redraw(); }, { placeholder: 'Protein' })),
-          F.field('should be called', F.input(row.to,
-            (value) => { row.to = value; redraw(); }, { placeholder: 'molecule_0' })),
-          UI.el('button', { class: 'small', text: '×', title: 'remove this pair',
-            onclick: () => { rows.splice(index, 1); paint(); } }),
-        ]));
-      });
-      redraw();
-    };
-    body.appendChild(cards);
-    body.appendChild(UI.el('div', { class: 'row form-actions' }, [
-      F.button('Add a pair', () => { rows.push({ from: '', to: '' }); paint(); }),
-    ]));
-    body.appendChild(preview.el);
-    paint();
-    return { body, read: () => rows.filter((r) => r.from && r.to)
-      .map((r) => `${r.from} ${r.to}`).join('\n') };
   },
 });
 
@@ -949,11 +774,11 @@ Forms.registerField('text.globs', {
     const body = UI.el('div', { class: 'form-body' });
     body.appendChild(F.hint('Patterns matched against the names inside the archive, '
       + 'one per line. * stands for any run of characters and ? for one, so '
-      + '*/kalp-AA.pdb finds that file whatever folder it is in.'));
+      + '*/forcefield.itp finds that file whatever folder it is in.'));
     body.appendChild(UI.el('div', { class: 'form-quote', text:
       '*.pdb            every PDB file at the top\n'
       + '*/*.itp          every itp one folder down\n'
-      + 'martini*/*.top   inside any folder whose name starts with martini' }));
+      + 'charmm*/*.itp    inside any folder whose name starts with charmm' }));
     const cards = UI.el('div');
     const preview = F.preview('The exact text this writes');
     const redraw = () => preview.set(rows.filter((r) => r.trim()).join('\n'));

@@ -243,10 +243,10 @@ const Panels = {
     // The tools. Ticked ones get installed; the rest stay available for later.
     toolBox.appendChild(UI.el('h3', { text: 'Tools' }));
     toolBox.appendChild(UI.el('p', { class: 'hint', text:
-      'The three Martini tools are ticked because every shipped tutorial uses them, '
-      + 'and they share one environment. The rest can wait — the Environments panel '
-      + 'installs any of them later, one click each. GROMACS is separate: it is built '
-      + 'from source, which is its own dialog because the flags matter.' }));
+      'Nothing is ticked: the two tutorials need only GROMACS and Python. Anything '
+      + 'here can be installed later from the Environments panel, one click each. '
+      + 'GROMACS is separate: it is built from source, which is its own dialog '
+      + 'because the flags matter.' }));
     const wanted = new Set(preselect || []);
 
     /* Not everything is a checkbox. GROMACS has no conda route -- one build
@@ -2546,7 +2546,7 @@ const Panels = {
       .map((c) => c.category))].sort();
 
     const nameInput = UI.el('input', { type: 'text', value: defaults.name || '' });
-    nameInput.placeholder = 'Martini membrane + ions';
+    nameInput.placeholder = 'Water box + ions';
     const listId = 'chunk-sections';
     const sectionInput = UI.el('input', { type: 'text', list: listId, value: defaults.category || '' });
     sectionInput.placeholder = 'optional — a heading under "Custom chunks"';
@@ -3766,8 +3766,7 @@ const Panels = {
 
       <p>Neither wall is the in wall or the out wall, and neither is for a particular
       kind of file. Both take anything, and it is your choice which side a cable comes
-      out of: seven of the nineteen wires in the Martini membrane workflow already run
-      right to left. Letting the same cable go on the other wall moves it across instead
+      out of. Letting the same cable go on the other wall moves it across instead
       of making a second copy. Only something that produces a file goes on a wall: a
       wire dragged backwards out of a socket waiting to be fed has nothing behind it to
       hang there.</p>
@@ -3810,9 +3809,9 @@ const Panels = {
       inside it is simply whatever is standing in its bounds, so dragging a node in puts
       it in and dragging it out takes it out.</p>
       <p>The shipped workflows and the packaged tutorials use one colour convention:
-      <b>green</b> structure in, <b>olive</b> box/solvent/ions/membrane, <b>indigo</b>
-      coarse-graining, <b>teal</b> minimisation, <b>blue</b> equilibration,
-      <b>purple</b> production, <b>brown</b> analysis, <b>grey</b> shared settings.</p>
+      <b>green</b> structure in, <b>olive</b> box/solvent/ions or an ice crystal,
+      <b>teal</b> minimisation, <b>blue</b> equilibration, <b>purple</b> production,
+      <b>brown</b> analysis, <b>grey</b> shared settings.</p>
       <h3>Chunks and tutorials</h3>
       <p>A chunk is a piece of graph — a few nodes already wired together, inside a
       coloured box. Click one to drop it in the middle of the view, or drag it to put
@@ -3996,8 +3995,7 @@ const Panels = {
       one is a consequence, not a finding — those are outlined in dashed amber instead,
       and counted at the bottom of the list. The panel refreshes as you rewire, so you
       do not have to press Check again.</p>
-      <p>An <i>optional</i> input left unconnected is not a problem. Disconnecting the
-      protein from a membrane builder is a smaller system, not an error, and the checker
+      <p>An <i>optional</i> input left unconnected is not a problem, and the checker
       will not invent one.</p>
       <h3>Running</h3>
       <p>Every node runs in its own directory with its inputs staged in by name, so the
@@ -4104,13 +4102,13 @@ const Panels = {
       <h3>Boxes you can fill in with a form</h3>
       <p>Some boxes do not want a single value, they want a few lines in the language
       of whatever program the node runs — the answers a GROMACS tool would ask you for
-      on the keyboard, or the list of molecules at the end of a topology. Those boxes
+      on the keyboard, or the energy terms to take out of a run. Those boxes
       carry a <b>Fill this in with a form…</b> button. The form asks the same thing
       with dropdowns and numbers, and shows the exact text it is about to write while
       you change it.</p>
-      <p>Eleven boxes have one: the answers a GROMACS tool reads from its keyboard,
-      index groups and selections, energy terms, the pieces of a topology, and the
-      rules for editing a text file. Opening a form on a box that already has
+      <p>Ten boxes have one: the answers a GROMACS tool reads from its keyboard,
+      index groups and selections, energy terms, lists of files, and the rules for
+      editing a text file. Opening a form on a box that already has
       something in it reads that back, including anything the form does not ask about,
       which is kept exactly as you typed it. The box itself stays editable throughout
       — if you know the words, typing them is still quicker.</p>

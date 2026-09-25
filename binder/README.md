@@ -14,7 +14,7 @@ desktop; Jupyter, which such services are built around, only hands it through.
 | file | what it does |
 |---|---|
 | `environment.yml` | the software: GROMACS 2026.3 for processors only, Python 3.12, numpy, and jupyter-server-proxy, all from conda-forge |
-| `postBuild` | runs once, while the copy is built: installs the plug-in below, checks the three tutorials against the blocks this version has, and downloads what they need (the lysozyme structure, CHARMM36, the lipid, the water box, the Martini 3 files) |
+| `postBuild` | runs once, while the copy is built: installs the plug-in below, checks the two tutorials against the blocks this version has, and downloads what they need (the lysozyme structure and CHARMM36) |
 | `jupyter-proxy/` | a small plug-in that tells Jupyter how to start the editor, and that it lives at `<session address>/comfygmx/` |
 | `launch.py` | what Jupyter runs to start the editor: it works out how many processors this session may use, writes the settings, and starts it |
 | `build-image.sh` | builds the same copy on your own machine, with repo2docker — the program Binder uses |
@@ -33,7 +33,6 @@ memory, as on mybinder.org, on an AMD EPYC 9274F:
 |---|---|---|
 | An ice cube melting | 2 min 48 s | 2 min 26 s |
 | Lysozyme in Water | 7 min 41 s | 6 min 47 s |
-| Lipids I: a bilayer that builds itself | 10 min 54 s | 10 min 44 s |
 
 A cloud machine can be slower than this one. [../docs/tutorial-runs.md](../docs/tutorial-runs.md)
 has the time of every run and what each tutorial came out as.
@@ -74,11 +73,20 @@ hours in any case; nothing is kept afterwards; at most 100 people on one
 repository at once. The first start after each change to the repository
 takes as long as a build; later ones are quicker.
 
-Ten quiet minutes means: no simulation running and nobody using the page. A
-running simulation keeps the session alive, since its progress flows to the
-page; so does moving the mouse or typing on the page, which the editor reports
-at most once every two minutes. A tab left open with nobody at it goes quiet,
-and the session ends as the site intends.
+Ten quiet minutes means ten minutes in which no request reaches the copy.
+While a run is going, the page asks the copy for news every few seconds, and
+each question counts; moving the mouse or typing on the page counts too, which
+the editor reports at most once every two minutes. A tab left open with nothing
+running and nobody at it sends nothing, and the session ends as the site
+intends.
+
+Why the page asks instead of listening: the servers in front of mybinder.org
+hold back a reply that stays open until it is complete. The page used to follow
+a run down one such reply, so online it saw nothing until the run was over, and
+since nothing else reached the copy in the meantime, mybinder.org closed it as
+unused. A Lipids I run (the Martini tutorial, since removed) was cut off half
+way, and a test copy with nothing but one open reply was gone within 16
+minutes.
 
 **A JupyterHub you run** (on a university machine or a rented cloud server)
 serves the same copy to every participant, with the processors and memory you

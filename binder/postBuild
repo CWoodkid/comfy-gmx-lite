@@ -12,27 +12,21 @@ set -euo pipefail
 #    Jupyter reads that folder only to learn which extensions to switch on.)
 python3 -m pip install --no-deps --no-build-isolation ./binder/jupyter-proxy
 
-# 2. Check the three tutorials still fit the blocks this version has. A
+# 2. Check the two tutorials still fit the blocks this version has. A
 #    failure here stops the build, which is better found now than in front of
 #    a class.
 python3 -m comfygmx --data-dir "$HOME/.comfy-gmx-lite" validate \
     workflows/tutorials/gmx-01-lysozyme-in-water.json \
-    workflows/tutorials/martini-01-lipids-i-a-bilayer-that-builds-itself.json \
     workflows/tutorials/workshop-01-an-ice-cube-melting.json
 
 # 3. Download, now, what the tutorials would download when they run: the
-#    lysozyme structure and CHARMM36, the lipid, the water box and the two
-#    Martini 3 files. (The ice tutorial builds its own crystal and needs
-#    nothing.) Each block keeps its result, and a block whose settings
-#    have not changed is not run again, so in the online copy these blocks
-#    finish at once and nobody depends on those websites during a class. If a
-#    site is down right now, the tutorial simply downloads it when it runs.
+#    lysozyme structure and CHARMM36. (The ice tutorial builds its own
+#    crystal and needs nothing.) Each block keeps its result, and a block
+#    whose settings have not changed is not run again, so in the online copy
+#    these blocks finish at once and nobody depends on those websites during
+#    a class. If a site is down right now, the tutorial simply downloads it
+#    when it runs.
 python3 -m comfygmx --data-dir "$HOME/.comfy-gmx-lite" run \
     workflows/tutorials/gmx-01-lysozyme-in-water.json --only ff --only fetch \
     --label "downloaded while the online copy was built" \
   || echo "postBuild: the lysozyme downloads failed; the tutorial will fetch them itself"
-python3 -m comfygmx --data-dir "$HOME/.comfy-gmx-lite" run \
-    workflows/tutorials/martini-01-lipids-i-a-bilayer-that-builds-itself.json \
-    --only lipid --only water --only ff --only lipid_itp \
-    --label "downloaded while the online copy was built" \
-  || echo "postBuild: the Martini downloads failed; the tutorial will fetch them itself"

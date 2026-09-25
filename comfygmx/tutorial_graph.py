@@ -81,10 +81,8 @@ def group(title: str, color: str, *node_ids: str) -> Dict[str, Any]:
 #: move it -- and a height that is too small is the one that hurts, because it
 #: is what lets two nodes overlap.  Too large only leaves a gap.
 NODE_H = {
-    "analysis.area_per_lipid": 262,
     "analysis.ice_count": 235,
     "build.ice": 284,
-    "build.lay_flat": 166,
     "gmx.clustsize": 290,
     "gmx.density": 350,
     "gmx.dssp": 471,
@@ -115,7 +113,6 @@ NODE_H = {
     "io.fetch_url": 284,
     "io.file": 212,
     "io.structure": 219,
-    "martini.merge_top": 828,
     "prep.clean": 313,
     "util.edit_text": 297,
     "util.mdp": 701,

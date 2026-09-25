@@ -52,7 +52,7 @@ MAX_LOG_LINES = 4000
 # --------------------------------------------------------------------------
 
 class EventBus:
-    """Fan-out of run events to any number of SSE listeners."""
+    """A run's messages, numbered, for any number of pages following it."""
 
     def __init__(self, history: int = 2000):
         self._lock = threading.Lock()

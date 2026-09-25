@@ -231,7 +231,7 @@ _REQUIREMENTS = [
      ["curl"], True),
     ("tar", "tar", "unpacks the archives those downloads arrive in", ["tar"], True),
     ("conda", "conda", "installs extra programs into environments of their own; "
-     "the three tutorials need none", [], False),
+     "the two tutorials need none", [], False),
     ("toolchain", "compiler", "only to build GROMACS from source",
      ["gcc", "g++", "make"], False),
     ("cmake", "cmake", "only to build GROMACS from source", ["cmake"], False),
@@ -290,7 +290,7 @@ def _tool_status(box: Toolbox, tool_id: str) -> Dict[str, Any]:
     return {"present": False, "where": ""}
 
 
-#: Ticked by default in the setup dialog.  Nothing, in this version: the three
+#: Ticked by default in the setup dialog.  Nothing, in this version: the two
 #: tutorials need GROMACS and a Python with numpy, and nothing else, and a
 #: first run should not spend twenty minutes installing things nobody asked for.
 #:
@@ -515,7 +515,7 @@ def plan(settings: Settings, choices: Optional[Dict[str, Any]] = None) -> Dict[s
     # 2. conda, which needs no root and so can simply be done. This version
     # needs it only as a place to put things: a tool that lives in an
     # environment, or cmake for a GROMACS build on a machine that has none.
-    # The three tutorials need neither, so without one of those conda is not
+    # The two tutorials need neither, so without one of those conda is not
     # installed unless somebody asks for it.
     conda_root = state["conda"]["root"] or str(MINIFORGE_HOME)
     short = {req["id"] for req in state["requirements"]

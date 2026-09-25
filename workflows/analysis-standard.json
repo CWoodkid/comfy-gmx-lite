@@ -34,7 +34,7 @@
       "id": "rms",
       "type": "gmx.measure",
       "pos": [
-        624,
+        600,
         0
       ],
       "params": {
@@ -46,7 +46,7 @@
       "id": "plot_rms",
       "type": "view.plot",
       "pos": [
-        924,
+        900,
         0
       ],
       "params": {}
@@ -55,7 +55,7 @@
       "id": "rmsf",
       "type": "gmx.measure",
       "pos": [
-        624,
+        600,
         546
       ],
       "params": {
@@ -68,7 +68,7 @@
       "id": "plot_rmsf",
       "type": "view.plot",
       "pos": [
-        924,
+        900,
         546
       ],
       "params": {}
@@ -77,7 +77,7 @@
       "id": "rg",
       "type": "gmx.measure",
       "pos": [
-        624,
+        600,
         1092
       ],
       "params": {
@@ -90,73 +90,8 @@
       "id": "plot_rg",
       "type": "view.plot",
       "pos": [
-        924,
+        900,
         1092
-      ],
-      "params": {}
-    },
-    {
-      "id": "dens",
-      "type": "gmx.measure",
-      "pos": [
-        0,
-        1252
-      ],
-      "params": {
-        "d": "Z",
-        "sl": 100,
-        "groups": "System\n",
-        "measure": "Density profile along an axis (density)"
-      }
-    },
-    {
-      "id": "plot_dens",
-      "type": "view.plot",
-      "pos": [
-        300,
-        1252
-      ],
-      "params": {}
-    },
-    {
-      "id": "pi",
-      "type": "gmx.measure",
-      "pos": [
-        0,
-        1798
-      ],
-      "params": {
-        "pi": true,
-        "groups": "Protein\n",
-        "measure": "Closest approach of two groups (mindist)"
-      }
-    },
-    {
-      "id": "plot_pi",
-      "type": "view.plot",
-      "pos": [
-        300,
-        1798
-      ],
-      "params": {}
-    },
-    {
-      "id": "energy",
-      "type": "gmx.energy",
-      "pos": [
-        0,
-        2344
-      ],
-      "params": {
-        "terms": "Potential\nTemperature\nPressure\nBox-Z\n"
-      }
-    },
-    {
-      "id": "plot_energy",
-      "type": "view.plot",
-      "pos": [
-        300,
-        2344
       ],
       "params": {}
     }
@@ -227,48 +162,6 @@
       "from_port": "xvg",
       "to_node": "plot_rg",
       "to_port": "xvg"
-    },
-    {
-      "from_node": "dens",
-      "from_port": "xvg",
-      "to_node": "plot_dens",
-      "to_port": "xvg"
-    },
-    {
-      "from_node": "pi",
-      "from_port": "xvg",
-      "to_node": "plot_pi",
-      "to_port": "xvg"
-    },
-    {
-      "from_node": "energy",
-      "from_port": "xvg",
-      "to_node": "plot_energy",
-      "to_port": "xvg"
-    },
-    {
-      "from_node": "pbc",
-      "from_port": "traj",
-      "to_node": "dens",
-      "to_port": "traj"
-    },
-    {
-      "from_node": "pbc",
-      "from_port": "tpr",
-      "to_node": "dens",
-      "to_port": "tpr"
-    },
-    {
-      "from_node": "pbc",
-      "from_port": "traj",
-      "to_node": "pi",
-      "to_port": "traj"
-    },
-    {
-      "from_node": "pbc",
-      "from_port": "tpr",
-      "to_node": "pi",
-      "to_port": "tpr"
     }
   ],
   "groups": [
@@ -284,18 +177,6 @@
         "plot_rms",
         "plot_rmsf",
         "plot_rg"
-      ]
-    },
-    {
-      "title": "Membrane checks",
-      "color": "#b06634",
-      "nodes": [
-        "dens",
-        "pi",
-        "energy",
-        "plot_dens",
-        "plot_pi",
-        "plot_energy"
       ]
     }
   ]

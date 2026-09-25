@@ -1,16 +1,15 @@
 """The tutorials this version ships, as runnable graphs.
 
-Two are published courses rebuilt as graphs: Lysozyme in Water, the first of
-Justin A. Lemkul's GROMACS tutorials (http://www.mdtutorials.com/gmx/), and
-Lipids I, the first of the Martini team's Martini 3 tutorials
-(https://cgmartini.nl/docs/tutorials/). What is packaged is a *translation* of
-a tutorial's command sequence into a Comfy-gmx graph, together with the
-parameter files the tutorial publishes. The explanatory prose on those sites
-is theirs and is not reproduced: each step carries a short summary of our own
-plus a link to the page it came from, so the tutorial stays the thing you read
-and this stays the thing you run.
+One is a published course rebuilt as a graph: Lysozyme in Water, the first
+of Justin A. Lemkul's GROMACS tutorials (http://www.mdtutorials.com/gmx/).
+What is packaged is a *translation* of the tutorial's command sequence into a
+Comfy-gmx graph, together with the parameter files the tutorial publishes.
+The explanatory prose on that site is the author's and is not reproduced:
+each step carries a short summary of our own plus a link to the page it came
+from, so the tutorial stays the thing you read and this stays the thing you
+run.
 
-The third, an ice cube melting, was written for this version and has no
+The other, an ice cube melting, was written for this version and has no
 published page behind it; its notes say everything it has to say.
 
 If you use one of these, cite the tutorial it came from -- see
@@ -25,12 +24,6 @@ from .chunks import COLOR
 from .tutorial_graph import (
     group as _group, link as _l, node as _n, note as _note, relayout as _relayout,
     untangle_groups as _untangle_groups,
-)
-from .tutorials_martini_lipids import (
-    AUTHOR as MARTINI_AUTHOR,
-    CITATION as MARTINI_CITATION,
-    SITE as MARTINI_SITE,
-    TUTORIALS as _MARTINI_TUTORIALS,
 )
 from .tutorials_ice import (
     AUTHOR as ICE_AUTHOR,
@@ -57,14 +50,6 @@ COLLECTIONS: Dict[str, Dict[str, str]] = {
         "site": SITE,
         "author": AUTHOR,
         "citation": CITATION,
-    },
-    "martini": {
-        "id": "martini",
-        "name": "Martini 3",
-        "label": "cgmartini.nl",
-        "site": MARTINI_SITE,
-        "author": MARTINI_AUTHOR,
-        "citation": MARTINI_CITATION,
     },
     "workshop": {
         "id": "workshop",
@@ -455,7 +440,6 @@ TUTORIALS: List[Dict[str, Any]] = [
 ]
 
 
-TUTORIALS += _MARTINI_TUTORIALS
 TUTORIALS += _ICE_TUTORIALS
 
 # Every packaged graph gets one last grooming here rather than in each module:
@@ -547,7 +531,7 @@ def collection_of(tutorial: Dict[str, Any]) -> Dict[str, str]:
 #: :data:`COLLECTIONS` but missing from here is still shown, after these -- a
 #: new collection that nobody remembered to list must not go invisible, which
 #: is exactly what once happened to two sets.
-COLLECTION_ORDER = ("gmx", "martini", "workshop")
+COLLECTION_ORDER = ("gmx", "workshop")
 
 
 def meta() -> Dict[str, Any]:

@@ -6,14 +6,13 @@ container limited to one processor and 2 GB of memory, as a mybinder.org
 session is. The processor was one core of an AMD EPYC 9274F; a cloud machine
 may well be slower. GROMACS was 2026.3 from conda-forge.
 
-The downloads (the protein, the force fields, the lipid) were already in the
-image, as they are online, so they took no time.
+The downloads (the protein and the force field) were already in the image, as
+they are online, so they took no time.
 
 | # | Tutorial | Blocks | From Run to the last block | of which, simulating |
 |---|---|---|---|---|
 | 1 | An ice cube melting | 27 | 2 min 48 s | 2 min 26 s |
 | 1 | Lysozyme in Water | 50 | 7 min 41 s | 6 min 47 s |
-| 1 | Lipids I: a bilayer that builds itself | 31 | 10 min 54 s | 10 min 44 s |
 
 ## An ice cube melting
 
@@ -63,26 +62,3 @@ What it came out as, against the published tutorial where it gives a number:
 The number of minimisation steps changes from run to run, because *Add ions*
 picks the waters it replaces at random; the atom with the largest force does
 not.
-
-## Lipids I: a bilayer that builds itself
-
-| run | length here (the tutorial's) | time |
-|---|---|---|
-| minimisation | 4,266 steps | 2 s |
-| self-assembly | 30 ns (30 ns) | 7 min 58 s — about 5,400 ns a day |
-| equilibration | 10 ns (30 ns) | 2 min 43 s |
-
-What it came out as:
-
-- 128 lipids went in on the first try, and 768 waters after them.
-- A bilayer formed, facing along y; *Turn the membrane flat* turned it into the
-  x–y plane before the second run.
-- Density across the membrane: two headgroup peaks at ±1.4 nm, a lower middle
-  between them.
-- Area per lipid: 0.641 nm² at the start of the second run, 0.602 averaged over
-  its 10 ns, 0.593 over the second half, still drifting slowly downwards.
-- Lateral diffusion of the lipids: 0.07 × 10⁻⁵ cm²/s.
-
-Self-assembly does not always work in 30 ns. Of 8 test runs of it, 7 had formed
-a bilayer at 30 ns, and the eighth had by 60 ns. Only 3 of the 7 formed lying
-flat; *Turn the membrane flat* turned the other 4.

@@ -14,13 +14,10 @@ const DROP_NODES = [
   { ext: ['mdp'], type: 'util.mdp', params: { mode: 'file' } },
 ];
 
-/* One colour per tutorial collection, matching the graphs each one builds:
-   blue for the atomistic GROMACS set, the Martini purple for the coarse-grained
-   one -- the same purple those nodes wear on the canvas -- and the analysis
-   green for the one made for this workshop. */
+/* One colour per tutorial collection: blue for the published GROMACS set, and
+   the analysis green for the one made for this workshop. */
 const TUTORIAL_COLOURS = {
   gmx: '#2b5d8a',
-  martini: '#7a4a7a',
   workshop: '#3f7a6d',
 };
 
@@ -399,8 +396,9 @@ const App = {
       host.appendChild(UI.el('div', { class: 'palette-hint', text: 'no tutorials available' }));
       return;
     }
-    // Grouped by collection: the GROMACS and the Martini sets have different
-    // authors and different papers to cite, so they are never one list.
+    // Grouped by collection: the published GROMACS set and the one made here
+    // have different authors and different papers to cite, so they are never
+    // one list.
     const collections = (this.tutorialMeta.collections
       || [{ id: 'gmx', label: 'mdtutorials.com/gmx' }]).slice();
     // A tutorial whose collection the server did not describe still has to be
@@ -417,8 +415,6 @@ const App = {
       const mine = this.tutorials.filter(
         (t) => (t.collection || 'gmx') === collection.id);
       if (!mine.length) continue;
-      // One colour per collection, matching what its graphs are made of: the
-      // GROMACS set builds atomistic systems, the Martini set coarse-grains.
       const colour = TUTORIAL_COLOURS[collection.id] || 'var(--accent)';
       host.appendChild(this.tint(
         UI.el('div', { class: 'cat-title', text: collection.label }), colour));
@@ -1954,10 +1950,11 @@ const App = {
 
   /* Ask the server what became of a run, rather than waiting to be told.
 
-     The status arrives over the event stream, and that is enough right up to
-     the moment it is not: a stream that dropped while nothing was happening,
-     or an event emitted between the last poll and the reconnect, leaves the
-     tab saying "running" over a run that finished minutes ago. Cancel is
+     The status arrives while the page follows the run (API.stream), and
+     that is enough right up to the moment it is not: following that stopped
+     while nothing was happening, or an event emitted between the last poll
+     and the reconnect, leaves the tab saying "running" over a run that
+     finished minutes ago. Cancel is
      where it shows, because a cancel is exactly when somebody is watching.
 
      Backs off rather than polling hard, and stops as soon as the run settles

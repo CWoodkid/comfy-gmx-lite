@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "Can M. Karakurt" }]
-keywords = ["molecular-dynamics", "gromacs", "martini", "coarse-grained", "workflow"]
+keywords = ["molecular-dynamics", "gromacs", "teaching", "workflow"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",

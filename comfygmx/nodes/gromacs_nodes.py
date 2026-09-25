@@ -295,8 +295,7 @@ def main():
     print(">> What to do instead:")
     print(">>   * A coarse-grained (Martini) system does not go through pdb2gmx")
     print(">>     at all. Its topology is put together from the Martini force-field")
-    print(">>     files with an 'Assemble topology' block, as the Martini tutorial")
-    print(">>     does.")
+    print(">>     files instead, which this version of Comfy-gmx does not do.")
     print(">>   * If this really is all-atom and the check is wrong, turn off")
     print(">>     'Check the structure is all-atom' on this node.")
     return 1

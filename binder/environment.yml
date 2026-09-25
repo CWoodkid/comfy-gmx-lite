@@ -13,7 +13,7 @@ dependencies:
   # GROMACS 2026.3 for processors only: no MPI and no graphics card, which is
   # what an online session has.
   - gromacs=2026.3=nompi_*
-  # The area-per-lipid step of the Martini tutorial and the ice counter need numpy.
+  # The ice counter needs numpy.
   - numpy
   # Lets the Jupyter server that Binder starts hand a web address over to the
   # Comfy-gmx editor. postBuild, in this folder, tells it how.

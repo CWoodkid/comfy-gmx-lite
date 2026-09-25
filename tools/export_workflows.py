@@ -98,13 +98,8 @@ def write(path: Path, graph: dict) -> None:
 
 
 def main() -> int:
-    # The membrane chunk has no trajectory block of its own: stacked under
-    # the basic one, its density blocks read the trajectory that one tidies.
-    from_pbc = [{"from_node": "pbc", "from_port": port, "to_node": block, "to_port": port}
-                for block in ("dens", "pi") for port in ("traj", "tpr")]
     examples = {
-        "analysis-standard": compose("analysis_basic", "analysis_membrane",
-                                     extra_links=from_pbc),
+        "analysis-standard": compose("analysis_basic"),
     }
     for name, graph in examples.items():
         validate(name, graph)
@@ -124,7 +119,7 @@ def main() -> int:
         slug = re.sub(r"-{2,}", "-",
                       re.sub(r"[^a-z0-9]+", "-", tutorial["name"].lower())).strip("-")
         # The collections number independently, so the collection has to be
-        # part of the name or gmx 1 and martini 1 would overwrite each other.
+        # part of the name or gmx 1 and workshop 1 would overwrite each other.
         collection = tutorial.get("collection", "gmx")
         write(OUT / "tutorials" / f"{collection}-{tutorial['number']:02d}-{slug}.json",
               payload)

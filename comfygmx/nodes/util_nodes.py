@@ -25,7 +25,7 @@ class MdpNode(Node):
     docs = "https://manual.gromacs.org/current/user-guide/mdp-options.html"
     outputs = (Port("mdp", "mdp", "mdp"),)
     params = (
-        Param("preset", "choice", "Preset", "md_martini", choices=list(PRESETS.keys()),
+        Param("preset", "choice", "Preset", "md_atomistic", choices=list(PRESETS.keys()),
               help="Starting point. Hover the node description for what each one assumes."),
         Param("mode", "choice", "Mode", "preset",
               choices=["preset", "manual", "file", "raw"],
@@ -155,7 +155,7 @@ class MdpNode(Node):
                 options = parse_mdp(source.read_text())
             title = f"from {source}"
         else:
-            preset_name = ctx.pstr("preset") or "md_martini"
+            preset_name = ctx.pstr("preset") or "md_atomistic"
             if preset_name not in PRESETS:
                 raise NodeError(f"unknown preset '{preset_name}'")
             options = dict(PRESETS[preset_name])

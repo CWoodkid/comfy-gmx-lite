@@ -57,13 +57,9 @@ function check(ok, what) {
 const SAMPLES = {
   'gmx.groups': 'Protein\nSystem\n',
   'files.list': 'topol.top\nposre.itp',
-  'top.molecules': 'DSPC 128\nW 768',
-  'gmx.ndx': 'a PO4\nname 3 Phosphates\nq\n',
+  'gmx.ndx': 'a CA\nname 3 Calphas\nq\n',
   'gmx.terms': 'Potential\nTemperature\n',
   'gmx.select': 'name OW',
-  'top.includes': '#include "martini_v3.0.0.itp"\n#include "martini_v3.0.0_solvents_v1.itp"',
-  'top.defines': '#define POSRES',
-  'top.rename': 'SOL W',
   'text.rules': 'replace: DPPC => DSPC',
   'text.globs': '*.itp',
 };

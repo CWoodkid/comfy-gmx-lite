@@ -1798,7 +1798,7 @@ def check_trajectory_carries_its_run_file() -> None:
     wired = {(link["from_node"], link["from_port"], link["to_node"], link["to_port"])
              for link in chunk["links"]}
     for source, target in (("pbc", "fit"), ("fit", "rms"), ("fit", "rmsf"),
-                           ("fit", "rg"), ("pbc", "dens"), ("pbc", "pi")):
+                           ("fit", "rg")):
         if (source, "tpr", target, "tpr") not in wired:
             failures.append(f"run file: the standard analysis chunk does not "
                             f"carry the run file from {source} to {target}, so "
@@ -2051,20 +2051,22 @@ def check_chain_letters_survive() -> None:
           "them says so first")
 
 
-def check_quiet_stream() -> None:
-    """A run that says nothing for a long time must not lose its connection.
+def check_following_a_run() -> None:
+    """The page follows a run by asking, over and over, what is new.
 
-    The page follows a run down one long-lived connection. That connection used
-    to be dropped after an hour in which the run had said nothing, which is
-    exactly the wrong hour to drop it: a block that starts ten copies of a
-    program side by side sends each copy's output to its own file, so from
-    outside it prints one line and then works in silence for as long as the job
-    takes. One such build ran for fourteen hours; the connection went after the
-    first, without a word about what had happened, and the tab sat there with a
-    block spinning over work no machine was doing any more.
+    It used to be one reply that stayed open for the whole run. The servers in
+    front of mybinder.org hold such a reply back until it is complete, so a run
+    there showed nothing until it was over; and with nothing else asked of it,
+    mybinder.org closed the copy as unused half way through a run. Now each
+    question gets a short, complete reply:
 
-    So: silence is not a reason to hang up. The connection ends when the work
-    ends, or when writing to it fails because the browser has gone.
+    - nothing new: the question waits (``wait`` seconds), then says so;
+    - news while it waits: the answer goes back at once, not at the end of
+      the wait, so the page still sees each step as it happens;
+    - ``since``: only what the page has not seen yet;
+    - the end: "finished", together with the message saying how the run
+      ended, even though the run is marked over a moment before that
+      message is sent.
     """
     import threading
     import time
@@ -2072,82 +2074,72 @@ def check_quiet_stream() -> None:
     from comfygmx.executor import EventBus
     from comfygmx.server import Handler
 
-    sent = []
-
-    class Wire:
-        def write(self, data):
-            sent.append(bytes(data))
-            return len(data)
-
-        def flush(self):
-            pass
-
     class Pretend:
-        """Just enough of a request handler for the streaming loop."""
+        """Just enough of a request handler for one question."""
 
-        # What every browser speaks, and what makes the stream go out in
-        # marked pieces a proxy can pass on one by one.
-        request_version = "HTTP/1.1"
-
-        def __init__(self):
-            self.wfile = Wire()
-
-        def send_response(self, *a):
-            pass
-
-        def send_header(self, *a):
-            pass
-
-        def end_headers(self):
-            pass
+        def __init__(self, **query):
+            self.query = query
+            self.replies = []
 
         def q(self, name, default=""):
-            return default
+            return str(self.query.get(name, default))
+
+        def _json(self, data, status=200):
+            self.replies.append(data)
+
+    def ask(bus, is_finished, **query):
+        handler = Pretend(**query)
+        began = time.monotonic()
+        Handler._follow(handler, bus, is_finished)
+        took = time.monotonic() - began
+        if len(handler.replies) != 1:
+            failures.append(f"following a run: {len(handler.replies)} replies "
+                            "to one question instead of one")
+            return {"events": [], "finished": False}, took
+        return handler.replies[0], took
 
     bus = EventBus()
-    working = True
-    closed = threading.Event()
+    state = {"over": False}
+    over = lambda: state["over"]  # noqa: E731
 
-    def follow():
-        Handler._stream(Pretend(), bus, lambda: not working)
-        closed.set()
+    answer, took = ask(bus, over, since=0, wait=2)
+    if answer["events"] or answer["finished"] or not 1.8 <= took <= 3.5:
+        failures.append("following a run: a question with nothing new should "
+                        f"wait about 2 s and say so; it took {took:.1f} s and "
+                        f"said {answer}")
+        return
 
-    threading.Thread(target=follow, daemon=True).start()
-    # Long enough for the first keepalive, which is the proof the loop is alive
-    # and not merely blocked somewhere.
-    quiet = 17.0
-    time.sleep(quiet)
-    text = b"".join(sent).decode()
-    if closed.is_set():
-        failures.append("quiet stream: the connection was dropped after "
-                        f"{quiet:.0f}s in which the run said nothing")
+    threading.Timer(0.5, lambda: bus.emit({"type": "log", "line": "step 1"})).start()
+    answer, took = ask(bus, over, since=0, wait=10)
+    if [e.get("line") for e in answer["events"]] != ["step 1"] or took > 2.0:
+        failures.append("following a run: news that came while a question "
+                        f"waited should be answered at once; it took {took:.1f} s "
+                        f"and said {answer}")
         return
-    if ": keepalive" not in text:
-        failures.append("quiet stream: nothing was sent to keep the connection "
-                        "open, so a browser or a proxy may drop it")
-    if "event: end" in text:
-        failures.append("quiet stream: it announced the run was over while the "
-                        "run was still going")
+    seen = answer["events"][-1]["seq"]
 
-    working = False
-    bus.emit({"type": "run", "status": "done"})
-    if not closed.wait(10):
-        failures.append("quiet stream: the run finished but the connection "
-                        "stayed open")
+    bus.emit({"type": "log", "line": "step 2"})
+    answer, _ = ask(bus, over, since=seen, wait=10)
+    if [e.get("line") for e in answer["events"]] != ["step 2"]:
+        failures.append("following a run: asking since the last message seen "
+                        f"should give only the new one; it gave {answer}")
         return
-    if "event: end" not in b"".join(sent).decode():
-        failures.append("quiet stream: the run finished without the page being "
-                        "told, so it has to find out by asking")
+    seen = answer["events"][-1]["seq"]
+
+    # The run is marked over first; the message saying how it ended follows
+    # a moment later. A question asked in between must still carry it.
+    state["over"] = True
+    threading.Timer(0.2, lambda: bus.emit({"type": "run", "status": "error"})).start()
+    answer, took = ask(bus, over, since=seen, wait=10)
+    if not answer["finished"] or [e.get("status") for e in answer["events"]] != ["error"]:
+        failures.append("following a run: the end should come with the message "
+                        f"saying how the run ended; it said {answer}")
         return
-    # A proxy -- the Jupyter server of an online copy -- passes events on as
-    # they come only when the reply is sent in marked pieces, and knows the
-    # reply is over from the empty piece at the end.
-    if not b"".join(sent).endswith(b"0\r\n\r\n"):
-        failures.append("quiet stream: the reply does not end with the empty "
-                        "piece that tells a proxy it is complete")
+    if took > 2.0:
+        failures.append(f"following a run: the last answer took {took:.1f} s")
         return
-    print(f"quiet stream: {quiet:.0f}s of silence survived, and the end was "
-          "announced when the work really ended, in pieces a proxy passes on")
+    print("following a run: quiet questions wait and say so, news is answered "
+          f"at once, and the end comes with how it ended ({took:.1f} s)")
 
 
 def check_keepalive() -> None:
@@ -2539,7 +2531,7 @@ CHECKS = (
     check_trajectory_carries_its_run_file,
     check_file_tidying,
     check_chain_letters_survive,
-    check_quiet_stream,
+    check_following_a_run,
     check_layouts,
     check_downloaded_files,
     check_box_maths,

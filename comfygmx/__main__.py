@@ -407,7 +407,7 @@ def _ready(settings: Settings) -> Settings:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="comfy-gmx",
-        description="Node-based workbench for GROMACS and Martini simulations.",
+        description="Comfy-gmx lite: molecular dynamics with GROMACS, as blocks wired together in a browser.",
     )
     parser.add_argument("--version", action="version", version=f"comfy-gmx {__version__}")
     parser.add_argument("--data-dir", help=DATA_DIR_HELP)

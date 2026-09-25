@@ -24,8 +24,7 @@ X, Y = 300, 150
 #: you learn it once and every graph reads the same way afterwards.
 COLOR = {
     "input":       "#4a7a4a",   # green  -- getting a structure in and cleaned
-    "build":       "#b58b2a",   # olive  -- box, solvent, ions, membrane
-    "coarse":      "#6a6aa8",   # indigo -- martinize and everything CG-specific
+    "build":       "#b58b2a",   # olive  -- box, solvent, ions, an ice crystal
     "minimise":    "#3f6d7d",   # teal   -- energy minimisation
     "equilibrate": "#3f789e",   # blue   -- NVT, NPT, the ladder
     "production":  "#a1309b",   # purple -- the run you actually keep
@@ -189,26 +188,6 @@ CHUNKS: List[Dict[str, Any]] = [
         ),
     },
     {
-        "id": "martini_run",
-        "name": "Martini equilibration & production",
-        "category": "Martini",
-        "description": "Martini 3 minimisation, restrained equilibration at 5 fs and "
-                       "production at 20 fs, semiisotropic throughout.",
-        "graph": _merge(
-            _stage("cgem_", 0, 0, "em_martini", "em",
-                   "CG minimisation", COLOR["minimise"]),
-            _stage("cgeq_", 0, 1, "eq_martini", "eq",
-                   "CG equilibration", COLOR["equilibrate"]),
-            _stage("cgmd_", 0, 2, "md_martini", "md",
-                   "CG production", COLOR["production"]),
-            {"nodes": [], "links": [
-                _l("cgem_mdrun", "structure", "cgeq_grompp", "structure"),
-                _l("cgeq_mdrun", "structure", "cgmd_grompp", "structure"),
-                _l("cgeq_mdrun", "checkpoint", "cgmd_grompp", "checkpoint"),
-            ]},
-        ),
-    },
-    {
         "id": "analysis_basic",
         "name": "Standard analysis",
         "category": "Analysis",
@@ -249,31 +228,6 @@ CHUNKS: List[Dict[str, Any]] = [
                 _l("rms", "xvg", "plot_rms", "xvg"),
                 _l("rmsf", "xvg", "plot_rmsf", "xvg"),
                 _l("rg", "xvg", "plot_rg", "xvg"),
-            ],
-        },
-    },
-    {
-        "id": "analysis_membrane",
-        "name": "Membrane checks",
-        "category": "Analysis",
-        "description": "Density profile along z and a periodic-image check -- the two "
-                       "things worth looking at before trusting a bilayer run.",
-        "graph": {
-            "groups": [_g("Membrane checks", COLOR["analysis"], "dens", "pi", "energy",
-                          "plot_dens", "plot_pi", "plot_energy")],
-            "nodes": [
-                _n("dens", "gmx.density", 0, 0, d="Z", sl=100, groups="System\n"),
-                _n("plot_dens", "view.plot", 1, 0),
-                _n("pi", "gmx.mindist", 0, 1, pi=True, groups="Protein\n"),
-                _n("plot_pi", "view.plot", 1, 1),
-                _n("energy", "gmx.energy", 0, 2,
-                   terms="Potential\nTemperature\nPressure\nBox-Z\n"),
-                _n("plot_energy", "view.plot", 1, 2),
-            ],
-            "links": [
-                _l("dens", "xvg", "plot_dens", "xvg"),
-                _l("pi", "xvg", "plot_pi", "xvg"),
-                _l("energy", "xvg", "plot_energy", "xvg"),
             ],
         },
     },

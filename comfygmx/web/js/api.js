@@ -180,29 +180,61 @@ const API = (() => {
        entry by id, or {url, name} for an address you found yourself. */
     installForcefield: (what) => post('api/forcefields/install', what),
 
-    /* Server-Sent Events; returns a close function.
+    /* Follow a run or a job as it happens; returns a function that stops.
 
-       onEnd is told which of the two ways it ended. The server saying "end"
-       means the work really is over. Anything else -- the machine slept, the
-       network blinked, the server was restarted -- means only that we stopped
-       being told, which is not the same thing and must not be read as one.
-       Treating the second as the first is how a finished run could be
-       announced hours early, and how a block was left spinning for ever. */
+       The page asks the server "anything new since message N?", over and
+       over. The server answers at once when there is news, or after ten
+       seconds of nothing, and the page asks again. This used to be one reply
+       that stayed open and grew; the servers in front of mybinder.org hold
+       such a reply back until it is complete, so a run there showed nothing
+       until it was over -- and, with no other requests, the copy was closed
+       as unused half way through a run.
+
+       onEnd is told which of the two ways it ended. The server saying
+       "finished" means the work really is over. Anything else -- the machine
+       slept, the network blinked, the server was restarted -- means only that
+       we stopped being told, which is not the same thing and must not be read
+       as one. Treating the second as the first is how a finished run could be
+       announced hours early, and how a block was left spinning for ever. A
+       question that fails is asked twice more, a few seconds apart, before it
+       counts as having stopped being told: a network that blinks for a
+       second should not cost anybody anything. */
     stream(url, onEvent, onEnd) {
-      const source = new EventSource(url);
+      const [path, query] = url.split('?');
+      let since = Number(new URLSearchParams(query || '').get('since')) || 0;
       let over = false;
+      const pause = (ms) => new Promise((done) => setTimeout(done, ms));
       const finish = (clean) => {
         if (over) return;
         over = true;
-        source.close();
         if (onEnd) onEnd(clean);
       };
-      source.onmessage = (event) => {
-        try { onEvent(JSON.parse(event.data)); } catch (err) { /* keepalive */ }
-      };
-      source.addEventListener('end', () => finish(true));
-      source.onerror = () => finish(false);
-      return () => { over = true; source.close(); };
+      (async () => {
+        let failed = 0;
+        while (!over) {
+          let answer;
+          try {
+            answer = await get(`${path}?since=${since}&wait=10`);
+            failed = 0;
+          } catch (err) {
+            failed += 1;
+            if (failed > 2) { finish(false); return; }
+            await pause(2000 * failed);
+            continue;
+          }
+          if (over) return;
+          const events = answer.events || [];
+          for (const event of events) {
+            if (event.seq) since = Math.max(since, event.seq);
+            try { onEvent(event); } catch (err) { console.error(err); }
+          }
+          if (answer.finished) { finish(true); return; }
+          // A busy stretch sends many small messages. A second between
+          // questions gathers them into a few replies instead of hundreds.
+          if (events.length) await pause(1000);
+        }
+      })();
+      return () => { over = true; };
     },
   };
 })();

@@ -1,7 +1,7 @@
 """The local HTTP server.
 
 Standard library only: ``ThreadingHTTPServer`` for the REST surface, static files
-for the editor, and Server-Sent Events for live run logs.  Nothing to pip
+for the editor, and short repeated questions for live run logs.  Nothing to pip
 install, which matters on a workstation where every tool already lives in its
 own conda environment.
 """
@@ -83,6 +83,11 @@ class ScriptJob:
         #: the first four, and forgetting those is how a working conda ends up
         #: unrecorded because a tool after it would not build.
         self.on_finish = on_finish
+        #: True once the message saying how the job ended has been sent. The
+        #: status changes earlier, before the steps that follow a success
+        #: (recording what was installed), and a page told "finished" at
+        #: that point would never hear how it ended.
+        self.over = False
 
     def start(self) -> None:
         def worker() -> None:
@@ -106,6 +111,7 @@ class ScriptJob:
                 except Exception as exc:  # noqa: BLE001
                     self._on_line(f"recording what was installed failed: {exc}")
             self.bus.emit({"type": "job", "status": self.status, "rc": self.returncode})
+            self.over = True
 
         threading.Thread(target=worker, name=f"job-{self.id}", daemon=True).start()
 
@@ -368,60 +374,46 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         self._send(200, target.read_bytes(), ctype)
 
-    # -- SSE ------------------------------------------------------------
-    def _stream(self, bus: EventBus, is_finished: Callable[[], bool]) -> None:
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache")
-        # Sent in marked pieces ("chunked"), so that whatever passes the
-        # stream along on the way can hand each event on as it comes. The
-        # Jupyter server of an online copy is one: without the pieces, the
-        # only end to the reply is the connection closing, so it waited for
-        # that, and the page heard nothing about a run until it was over.
-        # Browsers read either form the same way.
-        chunked = getattr(self, "request_version", "") == "HTTP/1.1"
-        if chunked:
-            self.send_header("Transfer-Encoding", "chunked")
-        self.send_header("Connection", "keep-alive")
-        self.end_headers()
+    # -- following a run or a job -----------------------------------------
+    def _follow(self, bus: EventBus, is_finished: Callable[[], bool]) -> None:
+        """What has happened since the page last asked, as one short reply.
 
-        def send(data: bytes) -> None:
-            if chunked:
-                data = b"%x\r\n%s\r\n" % (len(data), data)
-            self.wfile.write(data)
-            self.wfile.flush()
+        The page keeps asking "anything new since message N?" (the ``since``
+        in the address). If something is waiting, the answer goes back at
+        once. If not, the question is held open for up to ``wait`` seconds
+        (10 unless the page says otherwise), and answered the moment
+        something happens -- so the page still hears of each step as it
+        happens, not ten seconds late.
 
+        This used to be one reply that stayed open for the whole run, adding
+        a message whenever there was news. On mybinder.org that never worked:
+        the servers in front of every online copy hold a reply back until it
+        is complete, so the page heard nothing until the run was over. Worse,
+        while that one reply was open the page sent nothing else, and
+        mybinder.org closes a copy that has had no requests for ten minutes:
+        a Lipids I run was shut down half way through. Short replies get
+        through at once, and each question counts as the copy being in use.
+
+        ``finished`` says the work is over and nothing more will come.
+        """
         seq = int(self.q("since", "0") or 0)
-        # This used to give up after an hour with nothing to say, which was
-        # exactly backwards: it can only happen while the work is still going,
-        # and quiet work is the kind you most want to keep watching. A block
-        # that starts ten copies of a program side by side sends each one's
-        # output to its own file, so the page heard one line and then nothing
-        # for fourteen hours -- and the connection was cut after the first one.
-        # The stream now lasts as long as the work does. A browser that has
-        # gone away is noticed instead by the keepalive below: writing to a
-        # closed connection raises, and that is what ends the loop.
         try:
-            while True:
-                events = bus.since(seq, timeout=15.0)
-                if events:
-                    lines = []
-                    for event in events:
-                        seq = max(seq, event["seq"])
-                        payload = json.dumps(event)
-                        lines.append(f"data: {payload}\n\n".encode())
-                    send(b"".join(lines))
-                else:
-                    send(b": keepalive\n\n")
-                if is_finished() and not bus.since(seq, timeout=0.01):
-                    send(b"event: end\ndata: {}\n\n")
-                    if chunked:
-                        # The empty piece that says the reply is complete.
-                        self.wfile.write(b"0\r\n\r\n")
-                        self.wfile.flush()
-                    return
-        except (BrokenPipeError, ConnectionResetError):
-            return
+            wait = min(max(float(self.q("wait", "10") or 10), 0.0), 25.0)
+        except ValueError:
+            wait = 10.0
+        events = bus.since(seq, timeout=0)
+        if not events and not is_finished():
+            events = bus.since(seq, timeout=wait)
+        if events:
+            seq = max(seq, max(event["seq"] for event in events))
+        finished = is_finished()
+        if finished:
+            # A run is marked over a moment before its last message -- the
+            # one that says how it ended -- is sent. Wait that moment, so the
+            # page learns whether it ended well, not just that it ended.
+            late = bus.since(seq, timeout=0.5)
+            events = events + late
+        self._json({"events": events, "finished": finished})
 
 
 # --------------------------------------------------------------------------
@@ -1014,7 +1006,7 @@ def h_job_events(self: Handler, job_id: str) -> None:
     if job is None:
         self._error("no such job", 404)
         return
-    self._stream(job.bus, lambda: job.status != "running")
+    self._follow(job.bus, lambda: job.over)
 
 
 def h_validate(self: Handler) -> None:
@@ -1296,7 +1288,7 @@ def h_run_events(self: Handler, run_id: str) -> None:
     if run is None:
         self._error("no such run", 404)
         return
-    self._stream(run.bus, lambda: run.status in ("done", "error", "cancelled"))
+    self._follow(run.bus, lambda: run.status in ("done", "error", "cancelled"))
 
 
 def h_run_cancel(self: Handler, run_id: str) -> None:

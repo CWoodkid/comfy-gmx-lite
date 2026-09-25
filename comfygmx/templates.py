@@ -146,25 +146,6 @@ _ATOMISTIC_NONBONDED = {
     "dispcorr": "no",
 }
 
-# Martini 3 production settings (Verlet + reaction field, de Jong 2016 /
-# Souza 2021).  epsilon-r = 15 is what the force field is parameterised with.
-_MARTINI_NONBONDED = {
-    "cutoff-scheme": "Verlet",
-    "nstlist": 20,
-    "pbc": "xyz",
-    "verlet-buffer-tolerance": 0.005,
-    "coulombtype": "reaction-field",
-    "coulomb-modifier": "Potential-shift-verlet",
-    "rcoulomb": 1.1,
-    "epsilon-r": 15,
-    "epsilon-rf": 0,
-    "vdwtype": "cutoff",
-    "vdw-modifier": "Potential-shift-verlet",
-    "rvdw": 1.1,
-    "dispcorr": "no",
-}
-
-
 def _preset(*dicts: Dict[str, object]) -> Dict[str, object]:
     out: Dict[str, object] = {}
     for d in dicts:
@@ -224,45 +205,6 @@ PRESETS: Dict[str, Dict[str, object]] = {
             "gen-vel": "no",
             "constraints": "h-bonds", "constraint-algorithm": "lincs",
             "continuation": "yes",
-        },
-    ),
-    "em_martini": _preset(
-        {"integrator": "steep", "emtol": 100.0, "emstep": 0.001, "nsteps": 10000},
-        _MARTINI_NONBONDED,
-        {"nstlog": 100, "nstenergy": 100, "constraints": "none"},
-    ),
-    "eq_martini": _preset(
-        {"integrator": "md", "dt": 0.005, "nsteps": 200000, "comm-mode": "Linear", "nstcomm": 100},
-        _MARTINI_NONBONDED,
-        _OUTPUT_SPARSE,
-        {
-            "tcoupl": "V-rescale", "tc-grps": "PROTEIN MEMBRANE SOLVENT",
-            "tau-t": "1.0 1.0 1.0", "ref-t": "310 310 310",
-            "pcoupl": "C-rescale", "pcoupltype": "semiisotropic",
-            "tau-p": 12.0, "compressibility": "3e-4 3e-4", "ref-p": "1.0 1.0",
-            "refcoord-scaling": "all",
-            "gen-vel": "yes", "gen-temp": 310, "gen-seed": -1,
-            "constraints": "none", "constraint-algorithm": "Lincs",
-            "continuation": "no", "lincs-order": 8, "lincs-warnangle": 90,
-            "define": "-DPOSRES -DPOSRES_FC=1000",
-        },
-    ),
-    "md_martini": _preset(
-        {"integrator": "md", "dt": 0.020, "nsteps": 50000000, "comm-mode": "Linear", "nstcomm": 100},
-        _MARTINI_NONBONDED,
-        {
-            "nstxout": 0, "nstvout": 0, "nstfout": 0,
-            "nstlog": 10000, "nstenergy": 10000,
-            "nstxout-compressed": 10000, "compressed-x-precision": 1000,
-        },
-        {
-            "tcoupl": "V-rescale", "tc-grps": "PROTEIN MEMBRANE SOLVENT",
-            "tau-t": "1.0 1.0 1.0", "ref-t": "310 310 310",
-            "pcoupl": "Parrinello-Rahman", "pcoupltype": "semiisotropic",
-            "tau-p": 12.0, "compressibility": "3e-4 3e-4", "ref-p": "1.0 1.0",
-            "gen-vel": "no",
-            "constraints": "none", "constraint-algorithm": "Lincs",
-            "continuation": "yes", "lincs-order": 8, "lincs-warnangle": 90,
         },
     ),
 }
@@ -366,9 +308,6 @@ PRESET_INFO: Dict[str, str] = {
     "nvt_atomistic": "NVT equilibration with position restraints and velocity generation.",
     "npt_atomistic": "NPT equilibration, C-rescale barostat, restraints still on.",
     "md_atomistic": "Unrestrained production MD, Parrinello-Rahman.",
-    "em_martini": "Martini 3 minimisation: reaction field, epsilon_r = 15, small emstep for freshly packed membranes.",
-    "eq_martini": "Martini 3 equilibration: 5 fs steps, semiisotropic C-rescale, backbone restrained.",
-    "md_martini": "Martini 3 production: 20 fs steps, semiisotropic Parrinello-Rahman.",
     "lysozyme_ions": "Lysozyme tutorial, verbatim: throwaway minimisation used only to "
                      "build the tpr genion needs (plain cutoff electrostatics).",
     "lysozyme_min": "Lysozyme tutorial, verbatim: steepest descent to Fmax < 1000, PME.",
@@ -377,183 +316,6 @@ PRESET_INFO: Dict[str, str] = {
     "lysozyme_npt": "Lysozyme tutorial, verbatim: 500 ps restrained NPT, C-rescale barostat.",
     "lysozyme_md": "Lysozyme tutorial, verbatim: 10 ns unrestrained production MD.",
 }
-
-
-# --------------------------------------------------------------------------
-# Martini 3 tutorial presets
-#
-# The nonbonded block below is the one every Martini 3 tutorial ships: straight
-# cutoffs at 1.1 nm with a reaction field and epsilon_r = 15. It is not a
-# stylistic choice -- the Martini 3 parameters were fitted with it, so changing
-# it changes the model.
-#
-# The KALP presets are transcribed from the .mdp files in the "Proteins II"
-# tutorial archive (cgmartini.nl, KALP_ProteinsII_Tutorial.zip). The CK1d
-# presets follow martini_v3.0_prod.mdp from the Martini download page, switched
-# to isotropic pressure coupling because a protein in water has no membrane
-# plane to couple separately.
-# --------------------------------------------------------------------------
-
-_M3_NONBONDED = {
-    "cutoff-scheme": "Verlet",
-    "nstlist": 20,
-    "ns-type": "grid",
-    "pbc": "xyz",
-    "verlet-buffer-tolerance": 0.005,
-    "coulombtype": "reaction-field",
-    "rcoulomb": 1.1,
-    "epsilon-r": 15,
-    "epsilon-rf": 0,
-    "vdwtype": "cutoff",
-    "vdw-modifier": "Potential-shift-verlet",
-    "rvdw": 1.1,
-}
-
-# Production runs disable the Verlet buffer estimate and set rlist by hand:
-# with a 20 fs step the estimator picks a buffer that lets membrane undulations
-# grow. rlist >= 1.35 nm is the tutorial's number for nstlist = 20.
-_M3_NONBONDED_PROD = dict(_M3_NONBONDED)
-_M3_NONBONDED_PROD.update({"verlet-buffer-tolerance": -1, "rlist": 1.35})
-
-_M3_OUTPUT = {
-    "nstxout": 0,
-    "nstvout": 0,
-    "nstfout": 0,
-    "nstlog": 1000,
-    "nstxout-compressed": 1000,
-    "compressed-x-precision": 100,
-}
-
-PRESETS.update({
-    # ---- KALP in a POPC bilayer, Proteins II -----------------------------
-    "martini3_kalp_min": _preset(
-        {"integrator": "steep", "nsteps": 1000, "nstxout": 0, "nstfout": 0,
-         "nstlog": 100},
-        _M3_NONBONDED,
-    ),
-    "martini3_kalp_eq": _preset(
-        {"define": "-DPOSRES", "integrator": "md", "dt": 0.01, "nsteps": 100000},
-        _M3_OUTPUT,
-        _M3_NONBONDED,
-        {
-            "tcoupl": "v-rescale", "tc-grps": "Protein_POPC W_ION",
-            "tau-t": "1.0 1.0", "ref-t": "300 300",
-            "gen-vel": "yes", "gen-temp": 300,
-            "pcoupl": "c-rescale", "pcoupltype": "semiisotropic",
-            "tau-p": 4.0, "compressibility": "4.5e-5 4.5e-5", "ref-p": "1.0 1.0",
-            "refcoord-scaling": "com",
-        },
-    ),
-    "martini3_kalp_md": _preset(
-        {"integrator": "md", "dt": 0.02, "nsteps": 1000000},
-        _M3_OUTPUT,
-        _M3_NONBONDED_PROD,
-        {
-            "tcoupl": "v-rescale", "tc-grps": "Protein_POPC W_ION",
-            "tau-t": "1.0 1.0", "ref-t": "300 300",
-            "continuation": "yes", "gen-vel": "no",
-            "pcoupl": "parrinello-rahman", "pcoupltype": "semiisotropic",
-            "tau-p": 12.0, "compressibility": "3e-4 3e-4", "ref-p": "1.0 1.0",
-            "lincs-order": 4, "lincs-warnangle": 30,
-        },
-    ),
-
-    # ---- the self-assembly route -----------------------------------------
-    # No bilayer exists yet, so there is no plane to couple to and no
-    # Protein_POPC / W_ION index: pressure is isotropic and the whole system is
-    # one temperature group until the membrane has formed.
-    "martini3_kalp_sa_min": _preset(
-        {"integrator": "steep", "nsteps": 2000, "nstxout": 0, "nstfout": 0,
-         "nstlog": 100, "define": "-DPOSRES -DFLEXIBLE"},
-        _M3_NONBONDED,
-    ),
-    "martini3_kalp_sa_eq": _preset(
-        {"define": "-DPOSRES", "integrator": "md", "dt": 0.01, "nsteps": 100000,
-         "comm-mode": "Linear", "nstcomm": 100},
-        _M3_OUTPUT,
-        _M3_NONBONDED,
-        {
-            "tcoupl": "v-rescale", "tc-grps": "System",
-            "tau-t": 1.0, "ref-t": 300,
-            "gen-vel": "yes", "gen-temp": 300,
-            "pcoupl": "c-rescale", "pcoupltype": "isotropic",
-            "tau-p": 6.0, "compressibility": "3e-4", "ref-p": 1.0,
-            "refcoord-scaling": "com",
-        },
-    ),
-    "martini3_kalp_sa_md": _preset(
-        {"title": "KALP self-assembly", "integrator": "md", "dt": 0.02,
-         "nsteps": 1000000, "comm-mode": "Linear", "nstcomm": 100},
-        _M3_OUTPUT,
-        _M3_NONBONDED_PROD,
-        {
-            "tcoupl": "v-rescale", "tc-grps": "System", "tau-t": 1.0, "ref-t": 300,
-            "continuation": "yes", "gen-vel": "no",
-            "pcoupl": "parrinello-rahman", "pcoupltype": "isotropic",
-            "tau-p": 12.0, "compressibility": "3e-4", "ref-p": 1.0,
-            "constraints": "none", "constraint-algorithm": "Lincs",
-            "lincs-order": 4, "lincs-warnangle": 30,
-        },
-    ),
-
-    # ---- CK1d in water, Proteins I ---------------------------------------
-    "martini3_sol_min": _preset(
-        {"integrator": "steep", "nsteps": 5000, "emtol": 100.0, "emstep": 0.001,
-         "nstxout": 0, "nstfout": 0, "nstlog": 100},
-        _M3_NONBONDED,
-    ),
-    "martini3_sol_eq": _preset(
-        {"define": "-DPOSRES", "integrator": "md", "dt": 0.01, "nsteps": 100000,
-         "comm-mode": "Linear", "nstcomm": 100},
-        _M3_OUTPUT,
-        _M3_NONBONDED,
-        {
-            "tcoupl": "v-rescale", "tc-grps": "Protein Non-Protein",
-            "tau-t": "1.0 1.0", "ref-t": "310 310",
-            "gen-vel": "yes", "gen-temp": 310, "gen-seed": -1,
-            "pcoupl": "c-rescale", "pcoupltype": "isotropic",
-            "tau-p": 4.0, "compressibility": "3e-4", "ref-p": 1.0,
-            "refcoord-scaling": "all",
-        },
-    ),
-    "martini3_sol_md": _preset(
-        {"integrator": "md", "dt": 0.02, "nsteps": 12500000,
-         "comm-mode": "Linear", "nstcomm": 100},
-        {"nstxout": 0, "nstvout": 0, "nstfout": 0,
-         "nstlog": 25000, "nstenergy": 25000,
-         "nstxout-compressed": 25000, "compressed-x-precision": 100},
-        _M3_NONBONDED_PROD,
-        {
-            "nsttcouple": 20, "nstpcouple": 20,
-            "tcoupl": "v-rescale", "tc-grps": "Protein Non-Protein",
-            "tau-t": "1.0 1.0", "ref-t": "310 310",
-            "continuation": "yes", "gen-vel": "no",
-            "pcoupl": "parrinello-rahman", "pcoupltype": "isotropic",
-            "tau-p": 12.0, "compressibility": "3e-4", "ref-p": 1.0,
-            "constraints": "none", "constraint-algorithm": "Lincs",
-            "lincs-order": 8, "lincs-warnangle": 90, "lincs-iter": 2,
-        },
-    ),
-})
-
-PRESET_INFO.update({
-    "martini3_kalp_min": "Proteins II, verbatim: 1000 steps of steepest descent on a "
-                         "pre-built bilayer.",
-    "martini3_kalp_eq": "Proteins II, verbatim: 1 ns restrained equilibration, 10 fs "
-                        "steps, semiisotropic c-rescale, needs a Protein_POPC / W_ION index.",
-    "martini3_kalp_md": "Proteins II, verbatim: 20 ns production at 20 fs, semiisotropic "
-                        "Parrinello-Rahman, needs a Protein_POPC / W_ION index.",
-    "martini3_kalp_sa_min": "Proteins II self-assembly: 2000 steps with flexible bonds, "
-                            "for a box of randomly placed lipids.",
-    "martini3_kalp_sa_eq": "Proteins II self-assembly: isotropic coupling and one "
-                           "temperature group -- there is no bilayer plane yet.",
-    "martini3_kalp_sa_md": "Proteins II self-assembly: 20 ns isotropic production; the "
-                           "bilayer forms within the first few nanoseconds.",
-    "martini3_sol_min": "Proteins I: steepest descent for a Martini protein in water.",
-    "martini3_sol_eq": "Proteins I: 1 ns restrained isotropic NPT at 310 K.",
-    "martini3_sol_md": "Proteins I: 250 ns production, isotropic Parrinello-Rahman. "
-                       "That is roughly 1 us of effective time at Martini's 1:4 ratio.",
-})
 
 
 def preset_names() -> Iterable[str]:
