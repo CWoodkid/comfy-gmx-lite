@@ -16,24 +16,22 @@ they are online, so they took no time.
 
 ## On mybinder.org
 
-On 2026-09-26 I ran both tutorials again on mybinder.org itself, on two of its
-sites. I ran them one after the other in the same session, with nobody touching
-the page:
+On 2026-09-26 I ran both tutorials on mybinder.org itself, on two of its
+sites, with nobody touching the page:
 
 | Tutorial | Blocks | 2i2c site | of which, simulating | GESIS site | of which, simulating |
 |---|---|---|---|---|---|
-| The ice cube's earlier version, two runs | 27 | 3 min 12 s | 2 min 50 s | 3 min 15 s | 2 min 51 s |
+| An ice cube melting | 22 | 2 min 50 s | 2 min 29 s | 2 min 49 s | 2 min 28 s |
 | Lysozyme in Water | 50 | 8 min 36 s | 7 min 37 s | 8 min 50 s | 7 min 46 s |
 
 That is between 12 and 16 per cent slower than the online copy on my
-workstation was. Each session stayed open for the whole twelve minutes, and
-the page showed every step as it happened.
+workstation. Each session stayed open for the whole run, and the page showed
+every step as it happened.
 
-The ice tutorial timed there was the earlier version, with two runs of 100 ps,
-one at 300 K and one at 200 K. Later the same day I replaced them with the one
-run that heats the cube from 200 K to 1000 K. That run takes the same number of
-steps, 100,000, and in the online copy on my workstation the new version was
-22 seconds faster than the old one. I have not timed it on mybinder.org yet.
+I timed the ice tutorial after I changed it to one heating run, in a session
+of its own on each site. Before the change, with two runs of 100 ps at 300 K
+and 200 K and 27 blocks, it took 3 min 12 s on the 2i2c site and 3 min 15 s on
+GESIS.
 
 ## An ice cube melting
 

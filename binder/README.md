@@ -31,12 +31,11 @@ touching the page:
 
 | tutorial | mybinder.org (2i2c) | mybinder.org (GESIS) | this copy on my workstation (AMD EPYC 9274F) |
 |---|---|---|---|
-| An ice cube melting | not timed yet | not timed yet | 2 min 26 s |
+| An ice cube melting | 2 min 50 s | 2 min 49 s | 2 min 26 s |
 | Lysozyme in Water | 8 min 36 s | 8 min 50 s | 7 min 41 s |
 
-The ice tutorial changed after I timed it on mybinder.org: one heating run now
-replaces its two runs at 300 K and 200 K, and I have not timed that version
-there yet. The old one took 3 min 12 s and 3 min 15 s.
+I timed the ice tutorial after I changed it to one heating run. Before, with
+its two runs at 300 K and 200 K, it took 3 min 12 s and 3 min 15 s there.
 
 mybinder.org is several sites. Each start lands on one of them, and they run at
 slightly different speeds. I limited the copy on my workstation to one
