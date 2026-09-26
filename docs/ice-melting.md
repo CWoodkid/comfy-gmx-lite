@@ -1,21 +1,22 @@
 # An ice cube melting
 
-A tutorial written for Comfy-gmx lite. There is no published course behind it,
-so this page is the teacher's notes: what the simulation does, why it is set up
-the way it is, what the class should see, and what to try next.
+I wrote this tutorial for Comfy-gmx lite. There is no published course behind
+it, so this page holds my teacher's notes: what the simulation does, why I set
+it up the way I did, what the class should see, and what to try next.
 
 Open the **Tutorials** tab on the left, click **An ice cube melting** (under
 *Made for Comfy-gmx lite*), press **Load as new graph**, then **Run**.
 
 ## What it shows
 
-A tiny ice cube — 768 water molecules, about 3 nanometres across — floats in
-empty space. The same cube is simulated twice for 100 picoseconds:
+A tiny ice cube of 768 water molecules, about 3 nanometres across, floats in
+empty space. The tutorial simulates the same cube twice, for 100 picoseconds
+each time:
 
-- at **300 K** (27 °C), room temperature, it melts. The corners go first, then
+- At **300 K** (27 °C), room temperature, it melts. The corners go first, then
   the edges, then the faces. Within a few tens of picoseconds the crystal is
   gone, and the liquid pulls itself into a round drop.
-- at **200 K** (−73 °C), colder than any freezer, it holds. The molecules
+- At **200 K** (−73 °C), colder than any freezer, it holds. The molecules
   shiver in place, but the pattern of the crystal stays.
 
 Three results make the difference visible:
@@ -26,9 +27,9 @@ Three results make the difference visible:
 | **Radius of gyration** | roughly how far the molecules are from the middle, on average | shrinks clearly as the cube becomes a drop | shrinks a little |
 | **Preview trajectory** | a movie, one dot per molecule | a cube turning into a ball | a cube |
 
-What it came out as when it was run here, in the online copy on one
-processor (2 minutes 48 seconds from **Run** to the last block; on
-mybinder.org it takes about 3 minutes 15 seconds):
+This is what I got when I ran it in the online copy on one processor of my own
+computer. It took 2 minutes 48 seconds from **Run** to the last block. On
+mybinder.org it takes about 3 minutes 15 seconds.
 
 | | warm, 300 K | cold, 200 K |
 | --- | --- | --- |
@@ -40,8 +41,9 @@ mybinder.org it takes about 3 minutes 15 seconds):
 | radius of gyration, start → end | 1.46 → 1.38 nm | 1.46 → 1.42 nm |
 
 Each 100 ps run took a little over a minute. On another computer the numbers
-will differ a little: the tiny differences in how two machines round their
-arithmetic grow over a run, so no two computers follow quite the same path.
+will differ a little. Two machines round their arithmetic in slightly different
+ways, those tiny differences grow over a run, and so no two computers follow
+quite the same path.
 
 ## The science, for the teacher
 
@@ -49,14 +51,14 @@ arithmetic grow over a run, so no two computers follow quite the same path.
 In ice each molecule holds on to exactly four others with hydrogen bonds: it
 points its two hydrogens at two of them, and the other two point a hydrogen at
 it. Together they make a honeycomb of six-sided rings. Looking straight down
-one axis of the crystal (z here), the rings line up into open channels, and
-that open structure is why ice is less dense than liquid water and floats.
+one axis of the crystal (z here), the rings line up into open channels. That
+open structure is why ice is less dense than liquid water and floats.
 
 **Why it melts from the surface.** A molecule at a corner or an edge has fewer
 neighbours to hold on to than one inside, so it is the first to break free.
-Melting spreads inwards from the surface. Even well below freezing the outermost
-layer of ice is loose and slightly wet, which is part of why ice is slippery —
-the cold run shows a little of this too.
+Melting spreads inwards from the surface. Even well below freezing, the
+outermost layer of ice is loose and slightly wet, which is part of why ice is
+slippery. The cold run shows a little of this too.
 
 **Why the drop is round, and smaller.** Surface tension pulls a liquid into the
 shape with the least surface for its volume, which is a sphere. And liquid
@@ -68,38 +70,39 @@ molecules at the surface, where they are held less firmly, so it melts at a
 lower temperature than a big one. This cube starts to melt, slowly, even at
 250 K (−23 °C).
 
-## How it is set up, and why
+## How I set it up, and why
 
 **The water model is TIP4P/Ice.** A model is the set of rules the computer uses
 for how molecules push and pull on each other. TIP4P/Ice draws a water molecule
 as four points: the oxygen, the two hydrogens, and an invisible point that
-carries the oxygen's negative charge. Its numbers were fitted so that its ice
-behaves like real ice: its authors put its melting point at 272.2 K, and real
-ice melts at 273.15 K. Water models made for liquid water melt far lower —
-146 K for TIP3P and 215 K for SPC/E, two of the most used. With TIP3P, even the
-cold run here would be 54 degrees above the melting point.
+carries the oxygen's negative charge. Its authors fitted its numbers so that
+its ice behaves like real ice. They put its melting point at 272.2 K, and real
+ice melts at 273.15 K. Water models made for liquid water melt far lower: 146 K
+for TIP3P and 215 K for SPC/E, two of the most used. With TIP3P, even the cold
+run here would be 54 degrees above the melting point.
 
-**The crystal is built by the first block, *Ice crystal*.** It places the
-oxygens where ordinary ice (ice Ih, the hexagonal kind) puts them, then chooses
-which way each molecule points its hydrogens. That choice has rules — every
-oxygen has exactly two hydrogens near it and every hydrogen bond has exactly one
-hydrogen on it — and the block also makes sure the molecules' small electric
+**The first block, *Ice crystal*, builds the crystal.** It places the oxygens
+where ordinary ice (ice Ih, the hexagonal kind) puts them, then chooses which
+way each molecule points its hydrogens. That choice follows two rules: every
+oxygen has exactly two hydrogens near it, and every hydrogen bond has exactly
+one hydrogen on it. The block also makes sure the molecules' small electric
 charges do not all line up in one direction across the crystal. Changing the
 *Seed for the hydrogens* gives a different, equally valid arrangement of them.
 
-**Empty space instead of water around it.** The cube floats in a 5.5 nm box of
-nothing. That keeps the run small (fast enough for one processor in a lesson)
-and the picture clear. The box repeats in every direction, as simulation boxes
-do, so it is big enough that the cube never touches the copy of itself next
-door. It also melts far faster than a real ice cube in a drink: it is tiny,
-and the thermostat hands every molecule the heat it needs at once, where a real
-cube has to wait for heat to flow in from the drink around it.
+**Empty space around it, not water.** The cube floats in a 5.5 nm box of
+nothing. That keeps the run small, fast enough for one processor in a lesson,
+and it keeps the picture clear. The box repeats in every direction, as
+simulation boxes do, so I made it big enough that the cube never touches the
+copy of itself next door. The cube also melts far faster than a real ice cube
+in a drink. It is tiny, and the thermostat hands every molecule the heat it
+needs at once, where a real cube has to wait for heat to flow in from the drink
+around it.
 
 **Settle, then run.** A minimisation first nudges every molecule into place.
 Then each run gives the molecules speeds that match its temperature and keeps
 that temperature with a thermostat, for 50,000 steps of 2 femtoseconds. The
 settings also stop the cube drifting or spinning, so it stays in the middle of
-the picture; GROMACS warns about that once, and the run is allowed that one
+the picture. GROMACS warns about that once, and I let the run accept that one
 warning.
 
 **How the ice is counted.** The *Count the ice* block uses the CHILL+ method.
@@ -116,19 +119,19 @@ apart is what happens after that.
 
 ## Things to try
 
-- **Another temperature.** In the *Run parameters (.mdp)* block of the cold
-  run (in the box "3. Cold: 200 K"), change `ref_t` and `gen_temp` — both, to
-  the same number — and press **Run**. At 250 K the cube melts, but slowly. Where is the line
-  between melting and not melting in 100 ps?
-- **A bigger cube.** Raise *Cells along x* (or y, or z) on *Ice crystal*. The
-  time the runs take grows with the number of molecules, so double one
+- Try another temperature. In the *Run parameters (.mdp)* block of the cold
+  run (in the box "3. Cold: 200 K"), change `ref_t` and `gen_temp`, both to the
+  same number, and press **Run**. At 250 K the cube melts, but slowly. Where is
+  the line between melting and not melting in 100 ps?
+- Make the cube bigger. Raise *Cells along x* (or y, or z) on *Ice crystal*.
+  The time the runs take grows with the number of molecules, so double one
   direction at a time. Does a bigger cube take longer to melt?
-- **Look down the channels.** In the cold run's movie, turn the cube until you
-  look straight down the z axis. The six-sided rings line up into channels.
-- **A different hydrogen arrangement.** Change *Seed for the hydrogens* on
-  *Ice crystal*. The
-  oxygens stay where they are; the hydrogens point differently. The melting
-  should look the same — ask the class why that is a good sign.
+- Look down the channels. In the cold run's movie, turn the cube until you look
+  straight down the z axis. The six-sided rings line up into channels.
+- Change the hydrogens. Set a different *Seed for the hydrogens* on
+  *Ice crystal*. The oxygens stay where they are, and the hydrogens point
+  differently. The melting should look the same. Ask the class why that is a
+  good sign.
 
 ## References
 
@@ -137,7 +140,7 @@ apart is what happens after that.
   Chem. Phys.* 122, 234511. [doi:10.1063/1.1931662](https://doi.org/10.1063/1.1931662)
 - Nguyen, A. H. and Molinero, V. (2015). Identification of clathrate hydrates,
   hexagonal ice, cubic ice, and liquid water in simulations: the CHILL+
-  algorithm. *J. Phys. Chem. B* 119, 9369–9376.
+  algorithm. *J. Phys. Chem. B* 119, 9369-9376.
   [doi:10.1021/jp510289t](https://doi.org/10.1021/jp510289t)
 - Vega, C., Sanz, E. and Abascal, J. L. F. (2005). The melting temperature of
   the most common models of water. *J. Chem. Phys.* 122, 114507.

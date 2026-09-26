@@ -1,10 +1,10 @@
 # How long each tutorial takes, and what it came out as
 
-Every tutorial was run from start to finish in the online copy — the image
-`binder/build-image.sh` builds, the same one mybinder.org builds — in a
-container limited to one processor and 2 GB of memory, as a mybinder.org
-session is. The processor was one core of an AMD EPYC 9274F; a cloud machine
-may well be slower. GROMACS was 2026.3 from conda-forge.
+I ran every tutorial from start to finish in the online copy: the image that
+`binder/build-image.sh` builds, which is the same one mybinder.org builds. I
+limited the container to one processor and 2 GB of memory, as a mybinder.org
+session is. The processor was one core of an AMD EPYC 9274F, and a cloud
+machine may well be slower. GROMACS was 2026.3 from conda-forge.
 
 The downloads (the protein and the force field) were already in the image, as
 they are online, so they took no time.
@@ -16,24 +16,24 @@ they are online, so they took no time.
 
 ## On mybinder.org
 
-Both tutorials were run again on mybinder.org itself on 2026-09-26, on two of
-its sites, one after the other in the same session, with nobody touching the
-page:
+On 2026-09-26 I ran both tutorials again on mybinder.org itself, on two of its
+sites. I ran them one after the other in the same session, with nobody touching
+the page:
 
 | Tutorial | Blocks | 2i2c site | of which, simulating | GESIS site | of which, simulating |
 |---|---|---|---|---|---|
 | An ice cube melting | 27 | 3 min 12 s | 2 min 50 s | 3 min 15 s | 2 min 51 s |
 | Lysozyme in Water | 50 | 8 min 36 s | 7 min 37 s | 8 min 50 s | 7 min 46 s |
 
-Between 12 and 16 per cent slower than the table above. Each session stayed
-open for the whole twelve minutes, and the page showed every step as it
+That is between 12 and 16 per cent slower than the table above. Each session
+stayed open for the whole twelve minutes, and the page showed every step as it
 happened.
 
 ## An ice cube melting
 
 | run | length | time |
 |---|---|---|
-| minimisation | — | 1 s |
+| minimisation | n/a | 1 s |
 | warm, 300 K | 100 ps | 74 s |
 | cold, 200 K | 100 ps | 71 s |
 | counting the ice | 201 frames, each run | 7.5 s each |
@@ -41,7 +41,7 @@ happened.
 What it came out as:
 
 - The crystal: 768 molecules, 2.71 × 3.13 × 2.95 nm, with no overall dipole.
-  442 of them pass the ice test at the start; the rest sit on the surface,
+  442 of them pass the ice test at the start. The rest sit on the surface,
   with too few neighbours to pass.
 - Warm: 180 still ice after 1 ps, 105 at 10 ps, 15 at 30 ps, none from 40 ps
   on. Radius of gyration 1.46 → 1.38 nm.
@@ -49,7 +49,7 @@ What it came out as:
   50 ps and 240 over the second, going up and down by 20 or 30 from frame to
   frame. Radius of gyration 1.46 → 1.42 nm.
 
-More in [ice-melting.md](ice-melting.md).
+There is more in [ice-melting.md](ice-melting.md).
 
 ## Lysozyme in Water
 
@@ -63,7 +63,8 @@ More in [ice-melting.md](ice-melting.md).
 Each of the four `grompp` steps takes 8 to 9 seconds on one processor, and so
 does *Add ions*, which runs one too. Everything else takes a second or two.
 
-What it came out as, against the published tutorial where it gives a number:
+Here is what it came out as, next to the published tutorial wherever it gives
+a number:
 
 | | here | the tutorial |
 |---|---|---|
@@ -71,9 +72,9 @@ What it came out as, against the published tutorial where it gives a number:
 | minimisation | 457 steps, largest force 889 kJ/mol/nm on atom 567 | 566 steps, 980 on atom 567 |
 | temperature | about 210 K the moment the speeds are handed out, back near 298 K within 1.5 ps | 298 K |
 | density | 985 → 1026 kg/m³ over 5 ps | 1025.3 averaged over 500 ps |
-| RMSD after the production run | about 0.08 nm | — |
-| radius of gyration | 1.40 – 1.42 nm over 10 ps | 1.409 over 10 ns |
+| RMSD after the production run | about 0.08 nm | not given |
+| radius of gyration | 1.40 to 1.42 nm over 10 ps | 1.409 over 10 ns |
 
 The number of minimisation steps changes from run to run, because *Add ions*
-picks the waters it replaces at random; the atom with the largest force does
-not.
+picks the waters it replaces at random. The atom with the largest force does
+not change.
