@@ -227,6 +227,55 @@ function mdpPreset(node) {
   return table[String((node.params || {}).preset || '')] || null;
 }
 
+/* Which mdp option a run-parameters box stands for. The table comes from the
+   node itself (MdpNode._WIDGET_MAP); define is kept apart from it there
+   because it is not filled in with the others, but it is still an option. */
+function mdpKey(param) {
+  if (param === 'define') return 'define';
+  return ((Editor.mdp || {}).widgets || {})[param] || '';
+}
+
+/* The options a raw mdp text sets, by name. GROMACS reads a dash and an
+   underscore in a name as the same thing, so both are read as dashes. */
+function mdpRawOptions(text) {
+  const found = {};
+  for (const line of String(text || '').split('\n')) {
+    const body = line.split(';')[0];
+    const eq = body.indexOf('=');
+    if (eq < 0) continue;
+    const key = body.slice(0, eq).trim().toLowerCase().replace(/_/g, '-');
+    if (key) found[key] = body.slice(eq + 1).trim();
+  }
+  return found;
+}
+
+/* The same raw text with one option given a new value. The line that sets it
+   is changed where it stands, and its comment stays where it was; an option
+   the text does not set yet gets a line of its own at the end. */
+function mdpSetRaw(text, key, value) {
+  const want = String(key).toLowerCase().replace(/_/g, '-');
+  const lines = String(text || '').split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const semi = lines[i].indexOf(';');
+    const body = semi >= 0 ? lines[i].slice(0, semi) : lines[i];
+    const eq = body.indexOf('=');
+    if (eq < 0) continue;
+    if (body.slice(0, eq).trim().toLowerCase().replace(/_/g, '-') !== want) continue;
+    const after = body.slice(eq + 1);
+    const gap = (after.match(/^\s*/) || [''])[0] || ' ';
+    let line = `${body.slice(0, eq + 1)}${gap}${value}`;
+    if (semi >= 0) {
+      // Keep the comment in its column, as long as the value still fits.
+      const room = after.length - gap.length - String(value).length;
+      line += `${' '.repeat(Math.max(1, room))}${lines[i].slice(semi)}`;
+    }
+    lines[i] = line;
+    return lines.join('\n');
+  }
+  const kept = lines.join('\n').replace(/\s+$/, '');
+  return `${kept}${kept ? '\n' : ''}${key} = ${value}\n`;
+}
+
 /* Every widget filled in from the preset, so an edited node holds the whole
    parameter set instead of a diff against something invisible. */
 function mdpFill(node) {
@@ -288,8 +337,19 @@ const PARAM_FOLLOWS = {
         return Object.keys(cleared).length ? cleared : null;
       },
     };
+    /* In raw mode the text is the whole file, so a box is a way of changing
+       one line of it: what is typed goes into the text, and the box empties
+       again to show what the text now says. Otherwise raw mode would show the
+       values in the boxes and then quietly ignore anything typed there. */
+    const rawEdit = (node, raw, param) => {
+      const key = mdpKey(param);
+      const value = String(raw === undefined || raw === null ? '' : raw).trim();
+      if (!key || !value) return null;
+      return { raw: mdpSetRaw(node.params.raw, key, value), [param]: '' };
+    };
     // One rule per value widget, all the same rule.
     const touched = (node, raw, param) => {
+      if (node.params.mode === 'raw') return rawEdit(node, raw, param);
       if (node.params.mode !== 'preset' || !String(raw || '').trim()) return null;
       const changes = { ...mdpFill(node), mode: 'manual', [param]: raw };
       const fallback = (Editor.mdp || {}).default_name || 'run.mdp';
@@ -1269,21 +1329,51 @@ const Editor = {
   },
 
   /* What this widget shows when it is empty. For the run-parameters node that
-     is the preset's actual value rather than the words "preset default": the
-     widgets are deltas against a file nobody can see, and a delta against an
-     invisible baseline is not something anybody can check. */
+     is the value the run will actually use rather than the words "preset
+     default": the widgets are deltas against a file nobody can see, and a
+     delta against an invisible baseline is not something anybody can check. */
   _placeholder(node, param, bare = false) {
-    if (node.type !== 'util.mdp' || node.params.mode === 'raw') return param.placeholder || '';
-    const key = ((Editor.mdp || {}).widgets || {})[param.name];
-    if (!key) return param.placeholder || '';
-    const preset = mdpPreset(node);
-    const value = preset ? preset[key] : undefined;
-    if (value === undefined || value === null || String(value) === '') {
-      return param.placeholder || '';
-    }
+    const shown = this._mdpShown(node, param);
+    if (!shown) return this._mdpNotSet(node, param) || param.placeholder || '';
     // A dropdown's empty entry is already inside brackets; saying where the
     // value came from a second time inside them reads as a typo.
-    return bare ? String(value) : `${value}  (from ${node.params.preset})`;
+    return bare || !shown.from ? shown.value : `${shown.value}  (${shown.from})`;
+  },
+
+  /* What an empty run-parameters box says when nobody gives it a value: the
+     file then leaves the option out, and "preset default" would suggest a
+     value that is not there. Only said when the preset's table is at hand to
+     be sure of it. define keeps its example, because leaving it out is the
+     usual case. */
+  _mdpNotSet(node, param) {
+    if (node.type !== 'util.mdp' || !mdpKey(param.name) || param.name === 'define') return '';
+    if (node.params.mode === 'raw') return 'not in the raw text';
+    return mdpPreset(node) ? `not set by ${node.params.preset}` : '';
+  },
+
+  /* The value an empty run-parameters box stands for, and where it comes
+     from: the raw text in raw mode, the preset otherwise, and GROMACS's own
+     default where neither sets it. Shown from the moment the node appears, so
+     nobody has to edit a box to find out what it holds. Null for every other
+     box, and for a box whose value nobody knows. */
+  _mdpShown(node, param) {
+    if (node.type !== 'util.mdp') return null;
+    const key = mdpKey(param.name);
+    if (!key) return null;
+    const mode = node.params.mode;
+    // The file is read when the node runs, not here.
+    if (mode === 'file') return { value: 'as in the file', from: '' };
+    const known = (value) => value !== undefined && value !== null && String(value) !== '';
+    if (mode === 'raw') {
+      const value = mdpRawOptions(node.params.raw)[key];
+      if (known(value)) return { value: String(value), from: 'from the raw text' };
+    } else {
+      const preset = mdpPreset(node);
+      const value = preset ? preset[key] : undefined;
+      if (known(value)) return { value: String(value), from: `from ${node.params.preset}` };
+    }
+    const fallback = ((Editor.mdp || {}).gromacs_defaults || {})[key];
+    return known(fallback) ? { value: String(fallback), from: 'GROMACS default' } : null;
   },
 
   _buildWidget(node, param) {
@@ -1319,7 +1409,10 @@ const Editor = {
         (other) => whenNames(other.when).includes(param.name))
         || (def.inputs || []).concat(def.outputs || []).some(
           (port) => whenNames(port.when).includes(param.name));
-      if (followed || carries || controls) this._refreshNodeElement(node);
+      // The empty run-parameter boxes show what the preset, the mode or the
+      // raw text says, so a change to any of those has to redraw them too.
+      const shows = node.type === 'util.mdp' && ['preset', 'mode', 'raw'].includes(param.name);
+      if (followed || carries || controls || shows) this._refreshNodeElement(node);
       if (carries) this.drawWires();
     };
 
@@ -1501,6 +1594,9 @@ const Editor = {
       default: {
         input = UI.el('input', { type: 'text',
                                  placeholder: this._placeholder(node, param) });
+        // A value the run will really use, not an example of what to type:
+        // drawn to be read, not to fade into the box.
+        if (this._mdpShown(node, param)) input.classList.add('known-value');
         input.value = value === null || value === undefined ? '' : String(value);
         input.addEventListener('change', () => commit(input.value));
       }

@@ -312,6 +312,89 @@ Forms.registerField('gmx.groups', {
 
 
 /* ====================================================================
+   Which groups to show: every group this system has, to tick
+   ==================================================================== */
+
+/* What the other groups GROMACS makes by itself are. The common ones are in
+   STANDARD_GROUPS above; these turn up in the list of a real system too. */
+const MORE_GROUPS = [
+  ['Protein-H', 'the protein without its hydrogen atoms'],
+  ['MainChain+Cb', 'the backbone and carbonyl oxygens, plus the first carbon '
+    + 'of every side chain'],
+  ['MainChain+H', 'the backbone and carbonyl oxygens, with their hydrogens'],
+  ['SideChain-H', 'the side chains without their hydrogens'],
+  ['Prot-Masses', 'the protein atoms that have a mass'],
+  ['Water_and_ions', 'the water and the ions together'],
+  ['NA', 'the sodium ions'],
+  ['CL', 'the chloride ions'],
+  ['Oxygens', 'the oxygen of every water molecule: one point per molecule. '
+    + 'The Ice crystal block makes this group'],
+];
+
+Forms.registerField('gmx.pick_groups', {
+  title: 'What to show',
+  async build(ctx) {
+    const F = Forms.ui;
+    // In the order they were typed, so reading the box back changes nothing.
+    const chosen = ctx.value.split(',').map((name) => name.trim()).filter(Boolean);
+
+    // This system's own list exists once the run file feeding the block
+    // does. Until then, the usual names, and the reason there is no more.
+    let listed = null;
+    let why = '';
+    try {
+      listed = (await API.graphGroups(Editor.toJSON(), ctx.node.id)).groups || [];
+    } catch (err) {
+      why = err && err.message ? err.message : String(err);
+    }
+    const meaning = new Map(STANDARD_GROUPS.concat(MORE_GROUPS));
+    const groups = listed
+      ? listed.map((group) => ({ name: group.name, atoms: group.atoms }))
+      : STANDARD_GROUPS.map(([name]) => ({ name, atoms: null }));
+    // A name already in the box that the list does not have stays, ticked:
+    // a form never quietly throws a setting away.
+    for (const name of chosen) {
+      if (!groups.some((group) => group.name === name)) {
+        groups.push({ name, atoms: null, unlisted: true });
+      }
+    }
+
+    const body = UI.el('div', { class: 'form-body' });
+    const preview = F.preview('The exact text this writes');
+    const redraw = () => preview.set(chosen.join(', '));
+    body.appendChild(F.hint(listed
+      ? 'Every group this system has, with how many atoms are in each. Tick one '
+        + 'to show just that part, or several to show them together.'
+      : 'This system\'s own list is read from the run file that feeds this '
+        + 'block, and that file is not there yet. These are the usual groups; '
+        + 'run the blocks before this one, then open this again to see exactly '
+        + 'which groups this system has.', !listed));
+    if (why) body.appendChild(UI.el('div', { class: 'form-quote', text: why }));
+    for (const group of groups) {
+      const size = group.atoms === null || group.atoms === undefined
+        ? '' : ` (${group.atoms} atoms)`;
+      const label = `${group.name}${size}${group.unlisted ? ' (not in this list)' : ''}`;
+      const row = UI.el('div', { class: 'group-pick' }, [
+        F.check(label, chosen.includes(group.name), (checked) => {
+          const at = chosen.indexOf(group.name);
+          if (checked && at < 0) chosen.push(group.name);
+          if (!checked && at >= 0) chosen.splice(at, 1);
+          redraw();
+        }),
+      ]);
+      if (meaning.has(group.name)) row.appendChild(F.hint(meaning.get(group.name)));
+      body.appendChild(row);
+    }
+    body.appendChild(F.hint('Several ticked are shown as one: the block joins them '
+      + 'into a single group before it takes the frames.'));
+    body.appendChild(preview.el);
+    redraw();
+    return { body, read: () => chosen.join(', ') };
+  },
+});
+
+
+/* ====================================================================
    Lists of files
    ==================================================================== */
 

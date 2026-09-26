@@ -17,6 +17,7 @@ import re
 import shutil
 import sys
 import signal
+import subprocess
 import threading
 import time
 import traceback
@@ -27,7 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from . import __version__, bootstrap, facts, flaghints
+from . import __version__, bootstrap, facts, flaghints, groups
 from .chunks import chunk_list, delete_chunk, save_chunk
 from .config import WEB_DIR, Settings
 from .environments import (CATALOG, Toolbox, _version_number, available_versions,
@@ -546,6 +547,9 @@ def h_mdp_presets(self: Handler) -> None:
                 # in two languages drifts, and this one decides what a preset
                 # shows you.
                 "widgets": dict(MdpNode._WIDGET_MAP),
+                # What GROMACS uses for an option nobody set, so a box can show
+                # that number too instead of the words "preset default".
+                "gromacs_defaults": dict(MdpNode._GROMACS_DEFAULTS),
                 "default_name": MdpNode.DEFAULT_NAME})
 
 
@@ -1895,34 +1899,76 @@ def h_input_file(self: Handler) -> None:
     exactly the way running one node on its own looks up its inputs.
     """
     body = self._body()
-    graph = Graph(body.get("graph") or {})
-    node_id = str(body.get("node") or "")
-    port = str(body.get("port") or "")
+    found = _wired_file(self, Graph(body.get("graph") or {}),
+                        str(body.get("node") or ""), str(body.get("port") or ""))
+    if found is not None:
+        self._json(found)
+
+
+def _wired_file(self: Handler, graph: Graph, node_id: str,
+                port: str) -> Optional[Dict[str, str]]:
+    """The file an earlier node hands to one input, from the finished results.
+
+    Sends the reason and returns None when there is no such file yet.
+    """
     if node_id in graph.left_out:
         self._error(graph.left_out_reason(node_id), 400)
-        return
+        return None
     if node_id not in graph.nodes:
         self._error("no such node in this graph", 400)
-        return
+        return None
     wired = graph.incoming(node_id).get(port)
     if not wired:
         self._error(f"nothing is connected to '{port}'", 400)
-        return
+        return None
     source, source_port = wired
+    # By the name on the block, which is what the page shows. Two blocks can
+    # share one, so which socket it feeds is said as well.
+    named = f"{graph._name(source)}, which hands this block its '{port}',"
     signatures = graph.signatures()
     stored = self.app.executor.cached_result(signatures.get(source, ""))
     if not stored:
         self._error(
-            f"{source} has not been run yet, so the file it would hand over does "
+            f"{named} has not been run yet, so the file it would hand over does "
             "not exist. Run up to it first, then come back", 404)
-        return
+        return None
     value = (stored.get("outputs") or {}).get(source_port) or {}
     path = value.get("path") or ""
     if not path or not Path(path).exists():
-        self._error(f"{source} ran, but the file it produced is not there any more", 404)
+        self._error(f"{named} ran, but the file it produced is not there any more", 404)
+        return None
+    return {"path": path, "name": Path(path).name, "node": source,
+            "port": source_port}
+
+
+def h_graph_groups(self: Handler) -> None:
+    """Every group of atoms a block reading this system can be asked for.
+
+    What the Preview trajectory block's form offers: the groups GROMACS makes
+    for the system by itself, and those of an index file wired in, put
+    together the way the block puts them together when it runs. They exist
+    only once the run file does, so this asks the finished results, as
+    h_input_file does.
+    """
+    body = self._body()
+    graph = Graph(body.get("graph") or {})
+    node_id = str(body.get("node") or "")
+    tpr = _wired_file(self, graph, node_id, "tpr")
+    if tpr is None:
         return
-    self._json({"path": path, "name": Path(path).name, "node": source,
-                "port": source_port})
+    index = ""
+    if graph.incoming(node_id).get("index"):
+        found = _wired_file(self, graph, node_id, "index")
+        if found is None:
+            return
+        index = found["path"]
+    try:
+        listed = groups.all_groups(tpr["path"], index, self.app.toolbox)
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        self._error(str(exc), 500)
+        return
+    self._json({"groups": listed, "from": tpr["name"],
+                "index": Path(index).name if index else ""})
 
 
 def h_viz_sequence(self: Handler) -> None:
@@ -2144,6 +2190,7 @@ ROUTES: List[Tuple[re.Pattern, Tuple[str, ...], Callable]] = [
     (re.compile(r"^/api/viz/composition$"), ("GET",), h_viz_composition),
     (re.compile(r"^/api/viz/box-around$"), ("GET",), h_viz_box_around),
     (re.compile(r"^/api/graph/input-file$"), ("POST",), h_input_file),
+    (re.compile(r"^/api/graph/groups$"), ("POST",), h_graph_groups),
     (re.compile(r"^/api/viz/sequence$"), ("GET",), h_viz_sequence),
     (re.compile(r"^/api/viz/xvg$"), ("GET",), h_viz_xvg),
     (re.compile(r"^/api/viz/dssp$"), ("GET",), h_viz_dssp),

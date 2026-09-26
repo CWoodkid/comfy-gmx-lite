@@ -1306,6 +1306,13 @@ textarea.code {
 }
 #terminal-input:focus { outline: none; }
 #terminal-input::placeholder { color: var(--text-faint); opacity: .75; }
+/* An empty run-parameters box shows the value the run will use: readable, not
+   the faint grey of an example. */
+.widget input.known-value::placeholder { color: var(--text); opacity: .8; }
+/* In the list of groups, what each one is sits under its name, not above the
+   next one. */
+.group-pick { margin-bottom: 6px; }
+.group-pick .hint { margin: 0 0 0 22px; }
 /* A command is sitting there waiting for an answer: make the line impossible
    to miss, because the only other clue is that the output stopped. */
 #terminal-input-row.waiting {

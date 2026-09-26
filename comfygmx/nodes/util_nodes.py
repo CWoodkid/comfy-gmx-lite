@@ -36,15 +36,24 @@ class MdpNode(Node):
                    "something you cannot see -- and names its file after the preset it "
                    "came from. 'file' starts from an .mdp you already have and applies "
                    "the widgets on top of it, which is how one hand-tuned file becomes "
-                   "three replicas with different seeds. 'raw' ignores every widget and "
-                   "writes the text box verbatim."),
+                   "three replicas with different seeds. 'raw' writes the text box "
+                   "verbatim; the boxes show what it says, and typing in one "
+                   "changes that line of the text."),
         Param("path", "str", "Existing .mdp", "", placeholder="/path/to/eq1_nvt.mdp",
               help="Read when Mode = file. Values are parsed out and written back "
                    "through the same renderer as a preset, so the options survive but "
                    "the file's own comments do not."),
         Param("nsteps", "str", "nsteps", "", placeholder="preset default",
               help="Number of integration steps. Blank keeps the preset value."),
-        Param("dt", "str", "dt (ps)", "", placeholder="preset default"),
+        Param("dt", "str", "dt (ps)", "", placeholder="preset default",
+              help="The time step: how far the simulation moves time on between "
+                   "one calculation of the forces and the next, in picoseconds "
+                   "(1 ps is a millionth of a millionth of a second). The run "
+                   "lasts nsteps times dt: 50,000 steps of 0.002 ps is 100 ps. "
+                   "0.002 ps (2 femtoseconds) is usual when the bonds to "
+                   "hydrogen are held at a fixed length. A longer step reaches "
+                   "further for the same computer time, but too long and the "
+                   "atoms move too far in one step and the run falls apart."),
         Param("ref_t", "str", "ref-t (K)", "", placeholder="preset default",
               help="One value per tc-grp, space separated."),
         Param("tc_grps", "str", "tc-grps", "", placeholder="preset default"),
@@ -101,6 +110,27 @@ class MdpNode(Node):
         "gen_seed": "gen-seed",
     }
 
+    #: GROMACS's own value for each widget's option, used where neither the
+    #: preset nor the raw text sets it -- so a box shows the number the run will
+    #: really use rather than the words "preset default". Read from the
+    #: mdout.mdp that gmx grompp 2026.3 writes for an empty .mdp, and checked
+    #: against the 2026.3 manual's list of mdp options. gen-seed is the one
+    #: taken from the manual alone: its default, -1, means a new random seed
+    #: every time, so mdout.mdp shows the seed that was drawn instead. ref-t,
+    #: tc-grps, tau-t and ref-p have none: they are only read once a
+    #: thermostat or barostat is switched on, and then they must be given.
+    _GROMACS_DEFAULTS = {
+        "nsteps": "0",
+        "dt": "0.001",
+        "pcoupl": "no",
+        "pcoupltype": "isotropic",
+        "nstxout-compressed": "0",
+        "nstenergy": "1000",
+        "nstlog": "1000",
+        "gen-vel": "no",
+        "gen-seed": "-1",
+    }
+
     #: What the file is called when nobody has said. Kept as a constant because
     #: the browser renames it on the same rule when a preset is edited.
     DEFAULT_NAME = "run.mdp"
@@ -125,7 +155,9 @@ class MdpNode(Node):
                 raise NodeError("mode is 'raw' but the raw mdp text box is empty")
             plan.files[name] = body.rstrip() + "\n"
             plan.outputs["mdp"] = name
-            plan.notes.append("raw mode: widgets ignored")
+            plan.notes.append("raw mode: the raw text is the whole file. The value "
+                              "boxes change its lines; 'What goes into the "
+                              "trajectory' and 'Extra mdp lines' are not used")
             return plan
 
         if ctx.pstr("mode") == "file":

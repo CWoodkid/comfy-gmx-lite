@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import shlex
 from pathlib import Path
+from typing import List, Tuple
 
 from .base import (
     Node, NodeError, Param, Plan, PlanContext, Port, local_path,
@@ -201,10 +202,13 @@ class PreviewTrajectoryNode(Node):
         Param("frames", "int", "How many frames", 30, min=2, max=250,
               help="Only used by 'about this many'. Thirty is enough to see a "
                    "motion; the browser thins it again above sixty."),
-        Param("sel", "str", "Selection", "Protein",
-              help="An index group name. 'Protein' for a fold, 'System' to see "
-                   "everything including the box -- which for a solvated run is "
-                   "mostly water, so it is worth an index group."),
+        Param("sel", "str", "Selection", "Protein", form="gmx.pick_groups",
+              help="Which part of the system to show: the name of a group, or "
+                   "several names with commas between them, such as 'Protein, "
+                   "Ion'. 'Protein' for a fold, 'System' to see everything -- "
+                   "which for a solvated run is mostly water. 'Fill this in "
+                   "with a form…' lists every group this system has, with how "
+                   "many atoms each holds, and lets you tick several."),
         Param("pbc", "choice", "Periodic boundary", "mol",
               choices=["mol", "atom", "whole", "nojump", "none"],
               help="'mol' keeps molecules in one piece, which is what makes a "
@@ -225,6 +229,53 @@ class PreviewTrajectoryNode(Node):
 
     #: One PDB ATOM line is 81 bytes, and a model costs two more lines.
     BYTES_PER_ATOM_LINE = 81
+
+    @staticmethod
+    def _groups(text: str) -> List[str]:
+        """The group names in the Selection box: one, or several split by commas."""
+        return [name.strip() for name in str(text).split(",") if name.strip()]
+
+    @staticmethod
+    def _pick(plan: Plan, chosen: List[str], tpr: str, index: str) -> Tuple[str, str]:
+        """The one group trjconv is asked for, and the index file it is in.
+
+        One group and no index file is what this block always did, and it is
+        left exactly as it was. Otherwise two steps come first.
+
+        * With an index file wired in, trjconv would see only that file's
+          groups, and "System" would not be found. So the file's groups and
+          the system's own go into one file, the wired ones first, so a group
+          the file names itself wins over the standard one of the same name.
+        * With several groups, gmx select joins them into one: trjconv writes
+          a single group, and nothing in between would do.
+        """
+        for name in chosen:
+            if '"' in name:
+                raise NodeError(f'a group name cannot hold a double quote ("): {name}')
+        if index:
+            # The system's own groups, as make_ndx lists them when told to
+            # quit at once; then the wired file's, and the standard ones it
+            # does not already have.
+            plan.sh("printf 'q\\n' | {cmd} make_ndx -f " + shlex.quote(tpr)
+                    + " -o standard.ndx > /dev/null", tool="gmx",
+                    label="the system's own groups")
+            plan.sh("awk '/^\\[/ { name = $0; gsub(/^\\[ *| *\\]$/, \"\", name); "
+                    "keep = !(name in seen); seen[name] = 1 } keep' "
+                    + shlex.quote(index) + " standard.ndx > groups.ndx",
+                    label="every group in one file")
+            index = "groups.ndx"
+        if len(chosen) == 1:
+            return chosen[0], index
+        joined = "_".join(chosen)
+        select = ["select", "-s", tpr, "-on", "shown.ndx", "-select",
+                  f'"{joined}" ' + " or ".join(f'group "{name}"' for name in chosen)]
+        if index:
+            select[3:3] = ["-n", index]
+        plan.sh("{cmd} " + " ".join(shlex.quote(a) for a in select), tool="gmx",
+                label=f"{', '.join(chosen)} joined into one group")
+        plan.notes.append(f"shows {len(chosen)} groups together, as one group "
+                          f"called {joined}")
+        return joined, "shown.ndx"
 
     @staticmethod
     def _facts(ctx: PlanContext, traj: str) -> dict:
@@ -269,7 +320,10 @@ class PreviewTrajectoryNode(Node):
         # value 0", which says nothing about versions at all.
         argv = ["trjconv", "-s", tpr, "-f", traj, "-o", out,
                 "-pbc", ctx.pstr("pbc", "mol") or "mol"]
-        index = ctx.inp("index")
+        # One group, or several with commas between them. trjconv writes one
+        # group, so several are joined into one first (see _pick).
+        chosen = self._groups(ctx.pstr("sel", "Protein") or "Protein") or ["Protein"]
+        sel, index = self._pick(plan, chosen, tpr, ctx.inp("index"))
         if index:
             argv += ["-n", index]
         begin, end = ctx.pfloat("begin", 0.0), ctx.pfloat("end", 0.0)

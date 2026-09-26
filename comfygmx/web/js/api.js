@@ -161,6 +161,9 @@ const API = (() => {
     /* Which file a node's input port will really read -- the one an earlier
        node produced, which only exists once that node has run. */
     inputFile: (graph, node, port) => post('api/graph/input-file', { graph, node, port }),
+    /* Every group of atoms a block reading this system can be asked for,
+       read from the run file that feeds it (and its index file, if wired). */
+    graphGroups: (graph, node) => post('api/graph/groups', { graph, node }),
     /* The deposited sequence against what the coordinates hold: which residues
        are missing, and whether each run is a loop or a tail. */
     sequence: (what) => get('api/viz/sequence?' + (what.pdb

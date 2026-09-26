@@ -39,7 +39,15 @@ const sandbox = {
               getElementById: element, querySelector: element, body: element() },
   window: {},
   UI: { el: element, toast() {}, modal() {}, prose: () => [] },
-  API: {}, Editor: { nodes: new Map() }, App: {}, Panels: {},
+  // A stand-in server for the forms that ask it something before they draw:
+  // this system has three groups.
+  API: {
+    graphGroups: async () => ({ groups: [
+      { name: 'System', atoms: 2000 }, { name: 'Protein', atoms: 1960 },
+      { name: 'Ion', atoms: 40 }] }),
+  },
+  Editor: { nodes: new Map(), toJSON: () => ({ nodes: [], links: [] }) },
+  App: {}, Panels: {},
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
@@ -62,45 +70,61 @@ const SAMPLES = {
   'gmx.select': 'name OW',
   'text.rules': 'replace: DPPC => DSPC',
   'text.globs': '*.itp',
+  'gmx.pick_groups': 'Ion, Protein',
 };
 
 const words = (text) => String(text || '').split(/\s+/).filter(Boolean).join(' ');
 
-console.log('each form, opened and closed without a change');
-for (const [name, sample] of Object.entries(SAMPLES)) {
+/* Open one form on a text and close it again untouched: what it gives back.
+   A form that asks the server first gets the stand-in above. */
+async function roundTrip(name, sample) {
   const def = Forms.fields.get(name);
-  check(Boolean(def), `the ${name} form is not registered`);
-  if (!def) continue;
-  let made;
-  try {
-    made = def.build({ node: { id: 'n', params: {} },
-                       param: { name: 'x', label: name, help: '' },
-                       value: sample, reopen() {} });
-  } catch (err) {
-    check(false, `${name}: the form could not be drawn: ${err.message}`);
-    continue;
-  }
-  if (made && typeof made.then === 'function') {
-    // A form that asks the server first cannot be drawn without one.
-    console.log(`  ${name}: asks the server first -- not tested here`);
-    continue;
-  }
+  const made = await def.build({ node: { id: 'n', params: {} },
+                                 param: { name: 'x', label: name, help: '' },
+                                 value: sample, reopen() {} });
   const result = made.read();
-  const text = typeof result === 'string' ? result : result.text;
-  check(words(text) === words(sample),
-        `${name}: reading it back changed it\n        in:  ${JSON.stringify(sample)}\n`
-        + `        out: ${JSON.stringify(text)}`);
+  return typeof result === 'string' ? result : result.text;
 }
 
-console.log('the forms that exist');
-const registered = [...Forms.fields.keys()].sort();
-console.log(`  ${registered.length} forms: ${registered.join(', ')}`);
-for (const name of registered) {
-  check(name in SAMPLES, `${name} is registered but has no sample here to test it with`);
+async function main() {
+  console.log('each form, opened and closed without a change');
+  for (const [name, sample] of Object.entries(SAMPLES)) {
+    const def = Forms.fields.get(name);
+    check(Boolean(def), `the ${name} form is not registered`);
+    if (!def) continue;
+    let text;
+    try {
+      text = await roundTrip(name, sample);
+    } catch (err) {
+      check(false, `${name}: the form could not be drawn: ${err.message}`);
+      continue;
+    }
+    check(words(text) === words(sample),
+          `${name}: reading it back changed it\n        in:  ${JSON.stringify(sample)}\n`
+          + `        out: ${JSON.stringify(text)}`);
+  }
+
+  console.log('the groups form keeps what it cannot find, with or without the server');
+  const kept = await roundTrip('gmx.pick_groups', 'Protein, Mystery');
+  check(kept === 'Protein, Mystery',
+        `a group this system has not got was dropped: ${JSON.stringify(kept)}`);
+  sandbox.API.graphGroups = async () => { throw new Error('heat has not been run yet'); };
+  const offline = await roundTrip('gmx.pick_groups', 'Oxygens, System');
+  check(offline === 'Oxygens, System',
+        `with no run file to read, the box changed: ${JSON.stringify(offline)}`);
+
+  console.log('the forms that exist');
+  const registered = [...Forms.fields.keys()].sort();
+  console.log(`  ${registered.length} forms: ${registered.join(', ')}`);
+  for (const name of registered) {
+    check(name in SAMPLES, `${name} is registered but has no sample here to test it with`);
+  }
+
+  if (failures) {
+    console.log(`\n${failures} check(s) failed`);
+    process.exit(1);
+  }
+  console.log('\nall checks passed');
 }
 
-if (failures) {
-  console.log(`\n${failures} check(s) failed`);
-  process.exit(1);
-}
-console.log('\nall checks passed');
+main().catch((err) => { console.log(`  FAIL  ${err.stack || err}`); process.exit(1); });

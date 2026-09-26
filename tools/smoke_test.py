@@ -769,6 +769,86 @@ def check_param_boxes() -> None:
     print("parameter boxes: they appear and disappear with the box that controls them")
 
 
+def check_mdp_boxes() -> None:
+    """The run-parameters boxes show the value the run will use.
+
+    Left empty, a box on "Run parameters (.mdp)" means "whatever the preset
+    says", and used to say only "preset default" wherever the preset was
+    silent -- and, in raw mode, everywhere, while quietly ignoring anything
+    typed there. tools/mdp_boxes.js checks the editor's side. Here: every
+    GROMACS default the server sends belongs to a box, so none is sent for
+    nothing.
+    """
+    from comfygmx.nodes.util_nodes import MdpNode
+    stray = sorted(set(MdpNode._GROMACS_DEFAULTS) - set(MdpNode._WIDGET_MAP.values()))
+    check(not stray, f"GROMACS defaults for options no box shows: {stray}")
+    node = shutil.which("node")
+    if not node:
+        print("run-parameter boxes: skipped -- node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "mdp_boxes.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the run-parameter box test failed:\n" + (proc.stdout or proc.stderr))
+    print("run-parameter boxes: every value on show from the start, and raw mode "
+          "edits the text")
+
+
+def check_trajectory_groups() -> None:
+    """Preview trajectory shows one group or several, from any list it offers.
+
+    trjconv writes one group, and with an index file it knows only that file's
+    groups. So several groups are joined by gmx select first, and an index file
+    is merged with the system's own groups -- the same list the block's form
+    offers, read by comfygmx.groups. One group and no index file must stay
+    exactly the command it always was, so no saved result goes stale.
+    """
+    import tempfile
+    from comfygmx import groups
+    from comfygmx.graph import Graph
+    from comfygmx.executor import dry_plan
+
+    def steps(sel, index=False):
+        nodes = [{"id": "f", "type": "io.file", "params": {"path": "/tmp/md.xtc"}},
+                 {"id": "t", "type": "io.file", "params": {"path": "/tmp/md.tpr"}},
+                 {"id": "v", "type": "view.trajectory", "params": {"sel": sel}}]
+        links = [{"from_node": "f", "from_port": "file", "to_node": "v", "to_port": "traj"},
+                 {"from_node": "t", "from_port": "file", "to_node": "v", "to_port": "tpr"}]
+        if index:
+            nodes.append({"id": "n", "type": "io.file", "params": {"path": "/tmp/ice.ndx"}})
+            links.append({"from_node": "n", "from_port": "file", "to_node": "v",
+                          "to_port": "index"})
+        entry = dry_plan(Graph({"nodes": nodes, "links": links}), Settings())["v"]
+        if entry.get("error"):
+            return ["error: " + entry["error"]]
+        return [step.argv[0] for step in entry["_plan"].steps]
+
+    one = steps("Protein")
+    check(one == ["printf '%b' 'Protein\\nProtein\\n' | {cmd} trjconv -s md.tpr -f md.xtc "
+                  "-o frames.pdb -pbc mol -center -skip 25"],
+          f"groups: one group and no index file is no longer the old command: {one}")
+    two = steps("Protein, Ion")
+    check(len(two) == 2 and two[0].startswith("{cmd} select ")
+          and '\'"Protein_Ion" group "Protein" or group "Ion"\'' in two[0]
+          and "-n shown.ndx" in two[1] and "Protein_Ion\\nProtein_Ion" in two[1],
+          f"groups: two groups are not joined into one before trjconv: {two}")
+    merged = steps("Oxygens, System", index=True)
+    check(len(merged) == 4 and "make_ndx" in merged[0] and "ice.ndx standard.ndx" in merged[1]
+          and "-n groups.ndx" in merged[2] and "-n shown.ndx" in merged[3],
+          f"groups: an index file is not merged with the system's own groups: {merged}")
+    quoted = steps('Pro"tein')
+    check(quoted[0].startswith("error:"), "groups: a name with a quote in it was let through")
+
+    with tempfile.TemporaryDirectory() as work:
+        ndx = Path(work) / "two.ndx"
+        ndx.write_text("[ Oxygens ]\n1 5 9\n13\n[ Water ]\n1 2 3 4\n")
+        read = groups.read_ndx(str(ndx))
+    check(read == [{"name": "Oxygens", "atoms": 4}, {"name": "Water", "atoms": 4}],
+          f"groups: an index file was read wrongly: {read}")
+    print("trajectory groups: one group as before, several joined, and an index "
+          "file merged with the system's own groups")
+
+
 def check_canvas_panning() -> None:
     """Can you move the canvas about on a laptop trackpad?
 
@@ -2525,6 +2605,7 @@ CHECKS = (
     check_chunk_inputs,
     check_switch_off_editor,
     check_param_boxes,
+    check_mdp_boxes,
     check_viewer_turn,
     check_file_picker,
     check_port_in_use,
@@ -2536,6 +2617,7 @@ CHECKS = (
     check_script_help,
     check_keepalive,
     check_trajectory_carries_its_run_file,
+    check_trajectory_groups,
     check_file_tidying,
     check_chain_letters_survive,
     check_following_a_run,
