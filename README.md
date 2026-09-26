@@ -12,7 +12,7 @@ single processor:
 
 | tutorial | what happens | time online |
 | --- | --- | --- |
-| **An ice cube melting** | a tiny ice cube at room temperature melts into a drop; the same cube in deep cold holds | about 3 minutes |
+| **An ice cube melting** | a tiny ice cube, heated from 200 K to 1000 K in one run, melts into a drop, and the drop boils away into a gas | about 2 and a half minutes |
 | **Lysozyme in Water** | the classic first GROMACS tutorial: a protein in a box of water, from download to analysis | about 9 minutes |
 
 I measured these times on mybinder.org, where each person gets one processor.

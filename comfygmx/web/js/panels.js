@@ -3710,12 +3710,36 @@ const Panels = {
      drift from what is under it, and typing in the box hides every section
      that does not match -- which is how you find "maxwarn" without knowing
      that it lives under Running. */
+  /* The table of file kinds in Help, from the same FILE_GUIDE the sockets
+     explain themselves with, each beside the colour its wires are drawn in. */
+  _fileGuideTable() {
+    const guide = Editor.fileGuide || {};
+    const safe = (text) => String(text).replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const rows = Object.entries(guide)
+      .filter(([key]) => key !== 'file')
+      .map(([key, entry]) => '<tr><th>'
+        + `<span class="help-swatch" style="background:${PORT_COLORS[key] || PORT_COLORS.file}"></span>`
+        + `${safe(entry.name)}<br><code>${safe(entry.endings)}</code></th>`
+        + `<td>${safe(entry.what)}</td></tr>`);
+    return rows.length
+      ? `<table class="help-files">${rows.join('')}</table>`
+      : '<p>The list has not arrived from the server yet. Open Help again in a moment.</p>';
+  },
+
   help() {
     const body = UI.el('div', { class: 'help-page' });
     const article = UI.el('article');
     body.appendChild(UI.el('nav', { class: 'help-toc' }));
     body.appendChild(article);
     article.innerHTML = `
+      <h2>Files</h2>
+      <h3>The kinds of file, and what is in them</h3>
+      <p>Every wire carries a file from the block that makes it to the blocks that
+      use it, and its colour says which kind of file that is. <b>Point at any socket,
+      or at a dot on a box's wall,</b> to read what it carries. Here are all of
+      them.</p>
+      ${this._fileGuideTable()}
       <h2>The graph</h2>
       <h3>Working with the graph</h3>
       <table>
@@ -3770,6 +3794,17 @@ const Panels = {
       of making a second copy. Only something that produces a file goes on a wall: a
       wire dragged backwards out of a socket waiting to be fed has nothing behind it to
       hang there.</p>
+
+      <p><b>Wires run left to right through a wall, as they do through a block.</b> A
+      cable that leaves its box through the right wall sets off to the right, and one
+      that comes into a box through the left wall arrives from the left. So a cable going
+      to a box underneath runs out to the right, round through the gap between the two
+      boxes and in from the left, instead of cutting back across the box it has just
+      left. When several cables make that trip together, they wrap round the corners
+      like a bundle: the one nearest the corner turns tightest, and each one further out
+      swings a little wider, so they never cross. A cable you put on the other wall,
+      leaving through the left or arriving through the right, bends whichever way is
+      shorter.</p>
 
       <p><b>Each cable is named beside its dot</b>, as shortly as it can be and still
       say which one it is. Usually that is just what comes out of the socket, such as

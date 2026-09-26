@@ -439,7 +439,7 @@ def h_info(self: Handler) -> None:
 def h_nodes(self: Handler) -> None:
     # The file-type table rides along with the catalogue rather than living in
     # the browser as a second copy: the same map in two languages drifts.
-    from .nodes.io_nodes import KIND_BY_SUFFIX
+    from .nodes.io_nodes import FILE_GUIDE, KIND_BY_SUFFIX
     categories = REGISTRY.categories()
     # The force-field list on the topology block is read off the disk each
     # time the catalogue is asked for, so a .ff folder dropped into the
@@ -468,7 +468,8 @@ def h_nodes(self: Handler) -> None:
                                             if found.get("gmx_top") else ""))
                         break
     self._json({"categories": categories,
-                "file_kinds": dict(KIND_BY_SUFFIX)})
+                "file_kinds": dict(KIND_BY_SUFFIX),
+                "file_guide": FILE_GUIDE})
 
 
 def h_gmx_forcefields(self: Handler) -> None:

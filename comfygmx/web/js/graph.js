@@ -53,6 +53,24 @@ function kindOfFile(path) {
   return (Editor.fileKinds || {})[name.slice(dot + 1).toLowerCase()] || 'file';
 }
 
+/* What a socket carries, in words: its name, then what kind of file that is
+   and what is in it, from the server's FILE_GUIDE (comfygmx/nodes/io_nodes.py).
+   A socket that only says "file" is looked up by its own name, the way the
+   server does it: an mdrun's energies, checkpoint and log are all plain files
+   as far as wiring goes, but they are nothing alike. */
+function fileAbout(label, type, portName) {
+  const guide = Editor.fileGuide || {};
+  const loose = type === 'file' || type === 'any';
+  const entry = (loose && guide[portName]) || guide[type] || (loose && guide.file);
+  if (!entry) return `${label} (${type})`;
+  // "checkpoint: checkpoint" says nothing twice.
+  const kind = entry.name.toLowerCase();
+  const head = String(label).toLowerCase() === kind
+    ? `${entry.name} (${entry.endings})`
+    : `${label}: ${kind} (${entry.endings})`;
+  return `${head}\n${entry.what}`;
+}
+
 /* Parameters that hold the name of the file a port will carry, in the order
    they win. Most nodes are covered by this list; a node that decides it
    differently says so in FILE_NAME_FOR rather than putting its own rule inside
@@ -294,6 +312,14 @@ const GROUP_PAD = 16;
    number caps how wide one name may be drawn, so what is checked for and what
    is written are the same thing. */
 const NAME_STRIP = 150;
+
+/* How much wider each cable of a bundle swings where the bundle turns back
+   round the corner of a box (see _swingWider): this much more pull on the
+   curve for every pixel its dot sits further from the corner than the dot
+   nearest the corner does. Tried on the tutorials: with less than about 16,
+   two cables side by side still touch where they turn; with 16 they stay a
+   dot's width apart all the way round. */
+const SWING_PER_PX = 16;
 
 /* How long two edits of the same thing count as one undo step. Typing into a
    text field fires a change per keystroke, and forty keystrokes must not be
@@ -1173,14 +1199,18 @@ const Editor = {
 
   _buildPort(node, port, direction) {
     const type = portType(node, port);
+    // Pointing at a socket, or at its name, says what kind of file goes
+    // through it and what is in one: most people meeting a tpr for the first
+    // time have no way to guess.
+    const about = `${fileAbout(port.label, type, port.name)}\n\n`
+      + (direction === 'in'
+        ? 'Double-click to unplug it.'
+        : 'Double-click to put it on the right-hand wall of its box.');
     const dot = UI.el('span', {
       class: 'port',
       'data-node': node.id, 'data-port': port.name,
       'data-dir': direction, 'data-type': type,
-      title: direction === 'in'
-        ? `${port.label} (${type}) -- double-click to unplug it`
-        : `${port.label} (${type}) -- double-click to put it on the right-hand `
-          + 'wall of its box',
+      title: about,
     });
     dot.style.background = PORT_COLORS[type] || PORT_COLORS.any;
     dot.addEventListener('mousedown', (event) => this._startLinkDrag(event, node, port, direction));
@@ -1192,7 +1222,7 @@ const Editor = {
 
     const row = UI.el('div', {
       class: `port-row${port.optional ? ' optional' : ''}`,
-    }, [dot, UI.el('span', { class: 'label', text: port.label })]);
+    }, [dot, UI.el('span', { class: 'label', text: port.label, title: about })]);
     return row;
   },
 
@@ -2495,10 +2525,10 @@ const Editor = {
       'data-node': node.id, 'data-port': port.name,
       'data-dir': 'out', 'data-type': type,
       'data-group': group.id, 'data-patch': '1', 'data-wall': entry.side,
-      title: used
-        ? `${name} (${type}) — drag from here to wire it somewhere else too`
-        : `${name} (${type}) — nothing wired from it yet. Drag from here to `
-          + 'whatever needs it',
+      title: `${fileAbout(name, type, port.name)}\n\n`
+        + (used
+          ? 'Drag from here to wire it somewhere else too.'
+          : 'Nothing is wired from it yet. Drag from here to whatever needs it.'),
     });
     dot.style.background = PORT_COLORS[type] || PORT_COLORS.any;
     this._groupDots.set(`${group.id}|${node.id}|${port.name}|out`, dot);
@@ -2514,7 +2544,8 @@ const Editor = {
       this._patchMenu(event, group, entry, name);
     });
     return UI.el('div', { class: `wall-row ${entry.side}` },
-                 [dot, UI.el('span', { class: 'wall-name', text: name })]);
+                 [dot, UI.el('span', { class: 'wall-name', text: name,
+                                       title: fileAbout(name, type, port.name) })]);
   },
 
   _patchMenu(event, group, entry, name) {
@@ -3013,9 +3044,84 @@ const Editor = {
     };
   },
 
+  /* Does a wire pass through this wall dot from left to right, the way it
+     passes through a block?
+
+     Yes for the two ordinary uses of a wall: a file leaving its box through
+     a dot on the box's right-hand wall, and a file arriving through a dot on
+     the left-hand wall of the box it is going into. Those dots then behave
+     like a block's own sockets -- the wire comes in from the left and goes
+     on to the right, whatever the next stop is. So a file going from one box
+     to another box underneath it leaves to the right, runs round through the
+     gap between the two boxes and comes in from the left, just as a wire
+     between two blocks stacked one above the other does. Leaning towards the
+     other end instead would turn it straight back across the box it had
+     just left.
+
+     No for a file put on the other wall -- leaving through the left wall, or
+     arriving through the right one. Such a dot has no natural side, so the
+     wire leans towards the other end of that stretch. */
+  _wallGoesRight(dot, role) {
+    const side = dot && dot.dataset ? dot.dataset.wall : '';
+    return side === (role === 'out' ? 'east' : 'west');
+  },
+
+  /* The highest and the lowest dot on each wall, keyed by box and side. */
+  _measureWalls() {
+    const spans = new Map();
+    for (const dot of this._groupDots.values()) {
+      const at = dot && dot.dataset && this.groupPortCenter(dot);
+      if (!at) continue;
+      const key = `${dot.dataset.group}|${dot.dataset.wall}`;
+      const span = spans.get(key);
+      if (span) {
+        span.top = Math.min(span.top, at.y);
+        span.bottom = Math.max(span.bottom, at.y);
+      } else {
+        spans.set(key, { top: at.y, bottom: at.y });
+      }
+    }
+    return spans;
+  },
+
+  /* How much wider than usual each end of a stretch swings, when a cable
+     has to turn back round the corner of a box.
+
+     That happens to a cable that leaves its box through the right-hand wall
+     for a left-hand wall further left -- usually that of the box underneath.
+     It goes out to the right, round the corner, back along the gap and in
+     from the left. A box often sends two or three such cables to the same
+     box, and drawn with the same curve, each one dot lower than the last,
+     they cut across each other where they turn. So they wrap round the
+     corners the way the cables in a real bundle do: the one whose dot is
+     nearest the corner turns tightest, and each dot further from it swings a
+     little wider. Any other stretch gets nothing extra and is drawn as it
+     always was. */
+  _swingWider(from, to) {
+    if (!from.dot || !to.dot || !from.onward || !to.onward || to.at.x >= from.at.x) {
+      return [0, 0];
+    }
+    const spans = this._spans || this._measureWalls();
+    const wall = (dot) => spans.get(`${dot.dataset.group}|${dot.dataset.wall}`);
+    const out = wall(from.dot);
+    const into = wall(to.dot);
+    if (!out || !into) return [0, 0];
+    // Going down, the cable turns round the bottom corner of the box it
+    // leaves and the top corner of the box it enters; going up, the other
+    // two.
+    const down = to.at.y >= from.at.y;
+    return [
+      SWING_PER_PX * (down ? out.bottom - from.at.y : from.at.y - out.top),
+      SWING_PER_PX * (down ? to.at.y - into.top : into.bottom - to.at.y),
+    ];
+  },
+
   drawWires() {
     const svg = this.dom.wires;
     svg.innerHTML = '';
+    // Where the dots on each wall reach, for _swingWider. Measured once here
+    // rather than for every wire.
+    this._spans = this._measureWalls();
     // Wall dots some wire goes through. The rest get a line of their own
     // after the loop.
     const used = new Set();
@@ -3048,30 +3154,34 @@ const Editor = {
         || PORT_COLORS.any;
 
       // Every place the wire touches, in order: the block that makes the
-      // thing, then any walls, then the block that takes it.
-      const stops = [atBlockOut];
-      for (const dot of [outDot, inDot]) {
+      // thing, then any walls, then the block that takes it. Each stop
+      // remembers whether the wire has to pass through it from left to
+      // right, the way it passes through a block.
+      const stops = [{ at: atBlockOut, onward: true }];
+      for (const [dot, role] of [[outDot, 'out'], [inDot, 'in']]) {
         const at = dot && this.groupPortCenter(dot);
-        if (at) stops.push(at);
+        if (at) stops.push({ at, dot, onward: this._wallGoesRight(dot, role) });
       }
-      stops.push(atBlockIn);
+      stops.push({ at: atBlockIn, onward: true });
 
       const target = this.nodes.get(link.to_node);
       const naming = `${source.title} to ${target ? target.title : link.to_node}`;
 
       // Which way a wire sets off and which way it arrives. A block's output
       // is on its right and its input on its left, so those two ends never
-      // change. A dot on a wall has no fixed side: it leans towards wherever
-      // the other end of that stretch happens to be. That is what stops a
-      // cable that doubles back at a wall from swinging out in a long S
-      // before coming back -- it makes a short, neat U instead.
+      // change, and neither do the wall dots that work the same way (see
+      // _wallGoesRight). Any other wall dot leans towards wherever the other
+      // end of that stretch happens to be. That is what stops a cable that
+      // doubles back at such a wall from swinging out in a long S before
+      // coming back -- it makes a short, neat U instead.
       const lean = (a, b) => (b.x >= a.x ? 1 : -1);
       for (let i = 0; i + 1 < stops.length; i += 1) {
-        const a = stops[i];
-        const b = stops[i + 1];
+        const a = stops[i].at;
+        const b = stops[i + 1].at;
         const shape = this._bezier(a, b,
-          i === 0 ? 1 : lean(a, b),
-          i + 2 === stops.length ? -1 : lean(b, a));
+          stops[i].onward ? 1 : lean(a, b),
+          stops[i + 1].onward ? -1 : lean(b, a),
+          this._swingWider(stops[i], stops[i + 1]));
 
         // Each stretch is a pair: an invisible fat stroke that catches the
         // pointer, and the thin one you actually see drawn on top of it.
@@ -3122,6 +3232,7 @@ const Editor = {
     for (const dot of this._groupDots.values()) {
       if (!used.has(dot)) this._drawWaitingCable(svg, dot);
     }
+    this._spans = null;
     if (this._linkDrag && this._linkDrag.temp) svg.appendChild(this._linkDrag.temp);
   },
 
@@ -3156,11 +3267,18 @@ const Editor = {
     const from = fromWall
       || this.portCenter(dot.dataset.node, dot.dataset.port, 'out');
     if (!from || !to) return;
-    // A block's output always sets off to the right. A wall dot leans towards
-    // whichever side the other end is on, the same rule the wires follow.
+    // A block's output always sets off to the right, and so does a wall dot
+    // the file leaves its box through on the right-hand wall. Any other wall
+    // dot leans towards whichever side the other end is on. The same rule
+    // the wires follow (see _wallGoesRight).
+    const role = home && home !== dot.dataset.group ? 'in' : 'out';
+    const leaves = !fromWall || this._wallGoesRight(exit, 'out');
+    const arrives = this._wallGoesRight(dot, role);
     const shape = this._bezier(from, to,
-      fromWall ? (to.x >= from.x ? 1 : -1) : 1,
-      from.x >= to.x ? 1 : -1);
+      leaves ? 1 : (to.x >= from.x ? 1 : -1),
+      arrives ? -1 : (from.x >= to.x ? 1 : -1),
+      this._swingWider({ at: from, dot: fromWall ? exit : null, onward: leaves },
+                       { at: to, dot, onward: arrives }));
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     line.setAttribute('class', 'wire-line');
     const grab = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -3291,16 +3409,17 @@ const Editor = {
     this.drawWires();
   },
 
-  /* The curve between two points. The last two numbers say which way the
+  /* The curve between two points. The next two numbers say which way the
      wire sets off and which way it arrives: 1 for rightwards, -1 for
      leftwards. Left out, they give the ordinary case of a wire leaving the
      right-hand side of one block and arriving at the left-hand side of the
-     next. */
-  _bezier(from, to, fromDir = 1, toDir = -1) {
+     next. The last one, also optional, makes the curve swing wider at its
+     start and at its end by that much (see _swingWider). */
+  _bezier(from, to, fromDir = 1, toDir = -1, wider = [0, 0]) {
     const dx = Math.max(50, Math.abs(to.x - from.x) * 0.55);
     return `M ${from.x} ${from.y} `
-      + `C ${from.x + dx * fromDir} ${from.y} `
-      + `${to.x + dx * toDir} ${to.y} ${to.x} ${to.y}`;
+      + `C ${from.x + (dx + wider[0]) * fromDir} ${from.y} `
+      + `${to.x + (dx + wider[1]) * toDir} ${to.y} ${to.x} ${to.y}`;
   },
 
   refreshPortStates() {
@@ -3811,14 +3930,19 @@ const Editor = {
       const world = this.screenToWorld(event.clientX, event.clientY);
       // Started on a wall? Then the wire should come out from under the
       // pointer, at the dot you took hold of, not from the block on the far
-      // side of the box. A wall dot has no fixed side, so the wire leans
-      // whichever way you are pulling it.
+      // side of the box. A dot that works like a block's socket sets off to
+      // the right, as a block's output does; any other wall dot has no fixed
+      // side, so the wire leans whichever way you are pulling it. The same
+      // rule the finished wire follows (see _wallGoesRight).
       const dot = this._linkDrag.dot;
       const anchor = (dot && this.groupPortCenter(dot))
         || this.portCenter(this._linkDrag.node.id, this._linkDrag.port.name,
           this._linkDrag.direction);
       if (anchor) {
-        const lean = dot ? (world.x >= anchor.x ? 1 : -1) : 1;
+        const home = this._homeOf && this._homeOf.get(this._linkDrag.node.id);
+        const role = dot && home !== dot.dataset.group ? 'in' : 'out';
+        const lean = !dot || this._wallGoesRight(dot, role)
+          ? 1 : (world.x >= anchor.x ? 1 : -1);
         const path = this._linkDrag.direction === 'out'
           ? this._bezier(anchor, world, lean, -lean)
           : this._bezier(world, anchor);

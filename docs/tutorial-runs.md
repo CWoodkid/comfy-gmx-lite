@@ -11,7 +11,7 @@ they are online, so they took no time.
 
 | # | Tutorial | Blocks | From Run to the last block | of which, simulating |
 |---|---|---|---|---|
-| 1 | An ice cube melting | 27 | 2 min 48 s | 2 min 26 s |
+| 1 | An ice cube melting | 22 | 2 min 26 s | 2 min 6 s |
 | 1 | Lysozyme in Water | 50 | 7 min 41 s | 6 min 47 s |
 
 ## On mybinder.org
@@ -22,32 +22,47 @@ the page:
 
 | Tutorial | Blocks | 2i2c site | of which, simulating | GESIS site | of which, simulating |
 |---|---|---|---|---|---|
-| An ice cube melting | 27 | 3 min 12 s | 2 min 50 s | 3 min 15 s | 2 min 51 s |
+| The ice cube's earlier version, two runs | 27 | 3 min 12 s | 2 min 50 s | 3 min 15 s | 2 min 51 s |
 | Lysozyme in Water | 50 | 8 min 36 s | 7 min 37 s | 8 min 50 s | 7 min 46 s |
 
-That is between 12 and 16 per cent slower than the table above. Each session
-stayed open for the whole twelve minutes, and the page showed every step as it
-happened.
+That is between 12 and 16 per cent slower than the online copy on my
+workstation was. Each session stayed open for the whole twelve minutes, and
+the page showed every step as it happened.
+
+The ice tutorial timed there was the earlier version, with two runs of 100 ps,
+one at 300 K and one at 200 K. Later the same day I replaced them with the one
+run that heats the cube from 200 K to 1000 K. That run takes the same number of
+steps, 100,000, and in the online copy on my workstation the new version was
+22 seconds faster than the old one. I have not timed it on mybinder.org yet.
 
 ## An ice cube melting
 
 | run | length | time |
 |---|---|---|
 | minimisation | n/a | 1 s |
-| warm, 300 K | 100 ps | 74 s |
-| cold, 200 K | 100 ps | 71 s |
-| counting the ice | 201 frames, each run | 7.5 s each |
+| heating, 200 K to 1000 K | 200 ps | 125 s |
+| counting the ice | 401 frames | 14 s |
 
-What it came out as:
+I ran it twice. It took 2 min 24 s the first time and 2 min 26 s the second;
+the times of each part above are from the second.
+
+What it came out as, the first time:
 
 - The crystal: 768 molecules, 2.71 × 3.13 × 2.95 nm, with no overall dipole.
-  442 of them pass the ice test at the start. The rest sit on the surface,
+  439 of them pass the ice test at the start. The rest sit on the surface,
   with too few neighbours to pass.
-- Warm: 180 still ice after 1 ps, 105 at 10 ps, 15 at 30 ps, none from 40 ps
-  on. Radius of gyration 1.46 → 1.38 nm.
-- Cold: 270 still ice after 1 ps, then about 250 on average over the first
-  50 ps and 240 over the second, going up and down by 20 or 30 from frame to
-  frame. Radius of gyration 1.46 → 1.42 nm.
+- The temperature followed the thermostat: 202 K at the start, 303 K at 50 ps,
+  412 K at 100 ps, 683 K at 150 ps and 1017 K at the end.
+- Ice: 274 still ice after 1 ps, 224 at 20 ps, 135 at 40 ps, 56 at 60 ps, and
+  none from 68.5 ps on.
+- Radius of gyration: 1.46 nm at the start, 1.38 nm at 73 ps as a drop, back
+  above 1.45 nm at 105 ps as the drop began to boil away, 2.65 nm at 160 ps,
+  and 2.73 nm at the end, with the gas spread through the box.
+- Potential energy: −45,930 kJ/mol at the start, −6,800 kJ/mol at the end.
+
+The second time, 442 passed the ice test at the start and the ice was all but
+gone at 61 ps rather than 67. Two runs never follow quite the same path, and a
+few picoseconds either way is the size of the difference to expect.
 
 There is more in [ice-melting.md](ice-melting.md).
 

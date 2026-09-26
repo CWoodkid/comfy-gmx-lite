@@ -692,6 +692,12 @@ textarea.code {
   border-bottom: 1px solid var(--line);
 }
 .help-page article h2:first-child { margin-top: 0; }
+/* The colour a kind of file's wires are drawn in, beside its name. */
+.help-swatch {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 6px; vertical-align: 0;
+}
+.help-files th { white-space: nowrap; }
 .help-page article.nothing-found::after {
   content: "Nothing in the help says that.";
   display: block; color: var(--text-faint); font-size: 12px; padding: 12px 2px;

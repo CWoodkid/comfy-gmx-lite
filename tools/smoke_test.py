@@ -25,6 +25,7 @@ from comfygmx.chunks import CHUNKS                     # noqa: E402
 from comfygmx.config import Settings                   # noqa: E402
 from comfygmx.executor import dry_plan                 # noqa: E402
 from comfygmx.graph import Graph                       # noqa: E402
+from comfygmx.nodes.io_nodes import file_guide_for    # noqa: E402
 from comfygmx.nodes.base import (NodeError, PlanContext,   # noqa: E402
                                  ToolMissing)
 
@@ -68,7 +69,12 @@ def check_registry() -> None:
                   f"{spec['type']} hint names {hint.get('command')!r}")
         for port in spec["inputs"] + spec["outputs"]:
             check(bool(port["type"]), f"{spec['type']} port {port['name']} has no type")
-    print(f"registry: {len(specs)} node types, {len(REGISTRY.categories())} categories")
+            # Pointing at any socket says what kind of file it carries.
+            check(bool(file_guide_for(port["type"], port["name"])),
+                  f"{spec['type']} port {port['name']} ({port['type']}) has no "
+                  "explanation in FILE_GUIDE, comfygmx/nodes/io_nodes.py")
+    print(f"registry: {len(specs)} node types, {len(REGISTRY.categories())} categories, "
+          "every socket explained")
 
 
 def check_flag_hints() -> None:
@@ -2357,9 +2363,10 @@ def check_doc_counts() -> None:
 #: packaged tutorial is spaced by the estimate, and an estimate that drifts
 #: 40 px low puts a note through the node underneath it.
 MEASURED_NOTE_HEIGHTS = [
-    # Measured 2026-09-25 in the browser, note card 536 px wide.
-    (296, "note_what"), (312, "note_build"), (296, "note_warm"),
-    (296, "note_cold"), (376, "note_read"),
+    # Measured 2026-09-26 in the browser, note card 536 px wide, after the
+    # two runs at 300 K and 200 K became one heating run.
+    (328, "note_what"), (360, "note_build"), (440, "note_heat"),
+    (519, "note_read"),
 ]
 
 

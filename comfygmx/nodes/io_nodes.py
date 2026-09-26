@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import shlex
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from .base import (
     Node, NodeError, Param, Plan, PlanContext, Port, copy_in,
@@ -372,6 +372,124 @@ def kind_of(name: str) -> str:
     """The declared type a file's name implies, or 'file' when it implies none."""
     suffix = Path(name).suffix.lstrip(".").lower()
     return KIND_BY_SUFFIX.get(suffix, "file")
+
+
+#: What each kind of file is, in a few plain sentences, for somebody meeting
+#: molecular dynamics for the first time. The editor shows the right one when
+#: you point at a socket or at a dot on a box's wall, and Help lists them all.
+#:
+#: Keyed by the kind of file a socket carries. A socket that only says "file"
+#: is looked up by its own name instead: an mdrun's energies, checkpoint and
+#: log are all plain files as far as wiring goes, but they are nothing alike.
+#: tools/smoke_test.py checks that every socket of every block finds an entry
+#: here, so a new block cannot arrive without its files being explained.
+FILE_GUIDE: Dict[str, Dict[str, str]] = {
+    "structure": {
+        "name": "Structure", "endings": ".gro, .pdb",
+        "what": "Where every atom is at one moment: a single snapshot. A .pdb "
+                "file is how the Protein Data Bank shares structures; a .gro "
+                "file is GROMACS's own kind, and it also keeps the size of the "
+                "box.",
+    },
+    "topology": {
+        "name": "Topology", "endings": ".top",
+        "what": "The recipe for the molecules: which atoms there are, which ones "
+                "are bonded together, their charges and sizes, and how many of "
+                "each molecule the system holds. The structure says where the "
+                "atoms are; the topology says how they pull and push on each "
+                "other. A .top file often reads in .itp files, one for each kind "
+                "of molecule.",
+    },
+    "mdp": {
+        "name": "Run settings", "endings": ".mdp",
+        "what": "A plain text list of choices for one run: how many steps, how "
+                "long each step is, the temperature, the pressure, and how far "
+                "apart atoms still feel each other. The letters stand for "
+                "molecular dynamics parameters.",
+    },
+    "tpr": {
+        "name": "Run input", "endings": ".tpr",
+        "what": "grompp checks the structure, the topology and the run settings "
+                "against each other and packs all three into this one file. "
+                "mdrun needs nothing else to start, and the measuring blocks "
+                "read it to know which atom is which. It is not text: GROMACS "
+                "can read it, a text editor cannot.",
+    },
+    "traj": {
+        "name": "Trajectory", "endings": ".xtc, .trr",
+        "what": "The film of the run: the positions of the atoms, saved again "
+                "and again while the simulation goes on. An .xtc file keeps "
+                "positions only, rounded to a thousandth of a nanometre to save "
+                "space; a .trr file keeps them in full, and can hold speeds and "
+                "forces too.",
+    },
+    "index": {
+        "name": "Index", "endings": ".ndx",
+        "what": "Named lists of atom numbers, such as Protein or Oxygens, so a "
+                "block can work on one part of the system and leave out the "
+                "rest.",
+    },
+    "xvg": {
+        "name": "Graph data", "endings": ".xvg",
+        "what": "A table of numbers ready to plot, such as temperature against "
+                "time, with the title and the labels of the axes written at the "
+                "top. Plain text; GROMACS's measuring tools all write it.",
+    },
+    "posre": {
+        "name": "Position restraints", "endings": ".itp",
+        "what": "A list of atoms to hold near where they started, each on a "
+                "spring, while everything around them settles. pdb2gmx writes "
+                "one for the protein.",
+    },
+    "ffdir": {
+        "name": "Force field", "endings": "a folder ending in .ff",
+        "what": "The rule book for a whole family of molecules: the size, charge "
+                "and bond strengths of every kind of atom they are made of. "
+                "pdb2gmx reads it to write the topology.",
+    },
+    # Sockets that only say "file", by their own name.
+    "edr": {
+        "name": "Energies", "endings": ".edr",
+        "what": "Temperature, pressure, the different kinds of energy and more, "
+                "noted down many times during the run. 'Energy terms' takes out "
+                "the ones you ask for and turns them into a graph.",
+    },
+    "checkpoint": {
+        "name": "Checkpoint", "endings": ".cpt",
+        "what": "Everything needed to carry on a run exactly where it stopped, "
+                "the speed of every atom included. The next run starts from it, "
+                "so the molecules keep moving the way they were.",
+    },
+    "log": {
+        "name": "Log", "endings": ".log",
+        "what": "What mdrun wrote while it worked: the settings it used, the "
+                "energies every so often, and at the end how fast it ran.",
+    },
+    "dat": {
+        "name": "Secondary structure", "endings": ".dat",
+        "what": "One line of letters for every saved frame, one letter for each "
+                "piece of the protein: whether it is part of a helix, a strand, "
+                "or neither.",
+    },
+    "radii": {
+        "name": "Particle sizes", "endings": ".dat",
+        "what": "How big each kind of atom counts as for this measurement. Left "
+                "out, GROMACS uses its own list.",
+    },
+    "file": {
+        "name": "A file", "endings": "any",
+        "what": "Any file at all. What is inside depends on the block that "
+                "wrote it.",
+    },
+}
+
+
+def file_guide_for(kind: str, name: str = "") -> Dict[str, str]:
+    """The FILE_GUIDE entry for a socket, or {} when there is none."""
+    loose = kind in ("file", "any")
+    if loose and name in FILE_GUIDE:
+        return FILE_GUIDE[name]
+    return FILE_GUIDE.get(kind) or (FILE_GUIDE["file"] if loose else {})
 
 
 class FetchUrlNode(Node):

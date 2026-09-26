@@ -6,10 +6,10 @@
       "type": "util.note",
       "pos": [
         0,
-        -201
+        0
       ],
       "params": {
-        "text": "STEPS 1-2 - Topology\n1AKI is hen egg white lysozyme. The crystal waters are stripped before pdb2gmx; keeping them would be right only if one were functional.\n\nThe tutorial uses CHARMM36, which GROMACS does not ship. Point the 'Force field directory' node at your unpacked *.ff folder, or delete that node and pick a bundled force field on pdb2gmx instead."
+        "text": "STEPS 1-2 - Topology\n1AKI is hen egg white lysozyme. The crystal waters are stripped before pdb2gmx; keeping them would be right only if one were functional.\n\nThe tutorial uses CHARMM36, which GROMACS does not ship. Point the 'Force field directory' node at your unpacked *.ff folder, or delete that node and pick a bundled force field on pdb2gmx instead.\n\nPoint at any socket to see what kind of file goes through it; Help (the ? at the top) lists them all."
       }
     },
     {
@@ -17,7 +17,7 @@
       "type": "gmx.forcefield",
       "pos": [
         0,
-        144
+        393
       ],
       "params": {
         "source": "archive URL",
@@ -30,7 +30,7 @@
       "type": "io.structure",
       "pos": [
         300,
-        144
+        393
       ],
       "params": {
         "source": "the Protein Data Bank",
@@ -43,7 +43,7 @@
       "type": "prep.clean",
       "pos": [
         600,
-        144
+        393
       ],
       "params": {
         "drop_water": true,
@@ -59,7 +59,7 @@
       "type": "gmx.pdb2gmx",
       "pos": [
         900,
-        144
+        393
       ],
       "params": {
         "forcefield": "charmm36-jul2022",
@@ -72,8 +72,8 @@
       "id": "note_solv",
       "type": "util.note",
       "pos": [
-        1200,
-        -201
+        0,
+        1326
       ],
       "params": {
         "text": "STEP 3 - Box and solvent\nA cubic box with 1.2 nm between the protein and every edge, then filled with SPC216 water (a generic 3-point box that relaxes into TIP3P).\nsolvate updates [ molecules ] in the topology as it goes."
@@ -83,8 +83,8 @@
       "id": "box",
       "type": "gmx.editconf",
       "pos": [
-        1200,
-        144
+        600,
+        1166
       ],
       "params": {
         "box_type": "cubic",
@@ -97,8 +97,8 @@
       "id": "solv",
       "type": "gmx.solvate",
       "pos": [
-        1524,
-        144
+        900,
+        1166
       ],
       "params": {
         "solvent": "spc216.gro",
@@ -109,8 +109,8 @@
       "id": "note_ions",
       "type": "util.note",
       "pos": [
-        1848,
-        -201
+        0,
+        2157
       ],
       "params": {
         "text": "STEP 4 - Ions\nLysozyme carries +8e, so 8 Cl- replace 8 waters. genion needs a tpr, which means a throwaway grompp first - this node runs both, so the pair of commands the tutorial issues is one node here.\n'SOL' is the group to replace: you do not want ions substituted into the protein."
@@ -120,8 +120,8 @@
       "id": "mdp_ions",
       "type": "util.mdp",
       "pos": [
-        1848,
-        667
+        600,
+        1997
       ],
       "params": {
         "preset": "lysozyme_ions",
@@ -132,8 +132,8 @@
       "id": "ions",
       "type": "gmx.genion",
       "pos": [
-        1848,
-        144
+        900,
+        1997
       ],
       "params": {
         "neutral": true,
@@ -149,8 +149,8 @@
       "id": "note_em",
       "type": "util.note",
       "pos": [
-        0,
-        827
+        2250,
+        925
       ],
       "params": {
         "text": "STEP 5 - Energy minimisation\nSteepest descent until Fmax < 1000 kJ/mol/nm. Two numbers in the log matter: Epot should be large and negative (order -1e6 here) and Fmax should be below the tolerance. If it is not, the geometry is bad and no amount of equilibration will rescue it."
@@ -160,8 +160,8 @@
       "id": "mdp_min",
       "type": "util.mdp",
       "pos": [
-        0,
-        1156
+        1950,
+        393
       ],
       "params": {
         "preset": "lysozyme_min",
@@ -172,8 +172,8 @@
       "id": "grompp_em",
       "type": "gmx.grompp",
       "pos": [
-        300,
-        1156
+        2250,
+        393
       ],
       "params": {
         "output": "em.tpr",
@@ -184,8 +184,8 @@
       "id": "mdrun_em",
       "type": "gmx.mdrun",
       "pos": [
-        600,
-        1156
+        2550,
+        393
       ],
       "params": {
         "deffnm": "em",
@@ -196,8 +196,8 @@
       "id": "energy_pot",
       "type": "gmx.energy",
       "pos": [
-        900,
-        1156
+        2850,
+        393
       ],
       "params": {
         "terms": "Potential\n",
@@ -208,8 +208,8 @@
       "id": "plot_pot",
       "type": "view.plot",
       "pos": [
-        1200,
-        1156
+        3150,
+        393
       ],
       "params": {}
     },
@@ -217,8 +217,8 @@
       "id": "note_nvt",
       "type": "util.note",
       "pos": [
-        0,
-        2017
+        2250,
+        2044
       ],
       "params": {
         "text": "STEP 6 - NVT equilibration\n5 ps here, with the protein position-restrained and velocities generated at 298 K. The tutorial runs 100 ps; on one processor that alone would take half an hour. The point is to let the solvent settle around a fixed solute.\nWatch the temperature. It drops at once, because about half of the energy handed out as speed goes straight into the molecules pulling on each other; then the thermostat brings it back to 298 K. The tutorial's thermostat corrects slowly (tau-t = 1 ps), which is fine over 100 ps but would not get there in 5, so here it corrects ten times faster (tau-t = 0.1 ps).\ngrompp needs -r for the restraint reference: that is the second wire from the minimised structure, into the 'restraint' port."
@@ -228,8 +228,8 @@
       "id": "mdp_nvt",
       "type": "util.mdp",
       "pos": [
-        0,
-        2426
+        1950,
+        1512
       ],
       "params": {
         "preset": "lysozyme_nvt",
@@ -244,8 +244,8 @@
       "id": "grompp_nvt",
       "type": "gmx.grompp",
       "pos": [
-        300,
-        2426
+        2250,
+        1512
       ],
       "params": {
         "output": "nvt.tpr"
@@ -255,8 +255,8 @@
       "id": "mdrun_nvt",
       "type": "gmx.mdrun",
       "pos": [
-        600,
-        2426
+        2550,
+        1512
       ],
       "params": {
         "deffnm": "nvt",
@@ -267,8 +267,8 @@
       "id": "energy_temp",
       "type": "gmx.energy",
       "pos": [
-        900,
-        2426
+        2850,
+        1512
       ],
       "params": {
         "terms": "Temperature\n",
@@ -279,8 +279,8 @@
       "id": "plot_temp",
       "type": "view.plot",
       "pos": [
-        1200,
-        2426
+        3150,
+        1512
       ],
       "params": {}
     },
@@ -288,8 +288,8 @@
       "id": "note_npt",
       "type": "util.note",
       "pos": [
-        0,
-        3287
+        2250,
+        3257
       ],
       "params": {
         "text": "STEP 7 - NPT equilibration\n5 ps here (the tutorial: 500 ps) with the barostat on, restraints still applied, continuing from the NVT checkpoint so velocities carry over. The barostat corrects in 1 ps instead of the tutorial's 5 (tau-p), for the same reason as the thermostat before it: in 5 ps a 5 ps correction would only have started.\nPressure fluctuates violently in a system this size - that is normal, not a problem. Density is the number to judge: it jumps from about 985 to over 1010 kg/m3 in the first picosecond and ends near 1025 -- the average the tutorial reports over its 500 ps."
@@ -299,8 +299,8 @@
       "id": "mdp_npt",
       "type": "util.mdp",
       "pos": [
-        0,
-        3680
+        1950,
+        2711
       ],
       "params": {
         "preset": "lysozyme_npt",
@@ -316,8 +316,8 @@
       "id": "grompp_npt",
       "type": "gmx.grompp",
       "pos": [
-        300,
-        3680
+        2250,
+        2711
       ],
       "params": {
         "output": "npt.tpr"
@@ -327,8 +327,8 @@
       "id": "mdrun_npt",
       "type": "gmx.mdrun",
       "pos": [
-        600,
-        3680
+        2550,
+        2711
       ],
       "params": {
         "deffnm": "npt",
@@ -339,8 +339,8 @@
       "id": "energy_press",
       "type": "gmx.energy",
       "pos": [
-        900,
-        3680
+        2850,
+        2711
       ],
       "params": {
         "terms": "Pressure\n",
@@ -351,8 +351,8 @@
       "id": "plot_press",
       "type": "view.plot",
       "pos": [
-        1200,
-        3680
+        3150,
+        2711
       ],
       "params": {}
     },
@@ -360,8 +360,8 @@
       "id": "energy_dens",
       "type": "gmx.energy",
       "pos": [
-        1524,
-        3680
+        2850,
+        3257
       ],
       "params": {
         "terms": "Density\n",
@@ -372,8 +372,8 @@
       "id": "plot_dens",
       "type": "view.plot",
       "pos": [
-        1848,
-        3680
+        3150,
+        3257
       ],
       "params": {}
     },
@@ -381,8 +381,8 @@
       "id": "note_md",
       "type": "util.note",
       "pos": [
-        0,
-        4541
+        2250,
+        4593
       ],
       "params": {
         "text": "STEP 8 - Production MD\n10 ps, no restraints, no velocity generation, a picture every 0.1 ps. The tutorial runs 10 ns, a thousand times longer: on one processor that takes about two days, where 10 ps takes about three minutes. Long enough to see the protein and the water move; far too short for the protein to change shape. Raise nsteps on the run-parameters node for a longer run."
@@ -392,8 +392,8 @@
       "id": "mdp_md",
       "type": "util.mdp",
       "pos": [
-        0,
-        4870
+        1950,
+        4061
       ],
       "params": {
         "preset": "lysozyme_md",
@@ -407,8 +407,8 @@
       "id": "grompp_md",
       "type": "gmx.grompp",
       "pos": [
-        300,
-        4870
+        2250,
+        4061
       ],
       "params": {
         "output": "md_0_10.tpr",
@@ -419,8 +419,8 @@
       "id": "mdrun_md",
       "type": "gmx.mdrun",
       "pos": [
-        600,
-        4870
+        2550,
+        4061
       ],
       "params": {
         "deffnm": "md_0_10",
@@ -431,8 +431,8 @@
       "id": "note_analysis",
       "type": "util.note",
       "pos": [
-        900,
-        4226
+        4200,
+        3556
       ],
       "params": {
         "text": "STEPS 9-10 - Analysis\nEverything downstream runs on the reimaged trajectory: the protein diffuses and would otherwise appear to jump across the box.\nTwo RMSD nodes - one against the equilibrated structure (md tpr) and one against the crystal structure (em tpr, whose coordinates are still the un-minimised PDB). In 10 ps both climb to about 0.08 nm. RMSD is not a convergence metric; it only says how far things moved.\nRg near 1.4 nm and flat means the fold is holding.\nEach one ends in a Preview plot, so the answer is on the canvas rather than in a file you have to go and find. Hover for values; the arrow button opens the same curve full size in the Plot tab."
@@ -442,8 +442,8 @@
       "id": "note_dssp",
       "type": "util.note",
       "pos": [
-        1848,
-        4226
+        5148,
+        3556
       ],
       "params": {
         "text": "Reading the secondary structure\nThe dssp node draws its own answer: residue up the side, time along the bottom, a colour per kind of structure. Warm colours are helices, cold ones are sheets, grey is loop.\nWhat to look for is bands, not values. A horizontal band that runs the whole width is an element that held for the entire run. A band that goes grey from one end is an element fraying, and the end it frays from tells you where. Grey creeping through the middle of a band is the interesting one: something opened up.\nLysozyme should be almost all band. Its helices are around residues 5-15, 25-36, 89-100 and 109-115, and the small beta sheet sits near 43-60; if those stay coloured for the whole run the fold is fine. The caption under the picture gives the run-average composition, which is the one number worth quoting - roughly 40% helix for this protein.\nThe second output, 'counts', is the same thing summed per frame, and it goes to a Preview plot: a flat line is a fold that held, a line that slopes down is one that is melting."
@@ -453,8 +453,8 @@
       "id": "pbc",
       "type": "gmx.trjconv",
       "pos": [
-        900,
-        4870
+        4200,
+        4061
       ],
       "params": {
         "pbc": "mol",
@@ -468,8 +468,8 @@
       "id": "rms",
       "type": "gmx.measure",
       "pos": [
-        1200,
-        4870
+        4524,
+        4061
       ],
       "params": {
         "groups": "Backbone\nBackbone\n",
@@ -482,8 +482,8 @@
       "id": "plot_rms",
       "type": "view.plot",
       "pos": [
-        1524,
-        4870
+        4824,
+        4061
       ],
       "params": {}
     },
@@ -491,8 +491,8 @@
       "id": "rms_xtal",
       "type": "gmx.measure",
       "pos": [
-        1848,
-        4870
+        5148,
+        4061
       ],
       "params": {
         "groups": "Backbone\nBackbone\n",
@@ -505,8 +505,8 @@
       "id": "plot_rms_xtal",
       "type": "view.plot",
       "pos": [
-        2172,
-        4870
+        5472,
+        4061
       ],
       "params": {}
     },
@@ -514,8 +514,8 @@
       "id": "gyrate",
       "type": "gmx.measure",
       "pos": [
-        1200,
-        5416
+        4524,
+        4607
       ],
       "params": {
         "sel": "Protein",
@@ -528,8 +528,8 @@
       "id": "plot_rg",
       "type": "view.plot",
       "pos": [
-        1524,
-        5416
+        4824,
+        4607
       ],
       "params": {}
     },
@@ -537,8 +537,8 @@
       "id": "dssp",
       "type": "gmx.dssp",
       "pos": [
-        1848,
-        5416
+        5148,
+        4607
       ],
       "params": {
         "sel": "Protein",
@@ -551,8 +551,8 @@
       "id": "plot_dssp",
       "type": "view.plot",
       "pos": [
-        2172,
-        5416
+        5472,
+        4607
       ],
       "params": {}
     },
@@ -560,8 +560,8 @@
       "id": "hbond",
       "type": "gmx.measure",
       "pos": [
-        1200,
-        5962
+        4524,
+        5153
       ],
       "params": {
         "r": "Protein",
@@ -574,8 +574,8 @@
       "id": "plot_hb",
       "type": "view.plot",
       "pos": [
-        1524,
-        5962
+        4824,
+        5153
       ],
       "params": {}
     },
@@ -583,8 +583,8 @@
       "id": "note_watch",
       "type": "util.note",
       "pos": [
-        0,
-        5962
+        5178,
+        5238
       ],
       "params": {
         "text": "Watch it, roughly\nThe Preview trajectory node pulls every second frame of the protein out with trjconv and plays them inside the node. It is for the questions you answer by looking - did it stay folded, did it leave the box, is the terminus flapping - and not for anything you would put a number on. Press play, drag the slider, drag the picture to turn it.\nIt writes the frames out as a multi-model PDB, so the same file opens in VMD or PyMOL when the rough look raises a real question."
@@ -594,8 +594,8 @@
       "id": "watch",
       "type": "view.trajectory",
       "pos": [
-        600,
-        5962
+        4200,
+        4767
       ],
       "params": {
         "mode": "every Nth",
@@ -953,6 +953,20 @@
         "fetch",
         "clean",
         "top"
+      ],
+      "patch": [
+        {
+          "node": "top",
+          "port": "structure",
+          "side": "east",
+          "label": "protein"
+        },
+        {
+          "node": "top",
+          "port": "topology",
+          "side": "east",
+          "label": "topology"
+        }
       ]
     },
     {
@@ -961,6 +975,32 @@
       "nodes": [
         "box",
         "solv"
+      ],
+      "patch": [
+        {
+          "node": "top",
+          "port": "topology",
+          "side": "west",
+          "label": "topology"
+        },
+        {
+          "node": "top",
+          "port": "structure",
+          "side": "west",
+          "label": "protein"
+        },
+        {
+          "node": "solv",
+          "port": "structure",
+          "side": "east",
+          "label": "protein in water"
+        },
+        {
+          "node": "solv",
+          "port": "topology",
+          "side": "east",
+          "label": "topology"
+        }
       ]
     },
     {
@@ -969,6 +1009,32 @@
       "nodes": [
         "mdp_ions",
         "ions"
+      ],
+      "patch": [
+        {
+          "node": "solv",
+          "port": "topology",
+          "side": "west",
+          "label": "topology"
+        },
+        {
+          "node": "solv",
+          "port": "structure",
+          "side": "west",
+          "label": "protein in water"
+        },
+        {
+          "node": "ions",
+          "port": "topology",
+          "side": "east",
+          "label": "topology"
+        },
+        {
+          "node": "ions",
+          "port": "structure",
+          "side": "east",
+          "label": "with ions"
+        }
       ]
     },
     {
@@ -978,7 +1044,35 @@
         "mdp_min",
         "grompp_em",
         "mdrun_em",
-        "energy_pot"
+        "energy_pot",
+        "plot_pot",
+        "note_em"
+      ],
+      "patch": [
+        {
+          "node": "ions",
+          "port": "structure",
+          "side": "west",
+          "label": "with ions"
+        },
+        {
+          "node": "ions",
+          "port": "topology",
+          "side": "west",
+          "label": "topology"
+        },
+        {
+          "node": "grompp_em",
+          "port": "tpr",
+          "side": "east",
+          "label": "em.tpr"
+        },
+        {
+          "node": "mdrun_em",
+          "port": "structure",
+          "side": "east",
+          "label": "minimised"
+        }
       ]
     },
     {
@@ -988,7 +1082,35 @@
         "mdp_nvt",
         "grompp_nvt",
         "mdrun_nvt",
-        "energy_temp"
+        "energy_temp",
+        "plot_temp",
+        "note_nvt"
+      ],
+      "patch": [
+        {
+          "node": "mdrun_em",
+          "port": "structure",
+          "side": "west",
+          "label": "minimised"
+        },
+        {
+          "node": "ions",
+          "port": "topology",
+          "side": "west",
+          "label": "topology"
+        },
+        {
+          "node": "mdrun_nvt",
+          "port": "checkpoint",
+          "side": "east",
+          "label": "checkpoint"
+        },
+        {
+          "node": "mdrun_nvt",
+          "port": "structure",
+          "side": "east",
+          "label": "after NVT"
+        }
       ]
     },
     {
@@ -999,7 +1121,42 @@
         "grompp_npt",
         "mdrun_npt",
         "energy_press",
-        "energy_dens"
+        "plot_press",
+        "energy_dens",
+        "plot_dens",
+        "note_npt"
+      ],
+      "patch": [
+        {
+          "node": "mdrun_nvt",
+          "port": "structure",
+          "side": "west",
+          "label": "after NVT"
+        },
+        {
+          "node": "mdrun_nvt",
+          "port": "checkpoint",
+          "side": "west",
+          "label": "checkpoint"
+        },
+        {
+          "node": "ions",
+          "port": "topology",
+          "side": "west",
+          "label": "topology"
+        },
+        {
+          "node": "mdrun_npt",
+          "port": "checkpoint",
+          "side": "east",
+          "label": "checkpoint"
+        },
+        {
+          "node": "mdrun_npt",
+          "port": "structure",
+          "side": "east",
+          "label": "after NPT"
+        }
       ]
     },
     {
@@ -1008,7 +1165,40 @@
       "nodes": [
         "mdp_md",
         "grompp_md",
-        "mdrun_md"
+        "mdrun_md",
+        "note_md"
+      ],
+      "patch": [
+        {
+          "node": "ions",
+          "port": "topology",
+          "side": "west",
+          "label": "topology"
+        },
+        {
+          "node": "mdrun_npt",
+          "port": "structure",
+          "side": "west",
+          "label": "after NPT"
+        },
+        {
+          "node": "mdrun_npt",
+          "port": "checkpoint",
+          "side": "west",
+          "label": "checkpoint"
+        },
+        {
+          "node": "grompp_md",
+          "port": "tpr",
+          "side": "east",
+          "label": "md_0_10.tpr"
+        },
+        {
+          "node": "mdrun_md",
+          "port": "traj",
+          "side": "east",
+          "label": "trajectory"
+        }
       ]
     },
     {
@@ -1017,10 +1207,37 @@
       "nodes": [
         "pbc",
         "rms",
+        "plot_rms",
         "rms_xtal",
+        "plot_rms_xtal",
         "gyrate",
+        "plot_rg",
         "dssp",
-        "hbond"
+        "plot_dssp",
+        "hbond",
+        "plot_hb",
+        "watch",
+        "note_watch"
+      ],
+      "patch": [
+        {
+          "node": "grompp_em",
+          "port": "tpr",
+          "side": "west",
+          "label": "em.tpr"
+        },
+        {
+          "node": "mdrun_md",
+          "port": "traj",
+          "side": "west",
+          "label": "trajectory"
+        },
+        {
+          "node": "grompp_md",
+          "port": "tpr",
+          "side": "west",
+          "label": "md_0_10.tpr"
+        }
       ]
     }
   ]

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 COL, ROW = 300, 175
 
@@ -46,15 +46,47 @@ def note(node_id: str, col: float, row: float, text: str) -> Dict[str, Any]:
     return node(node_id, "util.note", col, row, text=text)
 
 
-def group(title: str, color: str, *node_ids: str) -> Dict[str, Any]:
+def group(title: str, color: str, *node_ids: str,
+          walls: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     """A coloured box around named nodes.
 
     No bounds: how tall a node renders depends on its widgets, which only the
     browser knows, so the group names its members and the editor measures them
     once they are on the canvas.  Colours come from ``chunks.COLOR`` so a blue
     box means the same thing in a tutorial as it does in a chunk.
+
+    ``walls`` lists the wires that should pass through a dot on the box's left
+    or right edge, made with :func:`wall`.  It changes only how the wires are
+    drawn, never what is connected to what.
     """
-    return {"title": title, "color": color, "nodes": list(node_ids)}
+    box = {"title": title, "color": color, "nodes": list(node_ids)}
+    if walls:
+        box["patch"] = [dict(entry) for entry in walls]
+    return box
+
+
+def wall(node_id: str, port: str, side: str, label: str = "") -> Dict[str, str]:
+    """One dot on a box's edge that a file's wires pass through.
+
+    Every wire that leaves a box from ``node_id``'s output ``port`` goes out
+    through a dot on that box's edge, and every wire that comes into a box
+    from it comes in through one. Ten wires from one file then cross the
+    space between two boxes as one line, with the file's name written beside
+    the dot at each end. The editor calls this list the box's ``patch``: it
+    works like the patch panel at the back of a rack.
+
+    ``side`` is ``"west"`` for the left edge, where a box takes things in, or
+    ``"east"`` for the right edge, where it hands them on. The left edge fills
+    from the top down and the right edge from the bottom up, so a right edge
+    should list its dots in the opposite order to the left edge they run to,
+    or the lines cross on the way over. ``label`` replaces the name of the
+    output when that name would not tell two dots apart -- two files both
+    called "tpr", say.
+    """
+    entry = {"node": node_id, "port": port, "side": side}
+    if label:
+        entry["label"] = label
+    return entry
 
 
 # --------------------------------------------------------------------------
@@ -449,6 +481,54 @@ def untangle_groups(nodes: list, groups: list, gap: int = GAP_Y) -> list:
     return deoverlap(nodes) if pushed_any else nodes
 
 
+def level_with(nodes: list, moving: str, still: str, from_column: float) -> list:
+    """Slide everything from ``from_column`` rightwards up or down together,
+    so that the node ``moving`` ends up level with the node ``still``.
+
+    For a strip restacked on its own by ``relayout(bands=...)``: where its rows
+    end up depends on how tall everything above them turned out, so the only
+    reliable way to stand a box beside the one it belongs next to is to measure
+    both after the restacking and then move the strip.
+    """
+    by_id = {n["id"]: n for n in nodes}
+    shift = by_id[still]["pos"][1] - by_id[moving]["pos"][1]
+    for node in nodes:
+        if node["pos"][0] >= from_column * COL:
+            node["pos"][1] += shift
+    return nodes
+
+
+def space_boxes(nodes: list, groups: list, titles, gap: int) -> list:
+    """Leave at least ``gap`` pixels between boxes stacked one above the other.
+
+    For a column of boxes wired to each other through their walls. The wire
+    from one box to the next leaves through the upper box's right wall,
+    swings round through the gap and enters the lower box through its left
+    wall, and it needs room to turn without clipping either box's corner.
+
+    ``titles`` names the boxes from the top down. Each one that stands too
+    close under the box before it is moved down, together with everything
+    below it in the same column, so the column keeps its order and its notes
+    stay beside their boxes.
+    """
+    by_id = {n["id"]: n for n in nodes}
+    members = {g["title"]: [by_id[i] for i in g.get("nodes") or [] if i in by_id]
+               for g in groups}
+    column = [m for title in titles for m in members[title]]
+    left = min(n["pos"][0] for n in column)
+    right = max(n["pos"][0] + width_of(n) for n in column)
+    for upper, lower in zip(titles, titles[1:]):
+        shift = _group_box(members[upper])[3] + gap - _group_box(members[lower])[1]
+        if shift <= 0:
+            continue
+        top = min(n["pos"][1] for n in members[lower])
+        for node in nodes:
+            x = node["pos"][0]
+            if x + width_of(node) > left and x < right and node["pos"][1] >= top:
+                node["pos"][1] += shift
+    return nodes
+
+
 def make_room_for(nodes: list, column: float, ids) -> list:
     """Slide everything right of `column` one column over, and put `ids` there.
 
@@ -467,7 +547,7 @@ def make_room_for(nodes: list, column: float, ids) -> list:
     return nodes
 
 
-def relayout(nodes: list, gap: int = GAP_Y) -> list:
+def relayout(nodes: list, gap: int = GAP_Y, bands=()) -> list:
     """Push rows apart until no node overlaps the one below it.
 
     Columns are left alone and the order of the rows is kept, so a layout stays
@@ -480,8 +560,20 @@ def relayout(nodes: list, gap: int = GAP_Y) -> list:
     around them -- hundreds of pixels down the page for nothing that was in
     anybody's way.  The graphs came out scattered down a diagonal instead of
     reading as a tidy table.
+
+    ``bands`` splits the page into side-by-side strips, each given as the
+    column it starts at, and restacks every strip on its own.  A tutorial laid
+    out as boxes standing in columns needs this: the rows of one column of
+    boxes have nothing to do with the rows of the next, and restacking the
+    whole page at once would pull a box down just because a taller box in
+    another column happened to share its row number.
     """
     if not nodes:
+        return nodes
+    if bands:
+        edges = [float("-inf")] + sorted(band * COL for band in bands) + [float("inf")]
+        for low, high in zip(edges, edges[1:]):
+            relayout([n for n in nodes if low <= n["pos"][0] < high], gap)
         return nodes
     ys = sorted({n["pos"][1] for n in nodes})
     rows: list = []

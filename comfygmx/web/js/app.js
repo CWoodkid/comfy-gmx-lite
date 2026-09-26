@@ -76,6 +76,7 @@ const App = {
     }
 
     Editor.fileKinds = catalogue.file_kinds || {};
+    Editor.fileGuide = catalogue.file_guide || {};
     for (const category of catalogue.categories) {
       for (const spec of category.nodes) this.defs[spec.type] = spec;
     }

@@ -413,15 +413,16 @@ Editor.links = [
 ];
 const wallDot = { dataset: { group: group.id, wall: 'west' } };
 // Each stretch drawn, as: where it starts, where it ends, which way it sets
-// off, which way it arrives.
+// off, which way it arrives, and the curve itself.
 const drawn = [];
 Editor.dom = { wires: { innerHTML: '', appendChild: () => {} } };
 Editor.portCenter = (id) => ({ x: Editor.nodes.get(id).pos[0], y: 0 });
 Editor.groupPortCenter = () => ({ x: 150, y: 40 });
 const realBezier = Editor._bezier.bind(Editor);
-Editor._bezier = (a, b, fromDir = 1, toDir = -1) => {
-  drawn.push([a.x, b.x, fromDir, toDir]);
-  return realBezier(a, b, fromDir, toDir);
+Editor._bezier = (a, b, fromDir = 1, toDir = -1, wider = [0, 0]) => {
+  const shape = realBezier(a, b, fromDir, toDir, wider);
+  drawn.push([a.x, b.x, fromDir, toDir, shape]);
+  return shape;
 };
 sandbox.document.createElementNS = () => stub();
 Editor.drawWires = realDrawWires;          // the real one, back again
@@ -469,6 +470,94 @@ const looped = realBezier({ x: 200, y: 0 }, { x: 150, y: 0 }, 1, 1);
 const second = Number(looped.split('C')[1].trim().split(/\s+/)[2]);
 check(second > 150,
       `the curve is ignoring which way it was told to arrive (${looped})`);
+
+console.log('a cable from a right wall to a left wall runs round like a wire between blocks');
+// Two boxes, one above the other: pbc in g1 hands its trajectory out through
+// g1's right-hand wall at x 650, and fit in g2 underneath takes it in through
+// g2's left-hand wall at x 150. The second wall is to the LEFT of the first,
+// so leaning towards the other end would send the cable straight back across
+// g1. It has to leave to the right and come in from the left instead, through
+// the gap between the two boxes.
+const outDotEast = { dataset: { group: 'g1', wall: 'east' } };
+const inDotWest = { dataset: { group: 'g2', wall: 'west' } };
+const whereWas = Editor.groupPortCenter;
+Editor.groupPortCenter = (dot) => (dot === outDotEast ? { x: 650, y: 300 } : { x: 150, y: 700 });
+Editor.nodes.get('fit').pos[0] = 300;
+Editor._homeOf = new Map([['pbc', 'g1'], ['fit', 'g2']]);
+Editor._groupDots = new Map([['g1|pbc|traj|out', outDotEast], ['g2|pbc|traj|out', inDotWest]]);
+legs = run();
+check(legs.length === 3, `expected three stretches (${JSON.stringify(legs)})`);
+check(legs[1] && legs[1][0] === 650 && legs[1][1] === 150,
+      `the middle stretch does not run wall to wall (${JSON.stringify(legs)})`);
+check(legs[1] && legs[1][2] === 1 && legs[1][3] === -1,
+      'THE POINT: a cable from a right-hand wall to a left-hand wall further left '
+      + 'turns back across the box it came out of, instead of leaving to the right '
+      + `and coming in from the left (${JSON.stringify(legs[1])})`);
+check(legs[0][2] === 1 && legs[0][3] === -1 && legs[2][2] === 1 && legs[2][3] === -1,
+      'the stretches inside the two boxes are no longer drawn like ordinary wires '
+      + `(${JSON.stringify(legs)})`);
+// A cable on the other wall of a box -- here the left wall, going out -- still
+// leans, which is the short U checked just above.
+
+console.log('cables side by side wrap round a corner without crossing');
+// Two files go from g1's right-hand wall down to g2's left-hand wall, which
+// is further left, so both cables turn back round g1's bottom corner and g2's
+// top corner. Drawn with the same curve, each one dot lower than the other,
+// they would cut across each other at both corners.
+const dotsWere = Editor._groupDots;
+const at = (group, wall, x, y) => ({ dataset: { group, wall }, spot: { x, y } });
+Editor._groupDots = new Map([
+  ['g1|pbc|traj|out', at('g1', 'east', 1650, 300)],
+  ['g1|pbc|tpr|out', at('g1', 'east', 1650, 316)],
+  ['g2|pbc|traj|out', at('g2', 'west', 150, 700)],
+  ['g2|pbc|tpr|out', at('g2', 'west', 150, 716)],
+]);
+Editor.groupPortCenter = (dot) => dot.spot;
+Editor.links = [
+  { from_node: 'pbc', from_port: 'traj', to_node: 'fit', to_port: 'traj' },
+  { from_node: 'pbc', from_port: 'tpr', to_node: 'fit', to_port: 'tpr' },
+];
+legs = run();
+const between = legs.filter((l) => l[0] === 1650 && l[1] === 150).map((l) => l[4]);
+// Points along a curve, read back from the path the editor drew.
+const along = (d) => {
+  const n = d.replace(/[MC]/g, ' ').trim().split(/\s+/).map(Number);
+  const points = [];
+  for (let i = 0; i <= 400; i += 1) {
+    const t = i / 400;
+    const u = 1 - t;
+    const w = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+    points.push([0, 1].map((k) => w[0] * n[k] + w[1] * n[2 + k] + w[2] * n[4 + k] + w[3] * n[6 + k]));
+  }
+  return points;
+};
+// Whether two curves cross anywhere.
+const cross = (p, q) => {
+  const side = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  for (let i = 0; i + 1 < p.length; i += 1) {
+    for (let j = 0; j + 1 < q.length; j += 1) {
+      if (side(p[i], p[i + 1], q[j]) * side(p[i], p[i + 1], q[j + 1]) < 0
+          && side(q[j], q[j + 1], p[i]) * side(q[j], q[j + 1], p[i + 1]) < 0) return true;
+    }
+  }
+  return false;
+};
+check(between.length === 2, `expected two cables from wall to wall (${JSON.stringify(legs)})`);
+check(between.length === 2 && !cross(along(between[0]), along(between[1])),
+      'THE POINT: two cables turning back round a box side by side cut across '
+      + `each other where they turn (${JSON.stringify(between)})`);
+// ...and drawn the old way, both with the same curve, they would have: the
+// check above is not passing by luck.
+const plain = [[300, 700], [316, 716]].map(([from, to]) => along(
+  realBezier({ x: 1650, y: from }, { x: 150, y: to }, 1, -1)));
+check(cross(plain[0], plain[1]),
+      'the two cables would not have crossed even drawn the old way, so the check '
+      + 'above proves nothing');
+
+// Put the pieces back.
+Editor._groupDots = dotsWere;
+Editor.groupPortCenter = whereWas;
+Editor.nodes.get('fit').pos[0] = -300;
 
 /* A dot on a wall stands for the wires going through it. Cut the last of
    them and the dot goes too: leaving it behind was a dot standing for

@@ -22,8 +22,9 @@ from typing import Any, Dict, List
 
 from .chunks import COLOR
 from .tutorial_graph import (
-    group as _group, link as _l, node as _n, note as _note, relayout as _relayout,
-    untangle_groups as _untangle_groups,
+    group as _group, level_with as _level_with, link as _l, node as _n,
+    note as _note, relayout as _relayout, space_boxes as _space_boxes,
+    untangle_groups as _untangle_groups, wall as _wall,
 )
 from .tutorials_ice import (
     AUTHOR as ICE_AUTHOR,
@@ -66,73 +67,86 @@ COLLECTIONS: Dict[str, Dict[str, str]] = {
 # --------------------------------------------------------------------------
 
 _LYSOZYME_NODES: List[Dict[str, Any]] = [
+    # The page reads in three columns. On the left, the protein is prepared:
+    # topology, box and water, ions. In the middle, the four runs, one below
+    # the other. On the right, the analysis, beside the production run it
+    # reads.
+    #
+    # Every file that goes from one box to another leaves its box through a
+    # dot on the right-hand wall and enters the next box through a dot on the
+    # left-hand wall, with a short name written beside each dot. Between two
+    # boxes stacked one above the other the wire swings round through the gap,
+    # so the boxes in a column stand well apart (see space_boxes below). The
+    # notes for the runs sit inside their boxes, under grompp and mdrun, where
+    # no wire has to pass.
+
     # ---- steps 1-2: structure and topology -------------------------------
-    _note("note_setup", 0, -1.15,
+    _note("note_setup", 0, 0,
           "STEPS 1-2 - Topology\n"
           "1AKI is hen egg white lysozyme. The crystal waters are stripped before "
           "pdb2gmx; keeping them would be right only if one were functional.\n\n"
           "The tutorial uses CHARMM36, which GROMACS does not ship. Point the "
           "'Force field directory' node at your unpacked *.ff folder, or delete that "
-          "node and pick a bundled force field on pdb2gmx instead."),
+          "node and pick a bundled force field on pdb2gmx instead.\n\n"
+          "Point at any socket to see what kind of file goes through it; Help "
+          "(the ? at the top) lists them all."),
     # Fetched rather than left blank. The tutorial does use CHARMM36 and does
     # tell you to get it from the MacKerell lab -- but shipping an empty path
     # meant the first node of the first tutorial failed with "no force field
     # directory given", which is a poor way to meet somebody. The node can
     # download and unpack an archive, and this is the archive.
-    _n("ff", "gmx.forcefield", 0, 0, source="archive URL",
+    _n("ff", "gmx.forcefield", 0, 1, source="archive URL",
        url="http://mackerell.umaryland.edu/download.php"
            "?filename=CHARMM_ff_params_files/charmm36-jul2022.ff.tgz",
        name="charmm36-jul2022"),
-    _n("fetch", "io.structure", 1, 0, source="the Protein Data Bank",
+    _n("fetch", "io.structure", 1, 1, source="the Protein Data Bank",
        pdb_id="1aki", format="pdb"),
-    _n("clean", "prep.clean", 2, 0,
+    _n("clean", "prep.clean", 2, 1,
        drop_water=True, drop_hetero=False, first_model=True, first_altloc=True,
        renumber=False, output="1AKI_clean.pdb"),
-    _n("top", "gmx.pdb2gmx", 3, 0,
+    _n("top", "gmx.pdb2gmx", 3, 1,
        forcefield="charmm36-jul2022", water="tip3p", ignh=False,
        output="1AKI_processed.gro"),
 
     # ---- step 3: box and solvent -----------------------------------------
-    _note("note_solv", 4, -1.15,
+    _note("note_solv", 0, 3.5,
           "STEP 3 - Box and solvent\n"
           "A cubic box with 1.2 nm between the protein and every edge, then filled "
           "with SPC216 water (a generic 3-point box that relaxes into TIP3P).\n"
           "solvate updates [ molecules ] in the topology as it goes."),
-    _n("box", "gmx.editconf", 4, 0,
+    _n("box", "gmx.editconf", 2, 3,
        box_type="cubic", distance=1.2, center=True, output="1AKI_newbox.gro"),
-    _n("solv", "gmx.solvate", 5, 0,
+    _n("solv", "gmx.solvate", 3, 3,
        solvent="spc216.gro", output="1AKI_solv.gro"),
 
     # ---- step 4: ions -----------------------------------------------------
-    _note("note_ions", 6, -1.15,
+    _note("note_ions", 0, 5.5,
           "STEP 4 - Ions\n"
           "Lysozyme carries +8e, so 8 Cl- replace 8 waters. genion needs a tpr, which "
           "means a throwaway grompp first - this node runs both, so the pair of "
           "commands the tutorial issues is one node here.\n"
           "'SOL' is the group to replace: you do not want ions substituted into the "
           "protein."),
-    # Column 6, under the genion that reads it: at column 5 it sat beneath
-    # solvate instead, and the two stages' boxes then reached across each other.
-    _n("mdp_ions", "util.mdp", 6, 1, preset="lysozyme_ions", filename="ions.mdp"),
-    _n("ions", "gmx.genion", 6, 0,
+    _n("mdp_ions", "util.mdp", 2, 5, preset="lysozyme_ions", filename="ions.mdp"),
+    _n("ions", "gmx.genion", 3, 5,
        neutral=True, concentration=0.0, pname="NA", nname="CL",
        solvent_group="SOL", maxwarn=0, output="1AKI_solv_ions.gro"),
 
     # ---- step 5: energy minimisation --------------------------------------
-    _note("note_em", 0, 1.85,
+    _note("note_em", 7.5, 2,
           "STEP 5 - Energy minimisation\n"
           "Steepest descent until Fmax < 1000 kJ/mol/nm. Two numbers in the log "
           "matter: Epot should be large and negative (order -1e6 here) and Fmax should "
           "be below the tolerance. If it is not, the geometry is bad and no amount of "
           "equilibration will rescue it."),
-    _n("mdp_min", "util.mdp", 0, 2.6, preset="lysozyme_min", filename="minim.mdp"),
-    _n("grompp_em", "gmx.grompp", 1, 2.6, output="em.tpr", restraint_from_conf=False),
-    _n("mdrun_em", "gmx.mdrun", 2, 2.6, deffnm="em", v=True),
-    _n("energy_pot", "gmx.energy", 3, 2.6, terms="Potential\n", output="potential.xvg"),
-    _n("plot_pot", "view.plot", 4, 2.6),
+    _n("mdp_min", "util.mdp", 6.5, 1, preset="lysozyme_min", filename="minim.mdp"),
+    _n("grompp_em", "gmx.grompp", 7.5, 1, output="em.tpr", restraint_from_conf=False),
+    _n("mdrun_em", "gmx.mdrun", 8.5, 1, deffnm="em", v=True),
+    _n("energy_pot", "gmx.energy", 9.5, 1, terms="Potential\n", output="potential.xvg"),
+    _n("plot_pot", "view.plot", 10.5, 1),
 
     # ---- step 6: NVT ------------------------------------------------------
-    _note("note_nvt", 0, 3.85,
+    _note("note_nvt", 7.5, 4,
           "STEP 6 - NVT equilibration\n"
           "5 ps here, with the protein position-restrained and velocities generated "
           "at 298 K. The tutorial runs 100 ps; on one processor that alone would take "
@@ -146,16 +160,16 @@ _LYSOZYME_NODES: List[Dict[str, Any]] = [
           "(tau-t = 0.1 ps).\n"
           "grompp needs -r for the restraint reference: that is the second wire from "
           "the minimised structure, into the 'restraint' port."),
-    _n("mdp_nvt", "util.mdp", 0, 4.6, preset="lysozyme_nvt", mode="manual",
+    _n("mdp_nvt", "util.mdp", 6.5, 3, preset="lysozyme_nvt", mode="manual",
        nsteps="2500", nstenergy="50", tau_t="0.1", filename="nvt.mdp"),
-    _n("grompp_nvt", "gmx.grompp", 1, 4.6, output="nvt.tpr"),
-    _n("mdrun_nvt", "gmx.mdrun", 2, 4.6, deffnm="nvt", v=True),
-    _n("energy_temp", "gmx.energy", 3, 4.6, terms="Temperature\n",
+    _n("grompp_nvt", "gmx.grompp", 7.5, 3, output="nvt.tpr"),
+    _n("mdrun_nvt", "gmx.mdrun", 8.5, 3, deffnm="nvt", v=True),
+    _n("energy_temp", "gmx.energy", 9.5, 3, terms="Temperature\n",
        output="temperature.xvg"),
-    _n("plot_temp", "view.plot", 4, 4.6),
+    _n("plot_temp", "view.plot", 10.5, 3),
 
     # ---- step 7: NPT ------------------------------------------------------
-    _note("note_npt", 0, 5.85,
+    _note("note_npt", 7.5, 6,
           "STEP 7 - NPT equilibration\n"
           "5 ps here (the tutorial: 500 ps) with the barostat on, restraints still "
           "applied, continuing from the NVT checkpoint so velocities carry over. The "
@@ -166,32 +180,32 @@ _LYSOZYME_NODES: List[Dict[str, Any]] = [
           "problem. Density is the number to judge: it jumps from about 985 to over "
           "1010 kg/m3 in the first picosecond and ends near 1025 -- the average the "
           "tutorial reports over its 500 ps."),
-    _n("mdp_npt", "util.mdp", 0, 6.6, preset="lysozyme_npt", mode="manual",
+    _n("mdp_npt", "util.mdp", 6.5, 5, preset="lysozyme_npt", mode="manual",
        nsteps="2500", nstenergy="50", tau_t="0.1", extra_flags="tau-p = 1.0",
        filename="npt.mdp"),
-    _n("grompp_npt", "gmx.grompp", 1, 6.6, output="npt.tpr"),
-    _n("mdrun_npt", "gmx.mdrun", 2, 6.6, deffnm="npt", v=True),
-    _n("energy_press", "gmx.energy", 3, 6.6, terms="Pressure\n", output="pressure.xvg"),
-    _n("plot_press", "view.plot", 4, 6.6),
-    _n("energy_dens", "gmx.energy", 5, 6.6, terms="Density\n", output="density.xvg"),
-    _n("plot_dens", "view.plot", 6, 6.6),
+    _n("grompp_npt", "gmx.grompp", 7.5, 5, output="npt.tpr"),
+    _n("mdrun_npt", "gmx.mdrun", 8.5, 5, deffnm="npt", v=True),
+    _n("energy_press", "gmx.energy", 9.5, 5, terms="Pressure\n", output="pressure.xvg"),
+    _n("plot_press", "view.plot", 10.5, 5),
+    _n("energy_dens", "gmx.energy", 9.5, 6, terms="Density\n", output="density.xvg"),
+    _n("plot_dens", "view.plot", 10.5, 6),
 
     # ---- step 8: production ----------------------------------------------
-    _note("note_md", 0, 7.85,
+    _note("note_md", 7.5, 9,
           "STEP 8 - Production MD\n"
           "10 ps, no restraints, no velocity generation, a picture every 0.1 ps. The "
           "tutorial runs 10 ns, a thousand times longer: on one processor that "
           "takes about two days, where 10 ps takes about three minutes. Long enough "
           "to see the protein and the water move; far too short for the protein to "
           "change shape. Raise nsteps on the run-parameters node for a longer run."),
-    _n("mdp_md", "util.mdp", 0, 8.6, preset="lysozyme_md", mode="manual",
+    _n("mdp_md", "util.mdp", 6.5, 8, preset="lysozyme_md", mode="manual",
        nsteps="5000", nstxout_compressed="50", filename="md.mdp"),
-    _n("grompp_md", "gmx.grompp", 1, 8.6, output="md_0_10.tpr",
+    _n("grompp_md", "gmx.grompp", 7.5, 8, output="md_0_10.tpr",
        restraint_from_conf=False),
-    _n("mdrun_md", "gmx.mdrun", 2, 8.6, deffnm="md_0_10", v=True),
+    _n("mdrun_md", "gmx.mdrun", 8.5, 8, deffnm="md_0_10", v=True),
 
     # ---- steps 9-10: analysis --------------------------------------------
-    _note("note_analysis", 3, 7.85,
+    _note("note_analysis", 14, 0,
           "STEPS 9-10 - Analysis\n"
           "Everything downstream runs on the reimaged trajectory: the protein diffuses "
           "and would otherwise appear to jump across the box.\n"
@@ -203,7 +217,7 @@ _LYSOZYME_NODES: List[Dict[str, Any]] = [
           "Each one ends in a Preview plot, so the answer is on the canvas rather "
           "than in a file you have to go and find. Hover for values; the arrow "
           "button opens the same curve full size in the Plot tab."),
-    _note("note_dssp", 6, 7.85,
+    _note("note_dssp", 17, 0,
           "Reading the secondary structure\n"
           "The dssp node draws its own answer: residue up the side, time along the "
           "bottom, a colour per kind of structure. Warm colours are helices, cold "
@@ -221,25 +235,25 @@ _LYSOZYME_NODES: List[Dict[str, Any]] = [
           "The second output, 'counts', is the same thing summed per frame, and it "
           "goes to a Preview plot: a flat line is a fold that held, a line that "
           "slopes down is one that is melting."),
-    _n("pbc", "gmx.trjconv", 3, 8.6,
+    _n("pbc", "gmx.trjconv", 14, 1,
        pbc="mol", ur="", center=True, output="md_0_10_noPBC.xtc",
        groups="Protein\nSystem\n"),
-    _n("rms", "gmx.rms", 4, 8.6, groups="Backbone\nBackbone\n", tu="ps",
+    _n("rms", "gmx.rms", 15, 1, groups="Backbone\nBackbone\n", tu="ps",
        output="rmsd.xvg"),
-    _n("plot_rms", "view.plot", 5, 8.6),
-    _n("rms_xtal", "gmx.rms", 6, 8.6,
+    _n("plot_rms", "view.plot", 16, 1),
+    _n("rms_xtal", "gmx.rms", 17, 1,
        groups="Backbone\nBackbone\n", tu="ps", output="rmsd_xtal.xvg"),
-    _n("plot_rms_xtal", "view.plot", 7, 8.6),
-    _n("gyrate", "gmx.gyrate", 4, 9.6, sel="Protein", tu="ps", output="gyrate.xvg"),
-    _n("plot_rg", "view.plot", 5, 9.6),
-    _n("dssp", "gmx.dssp", 6, 9.6, sel="Protein", tu="ps",
+    _n("plot_rms_xtal", "view.plot", 18, 1),
+    _n("gyrate", "gmx.gyrate", 15, 2, sel="Protein", tu="ps", output="gyrate.xvg"),
+    _n("plot_rg", "view.plot", 16, 2),
+    _n("dssp", "gmx.dssp", 17, 2, sel="Protein", tu="ps",
        output="dssp.dat", output_num="dssp_num.xvg"),
-    _n("plot_dssp", "view.plot", 7, 9.6),
-    _n("hbond", "gmx.hbond", 4, 10.6, r="Protein", t="Protein", output="hbnum.xvg"),
-    _n("plot_hb", "view.plot", 5, 10.6),
+    _n("plot_dssp", "view.plot", 18, 2),
+    _n("hbond", "gmx.hbond", 15, 3, r="Protein", t="Protein", output="hbnum.xvg"),
+    _n("plot_hb", "view.plot", 16, 3),
 
     # ---- and a look at the run itself -------------------------------------
-    _note("note_watch", 0, 10.6,
+    _note("note_watch", 17.1, 3,
           "Watch it, roughly\n"
           "The Preview trajectory node pulls every second frame of the protein "
           "out with trjconv and plays them inside the node. It is for the "
@@ -248,7 +262,7 @@ _LYSOZYME_NODES: List[Dict[str, Any]] = [
           "number on. Press play, drag the slider, drag the picture to turn it.\n"
           "It writes the frames out as a multi-model PDB, so the same file opens in "
           "VMD or PyMOL when the rough look raises a real question."),
-    _n("watch", "view.trajectory", 2, 10.6, mode="every Nth", skip=2,
+    _n("watch", "view.trajectory", 14, 2.5, mode="every Nth", skip=2,
        sel="Protein", pbc="mol", center=True),
 ]
 
@@ -317,26 +331,121 @@ _LYSOZYME_LINKS: List[Dict[str, str]] = [
     _l("grompp_md", "tpr", "hbond", "tpr"),
 ]
 
-#: The tutorial's own stages, as coloured boxes. Same palette as the chunks, so
-#: a blue box means equilibration wherever you meet one.
-# Rows are written as indices; this spaces them by how tall the nodes in each
-# one actually render.
-_relayout(_LYSOZYME_NODES)
 
+def _in(node: str, port: str, name: str) -> Dict[str, str]:
+    """A file coming into a box through a dot on its left-hand wall."""
+    return _wall(node, port, "west", name)
+
+
+def _out(node: str, port: str, name: str) -> Dict[str, str]:
+    """A file leaving a box through a dot on its right-hand wall."""
+    return _wall(node, port, "east", name)
+
+
+#: The tutorial's own stages, as coloured boxes. Same palette as the chunks, so
+#: a blue box means equilibration wherever you meet one. Each box holds its
+#: own plots and its note as well, so a stage reads as one piece.
+#:
+#: Every file that goes from one box to another has a dot on the right-hand
+#: wall of the box it leaves and one on the left-hand wall of the box it
+#: enters, and each dot is given a short name of its own. Left to the editor,
+#: a name is lengthened whenever the same word turns up twice on one box --
+#: "topology" coming in on the left and the updated topology going out on the
+#: right -- until it reads "Solvate · topology". The structure's name says
+#: how far along it is instead: protein, protein in water, with ions,
+#: minimised, after NVT, after NPT.
+#:
+#: The right wall lists its dots in the opposite order to the left wall they
+#: run to: the left wall fills from the top down and the right wall from the
+#: bottom up, and in this order the lines run side by side instead of
+#: crossing. Where a box takes files from two places, the order of its left
+#: wall is the one where the fewest wires cross, found by trying them: the
+#: topology goes below the files from the box above when it comes in from
+#: level or from below, and above them when it comes down from high up, as
+#: into the production run.
 _LYSOZYME_GROUPS = [
-    _group("1. Topology (pdb2gmx)", COLOR["input"], "ff", "fetch", "clean", "top"),
-    _group("3. Box and solvent", COLOR["build"], "box", "solv"),
-    _group("4. Add ions", COLOR["build"], "mdp_ions", "ions"),
+    _group("1. Topology (pdb2gmx)", COLOR["input"], "ff", "fetch", "clean", "top",
+           walls=[_out("top", "structure", "protein"),
+                  _out("top", "topology", "topology")]),
+    _group("3. Box and solvent", COLOR["build"], "box", "solv",
+           walls=[_in("top", "topology", "topology"),
+                  _in("top", "structure", "protein"),
+                  _out("solv", "structure", "protein in water"),
+                  _out("solv", "topology", "topology")]),
+    _group("4. Add ions", COLOR["build"], "mdp_ions", "ions",
+           # The structure only goes up, to the minimisation, while the
+           # topology goes to all four runs, down as well as up. So the
+           # structure takes the upper dot, and the wires going down never
+           # have to cross it.
+           walls=[_in("solv", "topology", "topology"),
+                  _in("solv", "structure", "protein in water"),
+                  _out("ions", "topology", "topology"),
+                  _out("ions", "structure", "with ions")]),
     _group("5. Energy minimisation", COLOR["minimise"],
-           "mdp_min", "grompp_em", "mdrun_em", "energy_pot"),
+           "mdp_min", "grompp_em", "mdrun_em", "energy_pot", "plot_pot", "note_em",
+           # em.tpr goes on to the analysis: RMSD against the crystal
+           # structure reads its coordinates. Named after the file, because
+           # the analysis takes a second tpr as well. Its wire drops steeply
+           # to the analysis, far below, while the minimised structure swings
+           # round into the next run, so the two have to cross once. With
+           # em.tpr on the lower dot that happens a little way out from the
+           # wall, clear of the names; on the upper dot it would cut across
+           # the other wire twice, right beside them.
+           walls=[_in("ions", "structure", "with ions"),
+                  _in("ions", "topology", "topology"),
+                  _out("grompp_em", "tpr", "em.tpr"),
+                  _out("mdrun_em", "structure", "minimised")]),
     _group("6. NVT equilibration", COLOR["equilibrate"],
-           "mdp_nvt", "grompp_nvt", "mdrun_nvt", "energy_temp"),
+           "mdp_nvt", "grompp_nvt", "mdrun_nvt", "energy_temp", "plot_temp",
+           "note_nvt",
+           walls=[_in("mdrun_em", "structure", "minimised"),
+                  _in("ions", "topology", "topology"),
+                  _out("mdrun_nvt", "checkpoint", "checkpoint"),
+                  _out("mdrun_nvt", "structure", "after NVT")]),
     _group("7. NPT equilibration", COLOR["equilibrate"],
-           "mdp_npt", "grompp_npt", "mdrun_npt", "energy_press", "energy_dens"),
-    _group("8. Production MD", COLOR["production"], "mdp_md", "grompp_md", "mdrun_md"),
+           "mdp_npt", "grompp_npt", "mdrun_npt", "energy_press", "plot_press",
+           "energy_dens", "plot_dens", "note_npt",
+           walls=[_in("mdrun_nvt", "structure", "after NVT"),
+                  _in("mdrun_nvt", "checkpoint", "checkpoint"),
+                  _in("ions", "topology", "topology"),
+                  _out("mdrun_npt", "checkpoint", "checkpoint"),
+                  _out("mdrun_npt", "structure", "after NPT")]),
+    _group("8. Production MD", COLOR["production"],
+           "mdp_md", "grompp_md", "mdrun_md", "note_md",
+           # The topology comes steeply down from high up on the left. On the
+           # bottom dot it would run through the curve of the two wires
+           # coming round from the box above, crossing each of them twice;
+           # on the top dot it crosses each of them once.
+           walls=[_in("ions", "topology", "topology"),
+                  _in("mdrun_npt", "structure", "after NPT"),
+                  _in("mdrun_npt", "checkpoint", "checkpoint"),
+                  _out("grompp_md", "tpr", "md_0_10.tpr"),
+                  _out("mdrun_md", "traj", "trajectory")]),
     _group("9-10. Analysis", COLOR["analysis"],
-           "pbc", "rms", "rms_xtal", "gyrate", "dssp", "hbond"),
+           "pbc", "rms", "plot_rms", "rms_xtal", "plot_rms_xtal", "gyrate",
+           "plot_rg", "dssp", "plot_dssp", "hbond", "plot_hb", "watch",
+           "note_watch",
+           # em.tpr comes down from above, the other two up from the
+           # production run, so it takes the top dot and nothing crosses.
+           walls=[_in("grompp_em", "tpr", "em.tpr"),
+                  _in("mdrun_md", "traj", "trajectory"),
+                  _in("grompp_md", "tpr", "md_0_10.tpr")]),
 ]
+
+# Rows are written as indices; this spaces them by how tall the nodes in each
+# one actually render. Each of the three columns is stacked on its own. Then
+# the boxes in each column are pulled apart far enough for the wire from one
+# to the next to swing round between them, and finally the runs are stood
+# level with the first box on the left and the analysis level with the
+# production run that feeds it.
+_relayout(_LYSOZYME_NODES, bands=(5, 13))
+_space_boxes(_LYSOZYME_NODES, _LYSOZYME_GROUPS,
+             ["1. Topology (pdb2gmx)", "3. Box and solvent", "4. Add ions"], 360)
+_space_boxes(_LYSOZYME_NODES, _LYSOZYME_GROUPS,
+             ["5. Energy minimisation", "6. NVT equilibration",
+              "7. NPT equilibration", "8. Production MD"], 360)
+_level_with(_LYSOZYME_NODES, "mdp_min", "ff", 5)
+_level_with(_LYSOZYME_NODES, "pbc", "mdp_md", 13)
 
 
 _LYSOZYME_STEPS = [
