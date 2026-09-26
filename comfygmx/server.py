@@ -386,8 +386,8 @@ class Handler(BaseHTTPRequestHandler):
         happens, not ten seconds late.
 
         This used to be one reply that stayed open for the whole run, adding
-        a message whenever there was news. On mybinder.org that never worked:
-        the servers in front of every online copy hold a reply back until it
+        a message whenever there was news. On mybinder.org that did not work:
+        the servers in front of its GESIS site hold such a reply back until it
         is complete, so the page heard nothing until the run was over. Worse,
         while that one reply was open the page sent nothing else, and
         mybinder.org closes a copy that has had no requests for ten minutes:

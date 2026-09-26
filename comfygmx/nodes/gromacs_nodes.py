@@ -681,18 +681,18 @@ class SolvateNode(Node):
     params = (
         Param("solvent", "combo", "Solvent box", "spc216.gro",
               choices=["spc216.gro", "tip4p.gro", "tip5p.gro", "water.gro"],
-              help="spc216.gro works for every 3-point water model. For Martini use the "
-                   "Martini water .gro shipped with the force field."),
+              help="spc216.gro works for every 3-point water model, TIP3P included; "
+                   "tip4p.gro and tip5p.gro are for the 4- and 5-point models."),
         Param("scale", "float", "van der Waals scale (-scale)", 0.57, step=0.01, advanced=True,
-              help="0.57 is the default for SPC. Martini water needs ~0.41 to reach the "
-                   "right density."),
+              help="0.57 is GROMACS's own default: it gives a density close to "
+                   "1000 g/l for a protein in water."),
         Param("maxsol", "int", "Max solvent molecules", 0, advanced=True,
               help="0 = fill the box completely."),
         Param("shell", "float", "Solvent shell (nm)", 0.0, advanced=True,
               help="Non-zero solvates only a shell around the solute."),
         Param("radius", "float", "Default vdW radius (-radius, nm)", 0.0, advanced=True,
-              help="Overrides the radius database for every atom. Martini solvation "
-                   "wants about 0.21 -- the bead database does not know CG sizes."),
+              help="The size given to atoms that GROMACS's list of atom sizes does "
+                   "not cover. 0 leaves GROMACS's own value, 0.105 nm."),
         Param("keep_water_out", "text", "Keep water out of (element, radius)", "",
               rows=3, advanced=True, placeholder="C 0.35",
               help="How big each kind of atom is treated as being, when solvate "
@@ -813,7 +813,8 @@ class GenionNode(Node):
         Param("pq", "int", "Positive charge", 1, advanced=True),
         Param("nq", "int", "Negative charge", -1, advanced=True),
         Param("solvent_group", "str", "Group to replace", "SOL",
-              help="SOL for atomistic water, W for Martini water."),
+              help="The molecules swapped for ions: SOL, the water, in almost every "
+                   "system."),
         Param("maxwarn", "int", "grompp -maxwarn", 1, advanced=True,
               help="The ion-generation grompp usually warns about a non-zero system "
                    "charge, which is exactly what this node is about to fix."),

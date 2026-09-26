@@ -27,7 +27,8 @@ Three results make the difference visible:
 | **Preview trajectory** | a movie, one dot per molecule | a cube turning into a ball | a cube |
 
 What it came out as when it was run here, in the online copy on one
-processor (2 minutes 48 seconds from **Run** to the last block):
+processor (2 minutes 48 seconds from **Run** to the last block; on
+mybinder.org it takes about 3 minutes 15 seconds):
 
 | | warm, 300 K | cold, 200 K |
 | --- | --- | --- |

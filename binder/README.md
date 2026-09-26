@@ -26,16 +26,19 @@ thirty people downloading at the same moment.
 
 ## How long the tutorials take
 
-Measured in this copy, in a container limited to one processor and 2 GB of
-memory, as on mybinder.org, on an AMD EPYC 9274F:
+From Run to the last block, with nobody touching the page, measured on
+2026-09-26:
 
-| tutorial | from Run to the last block | of which, simulating |
-|---|---|---|
-| An ice cube melting | 2 min 48 s | 2 min 26 s |
-| Lysozyme in Water | 7 min 41 s | 6 min 47 s |
+| tutorial | mybinder.org (2i2c) | mybinder.org (GESIS) | this copy on an AMD EPYC 9274F |
+|---|---|---|---|
+| An ice cube melting | 3 min 12 s | 3 min 15 s | 2 min 48 s |
+| Lysozyme in Water | 8 min 36 s | 8 min 50 s | 7 min 41 s |
 
-A cloud machine can be slower than this one. [../docs/tutorial-runs.md](../docs/tutorial-runs.md)
-has the time of every run and what each tutorial came out as.
+mybinder.org is several sites; each start lands on one of them, and they run
+at slightly different speeds. The local copy was limited to one processor and
+2 GB of memory, as a mybinder.org session is.
+[../docs/tutorial-runs.md](../docs/tutorial-runs.md) has the time of every
+part of every run and what each tutorial came out as.
 
 ## Try it on your own machine
 
@@ -80,13 +83,17 @@ the editor reports at most once every two minutes. A tab left open with nothing
 running and nobody at it sends nothing, and the session ends as the site
 intends.
 
-Why the page asks instead of listening: the servers in front of mybinder.org
-hold back a reply that stays open until it is complete. The page used to follow
+Why the page asks instead of listening: the servers in front of mybinder.org's
+GESIS site, at least, hold back a reply that stays open until it is complete
+(its 2i2c site was only tried with the new version). The page used to follow
 a run down one such reply, so online it saw nothing until the run was over, and
 since nothing else reached the copy in the meantime, mybinder.org closed it as
 unused. A Lipids I run (the Martini tutorial, since removed) was cut off half
 way, and a test copy with nothing but one open reply was gone within 16
-minutes.
+minutes. With the page asking instead, a test block that ran for 25 minutes,
+with nobody touching the page, kept its copy open to the end; and a copy left
+with its page open and nothing running had closed when it was looked at again,
+about 22 minutes later (tested on 2026-09-26).
 
 **A JupyterHub you run** (on a university machine or a rented cloud server)
 serves the same copy to every participant, with the processors and memory you

@@ -9,10 +9,13 @@ be looked at: the files it wrote, the command it ran, the numbers it produced.
 It comes with two tutorials, each short enough to run in a lesson on a single
 processor:
 
-| tutorial | what happens | time on one processor |
+| tutorial | what happens | time online |
 | --- | --- | --- |
 | **An ice cube melting** | a tiny ice cube at room temperature melts into a drop; the same cube in deep cold holds | about 3 minutes |
-| **Lysozyme in Water** | the classic first GROMACS tutorial: a protein in a box of water, from download to analysis | about 8 minutes |
+| **Lysozyme in Water** | the classic first GROMACS tutorial: a protein in a box of water, from download to analysis | about 9 minutes |
+
+The times are from Run to the last block, measured on mybinder.org, where each
+person gets one processor.
 
 Comfy-gmx lite is the teaching version of Comfy-gmx, a larger program by the
 same author, cut down to what these tutorials need and a few everyday GROMACS

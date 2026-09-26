@@ -124,8 +124,6 @@ const API = (() => {
       + (scan ? '&scan=1' : '')),
     xvg:         (path) => get(`api/viz/xvg?path=${encodeURIComponent(path)}`),
     mdlog:       (path) => get(`api/viz/log?path=${encodeURIComponent(path)}`),
-    /* What is in a structure -- chains, residue ranges, species -- without
-       running anything. Takes a path, or a PDB id to fetch once and keep. */
     versions: (tool) => get(`api/environment/versions?tool=${encodeURIComponent(tool)}`),
     cancelJob: (job) => post(`api/jobs/${encodeURIComponent(job)}/cancel`, {}),
     installs: (tool) => get('api/environment/installs'
@@ -149,6 +147,8 @@ const API = (() => {
     setupRun:    (choices) => post('api/setup/run', choices || {}),
     setupDone:   () => post('api/setup/done', {}),
 
+    /* What is in a structure -- chains, residue ranges, species -- without
+       running anything. Takes a path, or a PDB id to fetch once and keep. */
     composition: (what) => get('api/viz/composition?' + (what.pdb
       ? `pdb=${encodeURIComponent(what.pdb)}&format=${encodeURIComponent(what.format || 'pdb')}`
       : `path=${encodeURIComponent(what.path)}`)),
@@ -185,10 +185,10 @@ const API = (() => {
        The page asks the server "anything new since message N?", over and
        over. The server answers at once when there is news, or after ten
        seconds of nothing, and the page asks again. This used to be one reply
-       that stayed open and grew; the servers in front of mybinder.org hold
-       such a reply back until it is complete, so a run there showed nothing
-       until it was over -- and, with no other requests, the copy was closed
-       as unused half way through a run.
+       that stayed open and grew; the servers in front of mybinder.org (its
+       GESIS site, at least) hold such a reply back until it is complete, so a
+       run there showed nothing until it was over -- and, with no other
+       requests, the copy was closed as unused half way through a run.
 
        onEnd is told which of the two ways it ended. The server saying
        "finished" means the work really is over. Anything else -- the machine

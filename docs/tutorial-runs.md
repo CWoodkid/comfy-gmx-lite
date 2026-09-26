@@ -14,6 +14,21 @@ they are online, so they took no time.
 | 1 | An ice cube melting | 27 | 2 min 48 s | 2 min 26 s |
 | 1 | Lysozyme in Water | 50 | 7 min 41 s | 6 min 47 s |
 
+## On mybinder.org
+
+Both tutorials were run again on mybinder.org itself on 2026-09-26, on two of
+its sites, one after the other in the same session, with nobody touching the
+page:
+
+| Tutorial | Blocks | 2i2c site | of which, simulating | GESIS site | of which, simulating |
+|---|---|---|---|---|---|
+| An ice cube melting | 27 | 3 min 12 s | 2 min 50 s | 3 min 15 s | 2 min 51 s |
+| Lysozyme in Water | 50 | 8 min 36 s | 7 min 37 s | 8 min 50 s | 7 min 46 s |
+
+Between 12 and 16 per cent slower than the table above. Each session stayed
+open for the whole twelve minutes, and the page showed every step as it
+happened.
+
 ## An ice cube melting
 
 | run | length | time |

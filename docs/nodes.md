@@ -229,11 +229,11 @@ Fills the empty space in the box with water, and adds the water it added to the 
 
 | Parameter | Type | Default | Notes |
 |---|---|---|---|
-| Solvent box | combo (spc216.gro, tip4p.gro, tip5p.gro, water.gro) | `spc216.gro` | spc216.gro works for every 3-point water model. For Martini use the Martini water .gro shipped with the force field. |
-| van der Waals scale (-scale) | float | `0.57` | advanced. 0.57 is the default for SPC. Martini water needs ~0.41 to reach the right density. |
+| Solvent box | combo (spc216.gro, tip4p.gro, tip5p.gro, water.gro) | `spc216.gro` | spc216.gro works for every 3-point water model, TIP3P included; tip4p.gro and tip5p.gro are for the 4- and 5-point models. |
+| van der Waals scale (-scale) | float | `0.57` | advanced. 0.57 is GROMACS's own default: it gives a density close to 1000 g/l for a protein in water. |
 | Max solvent molecules | int | `0` | advanced. 0 = fill the box completely. |
 | Solvent shell (nm) | float | `0.0` | advanced. Non-zero solvates only a shell around the solute. |
-| Default vdW radius (-radius, nm) | float | `0.0` | advanced. Overrides the radius database for every atom. Martini solvation wants about 0.21 -- the bead database does not know CG sizes. |
+| Default vdW radius (-radius, nm) | float | `0.0` | advanced. The size given to atoms that GROMACS's list of atom sizes does not cover. 0 leaves GROMACS's own value, 0.105 nm. |
 | Keep water out of (element, radius) | text |  | advanced. How big each kind of atom is treated as being, when solvate decides whether a water will fit. One 'element radius' per line, in nm.  Why you would want it: solvate only asks whether a water overlaps an atom, so it happily fills the inside of an oil layer, a lipid tail region or any other loosely packed hydrophobic space -- water where no water belongs. Making carbon bigger than it really is, 0.35 instead of 0.17, closes those gaps.  This writes a vdwradii.dat beside the run, starting from GROMACS's own and changing only the lines you name. It affects nothing but where the waters are put; the run afterwards uses the force field's real radii. |
 | Output name | str | `solvated.gro` | advanced. |
 
@@ -263,7 +263,7 @@ Adds ions: enough to cancel the system's net charge, plus any salt you want at a
 | Negative ion | combo (CL, BR, IOD) | `CL` |  |
 | Positive charge | int | `1` | advanced. |
 | Negative charge | int | `-1` | advanced. |
-| Group to replace | str | `SOL` | SOL for atomistic water, W for Martini water. |
+| Group to replace | str | `SOL` | The molecules swapped for ions: SOL, the water, in almost every system. |
 | grompp -maxwarn | int | `1` | advanced. The ion-generation grompp usually warns about a non-zero system charge, which is exactly what this node is about to fix. |
 | Output name | str | `ions.gro` | advanced. |
 
