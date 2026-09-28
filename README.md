@@ -44,7 +44,8 @@ first-time user sees 25 blocks rather than hundreds.
 - The **Terminal** drawer under the canvas has two tabs. **Run** follows a
   run as it happens, with every command and its output. **Shell** is a command
   line (Bash) on the computer that runs the simulations, for looking at files,
-  editing them with `nano`, or running `gmx` by hand.
+  editing them with `nano`, or running `gmx` by hand. Several can be open at
+  once, each in a tab of its own.
 - The **Command**, **Log** and **Files** tabs show each block's exact
   commands, its output, and every file it wrote, ready to download.
 - Graphs are saved and shared as JSON files. **Export scripts** writes a graph

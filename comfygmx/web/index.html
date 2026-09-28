@@ -102,11 +102,11 @@
 
     <!-- A transcript of the run, under the graph rather than beside it: what
          is happening is a property of the whole run, not of whichever node
-         you last clicked. Its second tab is a real shell on this machine. -->
+         you last clicked. Its second tab holds real shells on this machine. -->
     <!-- The handle sits on the edge the drawer comes out of, rather than in the
          toolbar with things that open dialogs. It carries the run status, so a
          closed drawer still says whether anything is happening. -->
-    <button id="terminal-handle" title="What is running, and a shell on this machine (Ctrl+`)">
+    <button id="terminal-handle" title="What is running, and shells on this machine (Ctrl+`)">
       <span id="handle-dot" class="t-dot"></span>
       <span id="handle-label">Terminal</span>
     </button>
@@ -117,7 +117,7 @@
           <button id="terminal-tab-run" class="t-tab active" role="tab"
                   title="What the run is doing, block by block">Run</button>
           <button id="terminal-tab-shell" class="t-tab" role="tab"
-                  title="A bash shell on this machine, as in a terminal window: nano, cp, rm, gmx, any command">Shell</button>
+                  title="Bash shells on this machine, as in a terminal window: nano, cp, rm, gmx, any command. + opens another">Shell</button>
         </div>
         <span id="terminal-dot" class="t-dot for-run"></span>
         <span id="terminal-status" class="for-run">idle</span>
@@ -131,8 +131,6 @@
                 title="Type cd and this tab's run folder into the shell. Only while the shell is waiting at its prompt; anything half-typed on that line is cleared first">Go to run folder</button>
         <button id="shell-copy" class="small for-shell hidden"
                 title="Copy what is selected in the shell, or everything in it when nothing is">Copy</button>
-        <button id="shell-new" class="small for-shell hidden"
-                title="End this shell and start a fresh one">New shell</button>
         <button id="terminal-close" class="small" title="Hide (Ctrl+`)">▾</button>
       </header>
       <pre id="terminal-body" class="for-run"></pre>
@@ -146,9 +144,13 @@
         <button id="terminal-eof" class="small" title="Close the command's input (Ctrl+D)">EOF</button>
         <button id="terminal-stop" class="small danger" title="Stop the run (Ctrl+C). Press again to kill it outright">Stop</button>
       </div>
-      <!-- The Shell tab: filled in by ShellTab (terminal.js) with the screen
-           from vt.js, the first time the tab is opened. -->
-      <div id="shell-pane" class="for-shell hidden"></div>
+      <!-- The Shell tab: a strip with a tab for each shell, and under it
+           their screens (vt.js), one showing at a time. Filled in by
+           ShellTab (terminal.js) the first time the tab is opened. -->
+      <div id="shell-pane" class="for-shell hidden">
+        <div id="shell-tabs" role="tablist"></div>
+        <div id="shell-screens"></div>
+      </div>
     </section>
   </main>
 

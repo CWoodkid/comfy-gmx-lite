@@ -1,8 +1,9 @@
 """A real shell for the Terminal drawer's Shell tab.
 
-The drawer's Run tab follows a run. The Shell tab is an ordinary bash on this
-machine, the same as a terminal window: nano, cp, rm, gmx, anything you would
-type there. This file is the server's half of it.
+The drawer's Run tab follows a run. The Shell tab holds ordinary bash shells on
+this machine, the same as terminal windows: nano, cp, rm, gmx, anything you
+would type there. It can keep several, each in a numbered tab of its own, and
+each with its own connection to this server. This file is the server's half.
 
 Two pieces:
 
@@ -47,7 +48,8 @@ GRACE_SECONDS = 60.0
 #: How much of the latest output is kept, to redraw the screen of a page that
 #: comes back.
 BACKLOG_BYTES = 256 * 1024
-#: The most shells one server keeps at once. A page stuck reconnecting
+#: The most shells one server keeps at once, for all its pages and their tabs
+#: together. The page is told, so + stops there. A page stuck reconnecting
 #: through some fault must not be able to fill the machine with them.
 MAX_SHELLS = 8
 #: The largest message the page may send in one go: a big paste, not more.
@@ -448,6 +450,7 @@ class ShellSession:
                 "type": "ready", "id": self.id, "cwd": self.cwd,
                 "shell": self.argv[0], "again": not fresh,
                 "program": self.program, "catchup": len(self.backlog),
+                "most": MAX_SHELLS,
             })
             if self.backlog:
                 sock.send_bytes(bytes(self.backlog))
@@ -667,8 +670,9 @@ class Shells:
             if sum(1 for s in self._all.values() if s.alive) >= MAX_SHELLS:
                 raise ShellError(
                     f"{MAX_SHELLS} shells are open already, which is as many as "
-                    "one Comfy-gmx keeps. Type exit in one you no longer need, "
-                    "or close the pages showing them and wait a minute.")
+                    "one Comfy-gmx keeps. Close one you no longer need with the "
+                    "× on its tab, or type exit in it. Shells in pages that were "
+                    "closed end by themselves a minute later.")
             session = ShellSession(cwd, _clamp(cols, 2, 1000, 80),
                                    _clamp(rows, 2, 1000, 24), on_end=self._forget)
             self._all[session.id] = session

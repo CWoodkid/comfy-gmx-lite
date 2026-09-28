@@ -2495,6 +2495,10 @@ def check_shell() -> None:
         program that is
       * a page that comes back finds the same shell, with its screen
       * `exit` ends it, and a shell left without a page is hung up
+      * several at once, as the tabs above the screen open them, are several
+        bashes; each page is told how many one server keeps, closing one
+        tab ends that shell alone, and past the limit the next is refused
+        with how to make room
     """
     import os
     import tempfile
@@ -2637,6 +2641,69 @@ def check_shell() -> None:
         time.sleep(0.2)
         check(shells.count() == 0, "shell: the server still counts a shell after `exit`")
 
+        # Several at once, as the tabs above the screen open them: each its
+        # own bash, and closing one tab (x) leaves the others alone.
+        def pid_after(opened: _ShellPage, marker: bytes) -> str:
+            tail = opened.screen.split(marker)[-1] if marker in opened.screen else b""
+            found = re.search(rb"pid=(\d+)", tail)
+            return found.group(1).decode() if found else ""
+
+        one = page(f"?cwd={folder}&cols=80&rows=24")
+        two = page("?cols=80&rows=24")
+        both = all([opened.until(lambda p: p.said("ready"), 10) for opened in (one, two)])
+        check(both and one.said("ready")[0].get("id") != two.said("ready")[0].get("id"),
+              f"shell: two tabs did not get a shell each ({one.messages[:1]!r}, "
+              f"{two.messages[:1]!r})")
+        check(both and one.said("ready")[0].get("most") == shell_module.MAX_SHELLS,
+              "shell: the page was not told how many shells one server keeps")
+        one.type("cd /; echo one-$((2+2)) pid=$$\r")
+        two.type("echo two-$((3+3)) pid=$$\r")
+        one.until(lambda p: pid_after(p, b"one-4") != "", 10)
+        two.until(lambda p: pid_after(p, b"two-6") != "", 10)
+        pid_one, pid_two = pid_after(one, b"one-4"), pid_after(two, b"two-6")
+        check(bool(pid_one) and bool(pid_two) and pid_one != pid_two,
+              f"shell: the two tabs are not two shells (process {pid_one!r} and {pid_two!r})")
+        check(b"two-6" not in one.screen and b"one-4" not in two.screen,
+              "shell: what was typed in one shell showed up in the other")
+        check(shells.count() == 2, f"shell: with two tabs the server counts {shells.count()} shells")
+        one.send({"type": "hangup"})
+        gone = one.until(lambda p: p.said("exit"), 10) and one.said("exit")[0]
+        check(bool(gone) and gone.get("hung_up") is True,
+              f"shell: closing a tab did not hang its shell up ({gone!r})")
+        deadline = time.monotonic() + 5
+        while shells.count() > 1 and time.monotonic() < deadline:
+            time.sleep(0.1)
+        check(shells.count() == 1,
+              f"shell: after closing one of two tabs the server counts {shells.count()} shells")
+        two.type("echo still-$((4+4))\r")
+        check(two.until(lambda p: b"still-8" in p.screen, 10),
+              "shell: closing one shell's tab ended the other one too")
+        # As many as one server keeps: the next is refused, and told how to
+        # make room.
+        keep_most = shell_module.MAX_SHELLS
+        shell_module.MAX_SHELLS = 2
+        try:
+            three = page("?cols=80&rows=24")
+            three.until(lambda p: p.said("ready") or p.said("refused"), 10)
+            four = page("?cols=80&rows=24")
+            four.until(lambda p: p.said("ready") or p.said("refused"), 10)
+            why = four.said("refused")
+            check(bool(three.said("ready")) and bool(why)
+                  and "\u00d7 on its tab" in why[0].get("why", ""),
+                  "shell: with 2 of 2 shells open, a third was not refused with how to make "
+                  f"room ({four.messages[:1]!r})")
+        finally:
+            shell_module.MAX_SHELLS = keep_most
+        for opened in (two, three):
+            if opened.said("ready"):
+                opened.type("exit\r")
+                opened.until(lambda p: p.said("exit"), 10)
+        deadline = time.monotonic() + 5
+        while shells.count() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        check(shells.count() == 0,
+              f"shell: {shells.count()} shell(s) still open after exit in every tab")
+
         # A shell whose page never comes back is hung up after the grace time.
         keep = shell_module.GRACE_SECONDS
         shell_module.GRACE_SECONDS = 1.0
@@ -2686,7 +2753,23 @@ def check_shell() -> None:
         shutil.rmtree(folder, ignore_errors=True)
     print("shell: two strangers refused, a listed name let in, and an online session's "
           "own page behind Jupyter; typing, size, Ctrl+C, coming back, exit and hang-up "
-          "checked")
+          "checked, and several at once up to the limit")
+
+
+def check_shell_tabs() -> None:
+    """The Shell tab keeps several shells, each in a tab of its own.
+    `tools/shell_tabs.js` loads terminal.js with a stand-in for the page, the
+    screen and the server, and opens, closes and reloads them."""
+    node = shutil.which("node")
+    if not node:
+        print("shell tabs: skipped -- node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "shell_tabs.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the shell-tabs test failed:\n" + (proc.stdout or proc.stderr))
+    print("shell tabs: + opens more beside the first, \u00d7 ends only its own, and a "
+          "reload brings them all back")
 
 
 def check_keepalive() -> None:
@@ -3080,6 +3163,7 @@ CHECKS = (
     check_script_help,
     check_keepalive,
     check_shell,
+    check_shell_tabs,
     check_trajectory_carries_its_run_file,
     check_trajectory_groups,
     check_file_tidying,

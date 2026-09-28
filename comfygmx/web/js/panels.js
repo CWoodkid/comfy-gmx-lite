@@ -4190,13 +4190,18 @@ const Panels = {
       <code>less</code>, <code>gmx</code>, anything you would type there. It starts in this
       tab's run folder, and <b>Go to run folder</b> takes it back there later. Ctrl+C stops
       the command that is running, as in any terminal; with text selected, Ctrl+C copies
-      it instead, and Ctrl+V pastes. Reloading the page keeps the shell and what was on
-      its screen. It ends when you type <code>exit</code>, or a minute after the page is
-      closed; <b>New shell</b> starts a fresh one.</p>
+      it instead, and Ctrl+V pastes.</p>
+      <p>Several shells can be open at once, for example one running a long command while
+      another looks at the files it writes. Each has a numbered tab above the screen:
+      <b>+</b> opens another, up to eight in all, and <b>×</b> on a tab ends that shell. A
+      shell carries on while another one is showing, and a pulsing dot on its tab means a
+      program is running in it. Reloading the page keeps every shell and what was on its
+      screen. A shell ends when you type <code>exit</code> or close its tab, or a minute
+      after the page is closed; closing the last one starts a fresh one.</p>
       <p>A few keys belong to the browser and never reach the shell: Ctrl+W closes the
       browser tab, and Ctrl+T and Ctrl+N open new ones. In nano, search with F6 instead of
-      Ctrl+W. While a command is running in the shell, the page asks before it is closed
-      or reloaded.</p>
+      Ctrl+W. While a command is running in any of the shells, the page asks before it is
+      closed or reloaded.</p>
       <h3>From a terminal</h3>
       <p>Four scripts, and each answers <code>--help</code>:</p>
       <table>

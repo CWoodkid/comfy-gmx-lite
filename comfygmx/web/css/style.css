@@ -1376,7 +1376,36 @@ textarea.code {
 /* The Shell tab: a real terminal (vt.js). Every line is exactly one cell
    high and every character one cell wide, so what a program draws lines up
    the way it does in a terminal window. */
-#shell-pane { flex: 1; min-height: 0; display: flex; }
+#shell-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Above the screens, a tab for each shell and + for another. The tab on
+   screen takes the screen's colour, so it reads as the one in front. */
+#shell-tabs {
+  display: flex; align-items: flex-end; gap: 2px; flex-shrink: 0;
+  padding: 3px 8px 0; background: #0a0c0f; border-bottom: 1px solid var(--line);
+  overflow-x: auto; overflow-y: hidden;
+}
+/* Only there when the tabs do not fit, and slim, so it does not crowd them. */
+#shell-tabs::-webkit-scrollbar { height: 4px; }
+.shell-tab {
+  display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 44px;
+  max-width: 180px; padding-left: 8px; border: 1px solid transparent;
+  border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer;
+  white-space: nowrap; font-family: var(--mono); font-size: 10.5px;
+  line-height: 18px; color: var(--text-dim);
+}
+.shell-tab:hover { color: var(--text); }
+.shell-tab.active { color: var(--text); background: #0d0f13; border-color: var(--line-strong); }
+.shell-tab .t-dot { width: 6px; height: 6px; }
+/* Short of room, the word gives way and the number stays. */
+.shell-tab-no { flex-shrink: 0; }
+.shell-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#shell-tabs button {
+  flex-shrink: 0; background: none; border: none; border-radius: 3px;
+  padding: 0 6px; font-size: 13px; line-height: 18px; color: var(--text-faint);
+}
+#shell-tabs button:hover:not(:disabled) { background: #232830; color: var(--text); }
+/* The screens: only the chosen shell's is showing. */
+#shell-screens { flex: 1; min-height: 0; display: flex; }
 .vt { position: relative; flex: 1; min-width: 0; background: #0d0f13; overflow: hidden; }
 .vt-viewport {
   position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto;
