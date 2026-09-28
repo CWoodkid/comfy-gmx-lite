@@ -2228,6 +2228,317 @@ def check_following_a_run() -> None:
           f"at once, and the end comes with how it ended ({took:.1f} s)")
 
 
+class _ShellPage:
+    """A stand-in for the page's Shell tab: the browser's end of a WebSocket.
+
+    Written out here rather than taken from a package, like the server end in
+    comfygmx/shell.py. A browser scrambles ("masks") what it sends, so this
+    does too; the server would be right to refuse it otherwise.
+    """
+
+    def __init__(self, port: int, query: str = "", host: str = "",
+                 origin: str = "") -> None:
+        import base64
+        import os
+        import socket
+        host = host or f"127.0.0.1:{port}"
+        origin = origin if origin else f"http://{host}"
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=10)
+        key = base64.b64encode(os.urandom(16)).decode()
+        self.sock.sendall((
+            f"GET /api/shell{query} HTTP/1.1\r\nHost: {host}\r\n"
+            f"Origin: {origin}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = self.sock.recv(1)
+            if not chunk:
+                break
+            head += chunk
+        self.status = head.split(b"\r\n", 1)[0].decode(errors="replace")
+        self.messages: list = []   # what the server sent, as they came
+        self.screen = b""          # everything the shell wrote, joined up
+        self.over = False
+
+    def _exactly(self, size: int) -> bytes:
+        data = b""
+        while len(data) < size:
+            chunk = self.sock.recv(size - len(data))
+            if not chunk:
+                raise ConnectionError("closed")
+            data += chunk
+        return data
+
+    def send(self, message) -> None:
+        import json
+        import os
+        import struct
+        payload = json.dumps(message).encode()
+        mask = os.urandom(4)
+        size = len(payload)
+        head = (struct.pack("!BB", 0x81, 0x80 | size) if size < 126
+                else struct.pack("!BBH", 0x81, 0x80 | 126, size))
+        self.sock.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+
+    def type(self, text: str) -> None:
+        self.send({"type": "input", "data": text})
+
+    def _one(self) -> None:
+        import json
+        import struct
+        first, second = self._exactly(2)
+        size = second & 0x7F
+        if size == 126:
+            size = struct.unpack("!H", self._exactly(2))[0]
+        elif size == 127:
+            size = struct.unpack("!Q", self._exactly(8))[0]
+        payload = self._exactly(size)
+        opcode = first & 0x0F
+        if opcode == 0x8:
+            self.over = True
+            raise ConnectionError("closed")
+        if opcode == 0x2:
+            self.screen += payload
+            self.messages.append(("bytes", payload))
+        elif opcode == 0x1:
+            self.messages.append(("json", json.loads(payload)))
+
+    def until(self, wanted, seconds: float = 10.0) -> bool:
+        """Read until wanted(self) is true; False if it never became true."""
+        import socket
+        import time
+        end = time.monotonic() + seconds
+        while not wanted(self):
+            left = end - time.monotonic()
+            if left <= 0 or self.over:
+                return False
+            self.sock.settimeout(left)
+            try:
+                self._one()
+            except (socket.timeout, ConnectionError, OSError):
+                return wanted(self)
+        return True
+
+    def said(self, kind: str) -> list:
+        return [m for tag, m in self.messages if tag == "json" and m.get("type") == kind]
+
+    def close(self) -> None:
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
+def check_shell() -> None:
+    """The Terminal drawer's Shell tab, against a real server and a real bash.
+
+    What has to stay true:
+
+      * a page from another website gets no shell, and neither does a page
+        opened at a name the server does not know (the shell could otherwise
+        be reached by any web page open in the same browser)
+      * the shell starts in the folder asked for, at the size of the page's
+        screen, and follows the page when it changes size
+      * what is typed arrives, and what the shell writes comes back
+      * `yes | head` ends quietly, without "Broken pipe"
+      * Ctrl+C reaches the program in front, and the page is told which
+        program that is
+      * a page that comes back finds the same shell, with its screen
+      * `exit` ends it, and a shell left without a page is hung up
+    """
+    import os
+    import tempfile
+    import threading
+    import time
+
+    from comfygmx import shell as shell_module
+    from comfygmx.server import build_server
+
+    try:
+        httpd = build_server("127.0.0.1", 0, Settings())
+    except OSError as exc:
+        print(f"shell: skipped ({exc})")
+        return
+    port = httpd.server_address[1]
+    shells = httpd.RequestHandlerClass.app.shells
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    folder = Path(tempfile.mkdtemp(prefix="shell-check-"))
+    pages = []
+    # The test's shells read your ~/.bashrc like any other, but keep what is
+    # typed into them out of your own bash history.
+    history_before = os.environ.get("HISTFILE")
+    os.environ["HISTFILE"] = str(folder / "history")
+
+    def page(query: str = "", **kw) -> _ShellPage:
+        opened = _ShellPage(port, query, **kw)
+        pages.append(opened)
+        return opened
+
+    try:
+        # Another website's page: no shell, and no connection either.
+        stranger = page("", origin="http://example.org")
+        check("403" in stranger.status,
+              f"shell: a page from another website was answered {stranger.status!r}, not refused")
+        # A page opened at a name the server does not know: told why.
+        renamed = page("", host=f"example.org:{port}")
+        renamed.until(lambda p: p.said("refused"), 5)
+        why = renamed.said("refused")
+        check(bool(why) and "COMFYGMX_ALLOWED_HOSTS" in why[0].get("why", ""),
+              "shell: a page opened at an unknown name was not refused with the "
+              f"reason (it got {renamed.messages[:2]!r})")
+        check(shells.count() == 0, f"shell: {shells.count()} shell(s) started for refused pages")
+        # Behind a proxy the page's name differs from the server's; listed in
+        # COMFYGMX_ALLOWED_HOSTS, it may have a shell.
+        listed_before = os.environ.get("COMFYGMX_ALLOWED_HOSTS")
+        os.environ["COMFYGMX_ALLOWED_HOSTS"] = "hub.example.org"
+        try:
+            proxied = page("", origin="https://hub.example.org")
+            proxied.until(lambda p: p.said("ready") or p.said("refused"), 10)
+            check(bool(proxied.said("ready")),
+                  "shell: a page from a name listed in COMFYGMX_ALLOWED_HOSTS got no shell "
+                  f"({proxied.status!r}, {proxied.messages[:1]!r})")
+            if proxied.said("ready"):
+                proxied.type("exit\r")
+                proxied.until(lambda p: p.said("exit"), 10)
+        finally:
+            if listed_before is None:
+                os.environ.pop("COMFYGMX_ALLOWED_HOSTS", None)
+            else:
+                os.environ["COMFYGMX_ALLOWED_HOSTS"] = listed_before
+        unlisted = page("", origin="https://hub.example.org")
+        check("403" in unlisted.status,
+              f"shell: the same page, no longer listed, was answered {unlisted.status!r}")
+        # In an online session (binder/launch.py) the page is reached only
+        # through Jupyter, which asks for the session's token first and passes
+        # the page's own name on: hub.example.org rather than this server's.
+        # There the name check is left out. The check on pages from other
+        # websites is not.
+        jupyter_before = os.environ.get("COMFYGMX_BEHIND_JUPYTER")
+        os.environ["COMFYGMX_BEHIND_JUPYTER"] = "1"
+        try:
+            online = page("", host="hub.example.org", origin="https://hub.example.org")
+            online.until(lambda p: p.said("ready") or p.said("refused"), 10)
+            check(bool(online.said("ready")),
+                  "shell: behind Jupyter, the session's own page got no shell "
+                  f"({online.status!r}, {online.messages[:1]!r})")
+            if online.said("ready"):
+                online.type("exit\r")
+                online.until(lambda p: p.said("exit"), 10)
+            intruder = page("", host="hub.example.org", origin="https://example.org")
+            check("403" in intruder.status,
+                  "shell: behind Jupyter, a page from another website was answered "
+                  f"{intruder.status!r}, not refused")
+        finally:
+            if jupyter_before is None:
+                os.environ.pop("COMFYGMX_BEHIND_JUPYTER", None)
+            else:
+                os.environ["COMFYGMX_BEHIND_JUPYTER"] = jupyter_before
+        deadline = time.monotonic() + 5
+        while shells.count() and time.monotonic() < deadline:
+            time.sleep(0.1)
+
+        # The real page.
+        first = page(f"?cwd={folder}&cols=100&rows=30")
+        check("101" in first.status, f"shell: the page's own request was answered {first.status!r}")
+        ready = first.until(lambda p: p.said("ready"), 10) and first.said("ready")[0]
+        check(bool(ready) and ready.get("cwd") == str(folder),
+              f"shell: it did not start in the folder asked for ({ready!r})")
+        first.type("stty size; pwd; yes | head -2; echo marker-$((6*7)); echo pid=$$\r")
+        got = first.until(lambda p: b"pid=" in p.screen.split(b"marker-42")[-1]
+                          and b"marker-42" in p.screen, 15)
+        text = first.screen.decode(errors="replace")
+        check(got, f"shell: typing did not come back as output: {text[-400:]!r}")
+        check("30 100" in text, "shell: the shell did not start at the page's size (30 rows, 100 columns)")
+        check(str(folder) in text, "shell: pwd did not print the folder it started in")
+        check("Broken pipe" not in text, "shell: `yes | head` ended with 'Broken pipe'")
+        pid_line = [line for line in text.splitlines() if line.startswith("pid=")]
+        shell_pid = pid_line[-1].strip()[4:] if pid_line else ""
+
+        first.send({"type": "resize", "cols": 120, "rows": 40})
+        first.type("stty size\r")
+        check(first.until(lambda p: b"40 120" in p.screen, 10),
+              "shell: after the page grew to 40 rows and 120 columns, stty did not say so")
+
+        first.type("sleep 30\r")
+        check(first.until(lambda p: any(m.get("program") == "sleep" for m in p.said("busy")), 5),
+              "shell: the page was not told that sleep was running in front")
+        first.type("\x03")
+        check(first.until(lambda p: p.said("busy") and p.said("busy")[-1].get("program") == "", 5),
+              "shell: Ctrl+C did not stop sleep and bring the prompt back")
+
+        # The page goes away and comes back: the same shell, with its screen.
+        first.close()
+        time.sleep(0.3)
+        again = page(f"?id={ready.get('id', '')}&cols=120&rows=40")
+        back = again.until(lambda p: p.said("ready"), 10) and again.said("ready")[0]
+        check(bool(back) and back.get("again") is True and back.get("id") == ready.get("id"),
+              f"shell: a page coming back did not find its shell ({back!r})")
+        again.until(lambda p: b"marker-42" in p.screen, 5)
+        check(b"marker-42" in again.screen, "shell: a page coming back did not get the screen back")
+        again.type("echo pid=$$\r")
+        again.until(lambda p: p.screen.count(b"pid=") >= 2, 10)
+        check(f"pid={shell_pid}" in again.screen.decode(errors="replace").split("marker-42")[-1],
+              "shell: the page that came back is talking to a different shell")
+
+        again.type("exit\r")
+        ended = again.until(lambda p: p.said("exit"), 10) and again.said("exit")[0]
+        check(bool(ended) and ended.get("code") == 0,
+              f"shell: `exit` did not end it with code 0 ({ended!r})")
+        time.sleep(0.2)
+        check(shells.count() == 0, "shell: the server still counts a shell after `exit`")
+
+        # A shell whose page never comes back is hung up after the grace time.
+        keep = shell_module.GRACE_SECONDS
+        shell_module.GRACE_SECONDS = 1.0
+        try:
+            lonely = page("?cols=80&rows=24")
+            lonely.until(lambda p: p.said("ready"), 10)
+            lonely.type("echo pid=$$\r")
+            lonely.until(lambda p: b"pid=" in p.screen.split(b"$$")[-1], 10)
+            found = [line for line in lonely.screen.decode(errors="replace").splitlines()
+                     if line.startswith("pid=")]
+            lonely_pid = int(found[-1].strip()[4:]) if found else 0
+            lonely.close()
+            deadline = time.monotonic() + 8
+            while shells.count() and time.monotonic() < deadline:
+                time.sleep(0.2)
+            check(shells.count() == 0, "shell: a shell left without its page was not hung up")
+
+            def running(pid: int) -> bool:
+                try:
+                    os.kill(pid, 0)
+                    return True
+                except OSError:
+                    return False
+
+            deadline = time.monotonic() + 8
+            while lonely_pid and running(lonely_pid) and time.monotonic() < deadline:
+                time.sleep(0.2)
+            alive = bool(lonely_pid) and running(lonely_pid)
+            check(lonely_pid and not alive,
+                  f"shell: the hung-up shell (process {lonely_pid}) is still running")
+        finally:
+            shell_module.GRACE_SECONDS = keep
+    except OSError as exc:
+        failures.append(f"shell: {exc}")
+    finally:
+        for opened in pages:
+            opened.close()
+        httpd.shutdown()
+        httpd.server_close()
+        if history_before is None:
+            os.environ.pop("HISTFILE", None)
+        else:
+            os.environ["HISTFILE"] = history_before
+        # The shells write their history as they end, which can be a moment
+        # after the test has finished with them.
+        time.sleep(0.5)
+        shutil.rmtree(folder, ignore_errors=True)
+    print("shell: two strangers refused, a listed name let in, and an online session's "
+          "own page behind Jupyter; typing, size, Ctrl+C, coming back, exit and hang-up "
+          "checked")
+
+
 def check_keepalive() -> None:
     """A POST whose body nobody reads must not poison the connection.
 
@@ -2616,6 +2927,7 @@ CHECKS = (
     check_install_scripts,
     check_script_help,
     check_keepalive,
+    check_shell,
     check_trajectory_carries_its_run_file,
     check_trajectory_groups,
     check_file_tidying,

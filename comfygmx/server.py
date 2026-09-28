@@ -28,7 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from . import __version__, bootstrap, facts, flaghints, groups
+from . import __version__, bootstrap, facts, flaghints, groups, shell
 from .chunks import chunk_list, delete_chunk, save_chunk
 from .config import WEB_DIR, Settings
 from .environments import (CATALOG, Toolbox, _version_number, available_versions,
@@ -172,6 +172,8 @@ class App:
         self.executor = Executor(settings)
         self.toolbox = Toolbox(settings)
         self.jobs: Dict[str, ScriptJob] = {}
+        #: The Terminal drawer's Shell tabs. See shell.py.
+        self.shells = shell.Shells()
         self._sweep_cache()
 
     def _sweep_cache(self) -> None:
@@ -1315,6 +1317,59 @@ def h_run_input(self: Handler, run_id: str) -> None:
         eof=bool(body.get("eof"))))
 
 
+def h_shell(self: Handler) -> None:
+    """The Terminal drawer's Shell tab: a real bash, over a WebSocket.
+
+    Everything about the shell itself is in shell.py. This part answers the
+    browser's request to open the connection, and then hands it over.
+    """
+    headers = self.headers
+    # Whatever the answer, this connection is not used for another request.
+    self.close_connection = True
+    foreign = shell.foreign_page(headers)
+    if foreign:
+        # Not a Comfy-gmx page. It is told nothing more than no.
+        self._error(foreign, 403)
+        return
+    if (headers.get("Upgrade") or "").lower() != "websocket":
+        self._error("this address is for the Terminal drawer's Shell tab, "
+                    "which opens it as a WebSocket", 400)
+        return
+    if (headers.get("Sec-WebSocket-Version") or "").strip() != "13":
+        self._send(426, b"only WebSocket version 13", "text/plain; charset=utf-8",
+                   {"Sec-WebSocket-Version": "13"})
+        return
+    key = (headers.get("Sec-WebSocket-Key") or "").strip()
+    if not key:
+        self._error("no Sec-WebSocket-Key", 400)
+        return
+    # The connection is opened even when the shell is then refused: a
+    # browser shows the page nothing of a refused opening, only that it
+    # failed, and the reason is what somebody needs in order to fix it.
+    self.send_response(101, "Switching Protocols")
+    self.send_header("Upgrade", "websocket")
+    self.send_header("Connection", "Upgrade")
+    self.send_header("Sec-WebSocket-Accept", shell.accept_value(key))
+    self.end_headers()
+    self.wfile.flush()
+    sock = shell.Socket(self.rfile, self.wfile, self.connection)
+    why = shell.unknown_name(headers, self.server.server_address[0])
+    if not why:
+        try:
+            session, fresh = self.app.shells.find_or_start(
+                self.q("id"), self.q("cwd"), self.q("cols", "80"), self.q("rows", "24"))
+        except shell.ShellError as exc:
+            why = str(exc)
+    if why:
+        try:
+            sock.send_json({"type": "refused", "why": why})
+        except OSError:
+            pass
+        sock.close()
+        return
+    shell.converse(sock, session, fresh)
+
+
 def h_node_log(self: Handler, run_id: str, node_id: str) -> None:
     run = self.app.executor.get(run_id)
     if run is None or node_id not in run.nodes:
@@ -2170,6 +2225,7 @@ ROUTES: List[Tuple[re.Pattern, Tuple[str, ...], Callable]] = [
     (re.compile(r"^/api/runs/([A-Za-z0-9-]+)/events$"), ("GET",), h_run_events),
     (re.compile(r"^/api/runs/([A-Za-z0-9-]+)/cancel$"), ("POST",), h_run_cancel),
     (re.compile(r"^/api/runs/([A-Za-z0-9-]+)/input$"), ("POST",), h_run_input),
+    (re.compile(r"^/api/shell$"), ("GET",), h_shell),
     (re.compile(r"^/api/runs/([A-Za-z0-9-]+)/resume$"), ("POST",), h_run_resume),
     (re.compile(r"^/api/runs/([A-Za-z0-9-]+)/files$"), ("GET",), h_run_files),
     (re.compile(r"^/api/runs/([A-Za-z0-9-]+)/nodes/([^/]+)/log$"), ("GET",), h_node_log),

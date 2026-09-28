@@ -14,9 +14,10 @@ desktop. Jupyter, which such services are built around, only passes it through.
 | file | what it does |
 |---|---|
 | `environment.yml` | the software: GROMACS 2026.3 for processors only, Python 3.12, numpy, and jupyter-server-proxy, all from conda-forge |
+| `apt.txt` | programs from Ubuntu: nano, a simple text editor for the Shell tab |
 | `postBuild` | runs once, while the copy is built: installs the plug-in below, checks the two tutorials against the blocks this version has, and downloads what they need (the lysozyme structure and CHARMM36) |
 | `jupyter-proxy/` | a small plug-in that tells Jupyter how to start the editor, and that it lives at `<session address>/comfygmx/` |
-| `launch.py` | what Jupyter runs to start the editor: it works out how many processors this session may use, writes the settings, and starts it |
+| `launch.py` | what Jupyter runs to start the editor: it works out how many processors this session may use, writes the settings, and starts it, telling the Shell tab that Jupyter is the only way in |
 | `build-image.sh` | builds the same copy on your own machine with repo2docker, the program Binder uses |
 | `try-image.sh` | starts that copy as one person's session would be: one processor and 2 GB of memory |
 

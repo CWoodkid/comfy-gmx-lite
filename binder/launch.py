@@ -15,7 +15,8 @@ Three things happen before the editor starts:
    environment, runs are kept in ~/.comfy-gmx-lite, and the setup questions
    the editor asks on a first start are marked as answered, since everything
    is installed already.
-3. Start the editor on the port Jupyter gave.
+3. Start the editor on the port Jupyter gave, and tell it that Jupyter is the
+   only way in (see the Shell tab, in main below).
 
     python3 binder/launch.py PORT
 """
@@ -95,6 +96,13 @@ def main() -> int:
     # reading of numbers downstream, and the log should appear as it is written.
     os.environ["LC_ALL"] = "C"
     os.environ["PYTHONUNBUFFERED"] = "1"
+    # The Shell tab refuses a page opened at a name it does not know, such as
+    # hub.2i2c.mybinder.org, to stop a trick that needs the browser and the
+    # editor on the same computer. Here the editor listens only inside this
+    # session and Jupyter lets nothing through without the session's token,
+    # so that check is switched off. The check that refuses pages from other
+    # websites stays on. (comfygmx/shell.py, behind_jupyter)
+    os.environ["COMFYGMX_BEHIND_JUPYTER"] = "1"
     os.chdir(ROOT)
     os.execvp(sys.executable, [sys.executable, "-m", "comfygmx", "--data-dir", str(home),
                                "serve", "--port", port, "--no-browser"])

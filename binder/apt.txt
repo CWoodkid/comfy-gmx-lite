@@ -1,0 +1,6 @@
+# Programs from Ubuntu for the online copy, one name per line. Binder installs
+# them when it builds the copy, before the software in environment.yml.
+#
+# nano is a simple text editor for the Shell tab (Terminal, then Shell): the
+# help text points to it, and the image Binder starts from has no editor.
+nano

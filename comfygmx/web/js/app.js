@@ -753,8 +753,11 @@ const App = {
     document.addEventListener('keydown', (event) => this.onKey(event));
     window.addEventListener('beforeunload', (event) => {
       this.persist();
-      if (Sessions.running().length) {
-        // Runs survive the page; the warning is so a reload is deliberate.
+      // Runs survive the page; the warning is so a reload is deliberate. The
+      // same for a program running in the Shell tab: it outlives the page
+      // for a minute, but Ctrl+W, which closes a browser tab, is also nano's
+      // key for searching.
+      if (Sessions.running().length || ShellTab.busy()) {
         event.preventDefault();
         event.returnValue = '';
       }

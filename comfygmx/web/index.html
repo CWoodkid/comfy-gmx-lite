@@ -102,36 +102,53 @@
 
     <!-- A transcript of the run, under the graph rather than beside it: what
          is happening is a property of the whole run, not of whichever node
-         you last clicked. -->
+         you last clicked. Its second tab is a real shell on this machine. -->
     <!-- The handle sits on the edge the drawer comes out of, rather than in the
          toolbar with things that open dialogs. It carries the run status, so a
          closed drawer still says whether anything is happening. -->
-    <button id="terminal-handle" title="Show what is running (Ctrl+`)">
+    <button id="terminal-handle" title="What is running, and a shell on this machine (Ctrl+`)">
       <span id="handle-dot" class="t-dot"></span>
       <span id="handle-label">Terminal</span>
     </button>
     <section id="terminal" class="hidden">
       <div id="terminal-grip" title="Drag to resize"></div>
       <header>
-        <span id="terminal-dot" class="t-dot"></span>
-        <span id="terminal-status">idle</span>
+        <div class="t-tabs" role="tablist">
+          <button id="terminal-tab-run" class="t-tab active" role="tab"
+                  title="What the run is doing, block by block">Run</button>
+          <button id="terminal-tab-shell" class="t-tab" role="tab"
+                  title="A bash shell on this machine, as in a terminal window: nano, cp, rm, gmx, any command">Shell</button>
+        </div>
+        <span id="terminal-dot" class="t-dot for-run"></span>
+        <span id="terminal-status" class="for-run">idle</span>
+        <span id="shell-dot" class="t-dot for-shell hidden"></span>
+        <span id="shell-status" class="for-shell hidden">not started</span>
         <span class="spacer"></span>
-        <label class="check"><input type="checkbox" id="terminal-follow" checked> follow</label>
-        <button id="terminal-copy" class="small">Copy</button>
-        <button id="terminal-clear" class="small">Clear</button>
+        <label class="check for-run"><input type="checkbox" id="terminal-follow" checked> follow</label>
+        <button id="terminal-copy" class="small for-run">Copy</button>
+        <button id="terminal-clear" class="small for-run">Clear</button>
+        <button id="shell-cd" class="small for-shell hidden"
+                title="Type cd and this tab's run folder into the shell. Only while the shell is waiting at its prompt; anything half-typed on that line is cleared first">Go to run folder</button>
+        <button id="shell-copy" class="small for-shell hidden"
+                title="Copy what is selected in the shell, or everything in it when nothing is">Copy</button>
+        <button id="shell-new" class="small for-shell hidden"
+                title="End this shell and start a fresh one">New shell</button>
         <button id="terminal-close" class="small" title="Hide (Ctrl+`)">▾</button>
       </header>
-      <pre id="terminal-body"></pre>
+      <pre id="terminal-body" class="for-run"></pre>
       <!-- The typing line. A command that stops to ask a question gets its
            answer here, and Ctrl+C stops the run the way it does in a real
            terminal. -->
-      <div id="terminal-input-row">
+      <div id="terminal-input-row" class="for-run">
         <span id="terminal-prompt" title="What you type goes to the running command">&gt;</span>
         <input id="terminal-input" type="text" autocomplete="off" spellcheck="false"
                placeholder="type here to answer a command  ·  Ctrl+C stops the run  ·  Ctrl+D closes its input">
         <button id="terminal-eof" class="small" title="Close the command's input (Ctrl+D)">EOF</button>
         <button id="terminal-stop" class="small danger" title="Stop the run (Ctrl+C). Press again to kill it outright">Stop</button>
       </div>
+      <!-- The Shell tab: filled in by ShellTab (terminal.js) with the screen
+           from vt.js, the first time the tab is opened. -->
+      <div id="shell-pane" class="for-shell hidden"></div>
     </section>
   </main>
 
@@ -304,6 +321,7 @@
 <script src="js/forms.js"></script>
 <script src="js/graph.js"></script>
 <script src="js/sessions.js"></script>
+<script src="js/vt.js"></script>
 <script src="js/terminal.js"></script>
 <script src="js/panels.js"></script>
 <script src="js/app.js"></script>

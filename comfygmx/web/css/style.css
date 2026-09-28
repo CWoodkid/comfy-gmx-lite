@@ -1360,6 +1360,62 @@ textarea.code {
    in the scrollback the way it does in a real terminal. */
 .t-in    { color: var(--accent); }
 
+/* The drawer's two tabs, Run and Shell, at the left of its header. */
+.t-tabs { display: flex; gap: 2px; margin-right: 4px; }
+.t-tab {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  padding: 1px 9px; font-size: 11px; color: var(--text-dim); cursor: pointer;
+}
+.t-tab:hover { color: var(--text); }
+.t-tab.active { color: var(--text); background: var(--bg-panel); border-color: var(--line-strong); }
+#shell-status {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 10.5px;
+}
+
+/* The Shell tab: a real terminal (vt.js). Every line is exactly one cell
+   high and every character one cell wide, so what a program draws lines up
+   the way it does in a terminal window. */
+#shell-pane { flex: 1; min-height: 0; display: flex; }
+.vt { position: relative; flex: 1; min-width: 0; background: #0d0f13; overflow: hidden; }
+.vt-viewport {
+  position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto;
+  /* The scrollbar's place is kept even before there is anything to scroll,
+     or its arrival would narrow the screen by a column and make every
+     full-screen program redraw. */
+  scrollbar-gutter: stable;
+  padding: 4px 8px; cursor: text; outline: none;
+  font-family: var(--mono); font-size: 12.5px; line-height: 16px; color: #d7dde5;
+}
+.vt-row { height: 16px; white-space: pre; overflow: hidden; }
+.vt-row span { display: inline-block; height: 16px; vertical-align: top; }
+.vt-probe { position: absolute; visibility: hidden; white-space: pre; }
+.vt .b { font-weight: 700; }
+.vt .d { opacity: .6; }
+.vt .i { font-style: italic; }
+.vt .u { text-decoration: underline; }
+.vt .s { text-decoration: line-through; }
+.vt .us { text-decoration: underline line-through; }
+/* A character outside plain ASCII sits in a box of its own cell width, so
+   a font that draws it wider cannot push the rest of the line along. */
+.vt .g { width: var(--cw, 7.5px); text-align: center; }
+.vt .w2 { width: calc(var(--cw, 7.5px) * 2); }
+/* The cursor: filled while the shell has the keyboard, an outline when it
+   has not. Programs can ask for a bar or an underline instead. */
+.vt .vt-cursor { outline: 1px solid #8d97a5; outline-offset: -1px; }
+.vt .vt-cursor.on.block { background: #d7dde5 !important; color: #0d0f13 !important; outline: none; }
+.vt .vt-cursor.on.bar { outline: none; box-shadow: inset 2px 0 0 #d7dde5; }
+.vt .vt-cursor.on.under { outline: none; box-shadow: inset 0 -2px 0 #d7dde5; }
+.vt.reverse .vt-viewport { background: #d7dde5; color: #0d0f13; }
+.vt-input {
+  position: absolute; left: 8px; top: 4px; width: 2px; height: 16px;
+  padding: 0; border: 0; margin: 0; resize: none; overflow: hidden;
+  opacity: 0; background: transparent; color: transparent; pointer-events: none;
+  white-space: nowrap;
+}
+.vt.bell .vt-viewport { animation: vt-bell .18s ease-out; }
+@keyframes vt-bell { from { background: #2a2f38; } }
+
 /* ------------------------------------------------- colour in the palette */
 
 /* Each row carries the colour its node wears on the canvas, and each heading

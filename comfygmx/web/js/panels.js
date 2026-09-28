@@ -4163,13 +4163,27 @@ const Panels = {
       nowhere. On the run-parameters node the same box takes raw <code>key = value</code>
       mdp lines instead, and on the Python node it takes arguments for your own script.</p>
       <h3>The terminal drawer</h3>
-      <p><b>Terminal</b> in the toolbar, or <b>Ctrl+&#96;</b>, opens a transcript of the run
-      under the graph: every node in order, the command each one actually ran, its
-      output and how it ended. Drag its top edge to resize it. The <b>Log</b> tab on
-      the right shows one node at a time, which is what you want when reading a
-      failure; this is what you want when the question is what it is doing now.</p>
-      <p>It is a transcript, not a shell — what runs is what the graph says. The
-      commands in it are copy-pasteable as they stand, and <b>Copy</b> takes the lot.</p>
+      <p><b>Terminal</b> at the bottom right of the canvas, or <b>Ctrl+&#96;</b>, opens a
+      drawer under the graph with two tabs, <b>Run</b> and <b>Shell</b>. Drag its top edge
+      to make it taller.</p>
+      <p><b>Run</b> is a transcript of the run: every node in order, the command each one
+      actually ran, its output and how it ended. The <b>Log</b> tab on the right shows one
+      node at a time, which is what you want when reading a failure; this is what you want
+      when the question is what it is doing now. It is a transcript, not a shell: what
+      runs is what the graph says. The commands in it are copy-pasteable as they stand,
+      and <b>Copy</b> takes the lot.</p>
+      <p><b>Shell</b> is a real shell on this machine (bash), the same as a terminal
+      window: <code>ls</code>, <code>cp</code>, <code>rm</code>, <code>nano</code>,
+      <code>less</code>, <code>gmx</code>, anything you would type there. It starts in this
+      tab's run folder, and <b>Go to run folder</b> takes it back there later. Ctrl+C stops
+      the command that is running, as in any terminal; with text selected, Ctrl+C copies
+      it instead, and Ctrl+V pastes. Reloading the page keeps the shell and what was on
+      its screen. It ends when you type <code>exit</code>, or a minute after the page is
+      closed; <b>New shell</b> starts a fresh one.</p>
+      <p>A few keys belong to the browser and never reach the shell: Ctrl+W closes the
+      browser tab, and Ctrl+T and Ctrl+N open new ones. In nano, search with F6 instead of
+      Ctrl+W. While a command is running in the shell, the page asks before it is closed
+      or reloaded.</p>
       <h3>From a terminal</h3>
       <p>Four scripts, and each answers <code>--help</code>:</p>
       <table>

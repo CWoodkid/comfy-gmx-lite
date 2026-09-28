@@ -1,13 +1,17 @@
-/* The drawer under the canvas: one continuous transcript of a run.
+/* The drawer under the canvas. It has two tabs.
 
-   The Log tab shows one node at a time, which is right when you are reading a
-   failure and wrong when the question is "what is it doing". This is the other
-   view: every node in order, the command each one actually ran, its output and
-   how it ended, scrolling past as it happens.
+   Run: one continuous transcript of a run. The Log tab shows one node at a
+   time, which is right when you are reading a failure and wrong when the
+   question is "what is it doing". This is the other view: every node in
+   order, the command each one actually ran, its output and how it ended,
+   scrolling past as it happens.
 
-   You can type into it, but it is not a shell: what runs is what the graph
-   says. The line at the bottom does two things a real terminal does, and
-   nothing else.
+   Shell: a real bash on this machine, the same as a terminal window (the
+   ShellTab object at the end of this file).
+
+   You can type into the Run tab too, but it is not a shell: what runs is
+   what the graph says. Its line at the bottom does two things a real
+   terminal does, and nothing else.
 
      * What you type goes to the command that is running now, so a program that
        stops to ask a question can be answered instead of the run being thrown
@@ -22,6 +26,8 @@ const Terminal = {
   open: false,
   height: 210,
   follow: true,
+  /* Which tab is showing: 'run' or 'shell'. */
+  tab: 'run',
   el: null,
   body: null,
   input: null,
@@ -58,9 +64,29 @@ const Terminal = {
       this._save();
       if (this.follow) this.body.scrollTop = this.body.scrollHeight;
     });
+    document.getElementById('terminal-tab-run').addEventListener('click', () => this.showTab('run'));
+    document.getElementById('terminal-tab-shell').addEventListener('click', () => this.showTab('shell'));
     this._bindInput();
     this._bindResize();
+    ShellTab.init();
+    this.showTab(stored.tab === 'shell' ? 'shell' : 'run', true);
     this.toggle(stored.open === true, true);
+  },
+
+  /* Run or Shell. The shell is started the first time its tab is shown with
+     the drawer open, not before: most visits never need one. */
+  showTab(name, quiet = false) {
+    this.tab = name === 'shell' ? 'shell' : 'run';
+    const shell = this.tab === 'shell';
+    document.getElementById('terminal-tab-run').classList.toggle('active', !shell);
+    document.getElementById('terminal-tab-shell').classList.toggle('active', shell);
+    for (const el of this.el.querySelectorAll('.for-run')) el.classList.toggle('hidden', shell);
+    for (const el of this.el.querySelectorAll('.for-shell')) el.classList.toggle('hidden', !shell);
+    if (this.open) {
+      if (shell) ShellTab.show();
+      else this.body.scrollTop = this.body.scrollHeight;
+    }
+    if (!quiet) this._save();
   },
 
   /* ------------------------------------------------------------ typing in */
@@ -188,6 +214,7 @@ const Terminal = {
     if (this.open) {
       this.repaint(Sessions.active());
       this.body.scrollTop = this.body.scrollHeight;
+      if (this.tab === 'shell') ShellTab.show();
     }
     if (!quiet) this._save();
   },
@@ -292,7 +319,8 @@ const Terminal = {
     const el = document.getElementById('terminal-status');
     if (el) el.textContent = text;
     const dot = document.getElementById('terminal-dot');
-    if (dot) dot.className = `t-dot${running ? ' running' : ''}`;
+    // Only the one class changes: the dot also carries which tab it is on.
+    if (dot) dot.classList.toggle('running', Boolean(running));
     // A closed drawer still says whether anything is running, which is most of
     // why anyone would open it.
     const handle = document.getElementById('terminal-handle');
@@ -333,8 +361,327 @@ const Terminal = {
   _save() {
     try {
       localStorage.setItem('comfygmx.terminal', JSON.stringify({
-        open: this.open, height: this.height, follow: this.follow,
+        open: this.open, height: this.height, follow: this.follow, tab: this.tab,
       }));
     } catch (err) { /* private mode */ }
+  },
+};
+
+/* The drawer's Shell tab: a real shell on this machine.
+
+   The screen is vt.js; the shell itself runs on the server (comfygmx/shell.py)
+   and the two talk over a WebSocket, a connection that stays open both ways,
+   so each key goes straight to the shell and its output comes straight back.
+
+   The shell belongs to this browser tab, not to a graph tab: switching
+   between graphs keeps it. Reloading the page finds it again (the server
+   keeps it for a minute without a page), because a reload should not kill a
+   command somebody started from it. */
+const ShellTab = {
+  view: null,
+  socket: null,
+  /* The server's name for our shell, kept for the length of this browser
+     tab (sessionStorage), so a reload can ask for the same one back. */
+  id: '',
+  /* off, connecting, on, ended or refused. */
+  state: 'off',
+  /* The program in front of the shell, or '' at the prompt. */
+  program: '',
+  cwd: '',
+  _catchup: 0,
+  _retries: 0,
+  _retryTimer: 0,
+  _newArmed: 0,
+
+  init() {
+    try { this.id = sessionStorage.getItem('comfygmx.shell') || ''; } catch (err) { this.id = ''; }
+    document.getElementById('shell-new').addEventListener('click', () => this.renew());
+    document.getElementById('shell-copy').addEventListener('click', () => this.copyAll());
+    document.getElementById('shell-cd').addEventListener('click', () => this.goToRunFolder());
+    this.paint();
+  },
+
+  /* The tab has just been shown: start the shell, or bring it back. */
+  show() {
+    if (!this.view) {
+      const pane = document.getElementById('shell-pane');
+      this.view = new VT.View(pane, {
+        onData: (text) => this.type(text),
+        onResize: (cols, rows) => this._send({ type: 'resize', cols, rows }),
+        onCopy: (text) => this._copy(text),
+        onKey: (event) => this._key(event),
+      });
+    }
+    // The drawer was hidden until now, so the size is only known now. Not
+    // left for the next frame: a browser tab in the background draws no
+    // frames, and the shell would not start until somebody looked at it.
+    this.view.fit();
+    if (this.state === 'off') this.connect();
+    this.view.focus();
+  },
+
+  /* Keys the page keeps for itself even in the shell. */
+  _key(event) {
+    if ((event.ctrlKey || event.metaKey) && (event.key === '`' || event.key === '~')) {
+      event.preventDefault();
+      Terminal.toggle(false);
+      return false;
+    }
+    return true;
+  },
+
+  connect() {
+    clearTimeout(this._retryTimer);
+    if (this.socket) return;
+    this.state = 'connecting';
+    this.paint();
+    const where = this._startFolder();
+    // Relative to the page, so it still works when the page is reached
+    // through another server that puts it in a sub-folder.
+    const url = new URL('api/shell', window.location.href);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (this.id) url.searchParams.set('id', this.id);
+    if (where) url.searchParams.set('cwd', where);
+    url.searchParams.set('cols', this.view.cols);
+    url.searchParams.set('rows', this.view.rows);
+    let socket;
+    try {
+      socket = new WebSocket(url.toString());
+    } catch (err) {
+      this._lost(`could not reach the server: ${err.message}`);
+      return;
+    }
+    socket.binaryType = 'arraybuffer';
+    this.socket = socket;
+    socket.onmessage = (event) => this._message(event);
+    socket.onclose = () => {
+      if (this.socket !== socket) return;
+      this.socket = null;
+      if (this.state === 'on' || this.state === 'connecting') this._lost();
+    };
+  },
+
+  /* Where a new shell starts: the folder this graph tab's last run wrote
+     into, or the folder its runs go to, the same folder that "Open folder"
+     opens. */
+  _startFolder() {
+    try {
+      const folder = App.workFolder();
+      return folder.path || App.outputRoot || '';
+    } catch (err) {
+      return '';
+    }
+  },
+
+  _message(event) {
+    if (typeof event.data !== 'string') {
+      const bytes = new Uint8Array(event.data);
+      if (this._catchup) {
+        this._catchup = 0;
+        this.view.replay(bytes);
+      } else {
+        this.view.write(bytes);
+      }
+      return;
+    }
+    let message;
+    try { message = JSON.parse(event.data); } catch (err) { return; }
+    switch (message.type) {
+      case 'ready': {
+        const again = Boolean(message.again);
+        const wanted = this.id;
+        this.id = message.id;
+        try { sessionStorage.setItem('comfygmx.shell', this.id); } catch (err) { /* private mode */ }
+        this.state = 'on';
+        this._retries = 0;
+        this.program = message.program || '';
+        this.cwd = message.cwd || '';
+        this._catchup = message.catchup || 0;
+        if (again) {
+          // The same shell as before: its screen comes back from what it
+          // wrote, so start from a clean one.
+          this.view.reset();
+        } else {
+          if (wanted && this.view.screen.scrollback.length + this.view.screen.y > 0) {
+            this.view.note('The shell that was here has ended, and this is a new one.');
+          }
+          this.view.note(`A shell on this machine (${message.shell || 'bash'}), started in `
+            + `${message.cwd}. It is the same as a terminal window: type exit to end it.`);
+        }
+        this.paint();
+        break;
+      }
+      case 'busy':
+        this.program = message.program || '';
+        if (message.cwd) this.cwd = message.cwd;
+        this.paint();
+        break;
+      case 'exit':
+        this.state = 'ended';
+        this.program = '';
+        this._forget();
+        this.view.note(message.hung_up
+          ? 'The shell was hung up. Press any key for a new one.'
+          : `The shell has ended${message.code ? ` (exit code ${message.code})` : ''}. `
+            + 'Press any key for a new one.');
+        this.paint();
+        break;
+      case 'refused':
+        this.state = 'refused';
+        this._forget();
+        this.view.note(`No shell: ${message.why}`);
+        this.paint(message.why);
+        break;
+      case 'taken':
+        // The same shell was opened in another browser tab, which now has it.
+        this.state = 'off';
+        this.view.note('This shell is now shown in another browser tab. '
+          + 'Press any key to take it back.');
+        this.paint();
+        break;
+      default:
+        break;
+    }
+  },
+
+  /* The connection dropped without the shell ending: the server restarted,
+     or the machine slept. Try again a few times, gently. */
+  _lost(why = '') {
+    this.state = 'off';
+    this.paint(why || 'connection lost, trying again');
+    if (this._retries >= 6) {
+      this.view.note('Lost the connection to the server. Press any key to try again.');
+      this.paint('no connection');
+      return;
+    }
+    const wait = Math.min(8000, 500 * 2 ** this._retries);
+    this._retries += 1;
+    this._retryTimer = setTimeout(() => this.connect(), wait);
+  },
+
+  _forget() {
+    this.id = '';
+    try { sessionStorage.removeItem('comfygmx.shell'); } catch (err) { /* private mode */ }
+  },
+
+  _send(message) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN && this.state === 'on') {
+      this.socket.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
+  },
+
+  /* A key, a paste or a reply from the screen, on its way to the shell. */
+  type(text) {
+    if (this.state === 'on') {
+      this._send({ type: 'input', data: text });
+      return;
+    }
+    if (this.state === 'connecting') return;
+    // Ended, refused, lost or taken: a key starts things again.
+    this._retries = 0;
+    if (this.socket) {
+      try { this.socket.close(); } catch (err) { /* already closed */ }
+      this.socket = null;
+    }
+    this.connect();
+  },
+
+  /* True while a program is running in front of the shell, so leaving the
+     page should ask first. */
+  busy() {
+    return this.state === 'on' && Boolean(this.program);
+  },
+
+  renew() {
+    if (this.busy() && Date.now() - this._newArmed > 3000) {
+      this._newArmed = Date.now();
+      UI.toast(`${this.program} is running in the shell: press New shell again within `
+        + '3 seconds to end it and start a fresh shell', 'warn', 4000);
+      return;
+    }
+    this._newArmed = 0;
+    this._send({ type: 'hangup' });
+    if (this.socket) {
+      const old = this.socket;
+      this.socket = null;
+      try { old.close(); } catch (err) { /* already closed */ }
+    }
+    this._forget();
+    this.state = 'off';
+    if (this.view) this.view.reset();
+    this.connect();
+    if (this.view) this.view.focus();
+  },
+
+  copyAll() {
+    if (!this.view) return;
+    const text = this.view.selectionText() || this.view.allText();
+    if (text.trim()) this._copy(text);
+    else this.view.focus();
+  },
+
+  /* UI.copy, but with the keyboard given back to the shell once the copy is
+     done. Copying can borrow the keyboard for a moment (UI.fallbackCopy),
+     and after that the next letters would go to the graph's shortcuts. */
+  _copy(text) {
+    const back = () => { if (this.view) this.view.focus(); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(
+        () => { UI.toast('copied to clipboard', 'ok', 1800); back(); },
+        () => { UI.fallbackCopy(text); back(); });
+    } else {
+      UI.fallbackCopy(text);
+      back();
+    }
+  },
+
+  /* cd to the folder the Open folder button would open. Typed only while
+     the shell is at its prompt: into nano it would become part of a file.
+     Ctrl+E and Ctrl+U first clear anything half-typed on that line, so the
+     cd cannot end up glued to the end of some other command. */
+  async goToRunFolder() {
+    if (this.state !== 'on') { UI.toast('the shell is not running', 'warn'); return; }
+    if (this.program) {
+      UI.toast(`${this.program} is running in the shell; this would be typed into it. `
+        + 'Wait for it to finish, or stop it with Ctrl+C.', 'warn', 5000);
+      return;
+    }
+    let folder = this._startFolder();
+    if (!folder) { UI.toast('this tab has no run folder yet', 'warn'); return; }
+    // The folder of the last run may have been deleted since. Then the
+    // folder new runs go to is the useful answer, rather than a cd error.
+    try {
+      const found = await API.stat(folder);
+      if (!found.dir && App.outputRoot && folder !== App.outputRoot) {
+        UI.toast(`${folder} is not there any more: going to the run folder instead`, 'warn', 4000);
+        folder = App.outputRoot;
+      }
+    } catch (err) { /* the shell will say what is wrong with it */ }
+    if (this.program || this.state !== 'on') return;
+    const quoted = `'${folder.replace(/'/g, "'\\''")}'`;
+    this._send({ type: 'input', data: `\x05\x15cd -- ${quoted}\r` });
+    this.view.focus();
+  },
+
+  paint(detail = '') {
+    const status = document.getElementById('shell-status');
+    const dot = document.getElementById('shell-dot');
+    if (!status) return;
+    const home = (typeof App !== 'undefined' && App.homeDir) || '';
+    const short = (path) => (home && path.startsWith(home) ? `~${path.slice(home.length)}` : path);
+    let text;
+    switch (this.state) {
+      case 'connecting': text = 'starting…'; break;
+      case 'on': text = this.program ? `running ${this.program}` : `bash · ${short(this.cwd)}`; break;
+      case 'ended': text = 'ended · press any key for a new shell'; break;
+      case 'refused': text = 'refused'; break;
+      default: text = detail || 'not started';
+    }
+    status.textContent = text;
+    status.title = detail || text;
+    if (dot) dot.classList.toggle('running', this.busy());
+    document.getElementById('shell-cd').disabled = !(this.state === 'on' && !this.program);
   },
 };
