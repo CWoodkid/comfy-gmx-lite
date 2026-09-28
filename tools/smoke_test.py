@@ -950,6 +950,28 @@ def check_cached_tags() -> None:
           "Run with them")
 
 
+def check_side_panels() -> None:
+    """The panels either side of the canvas can be put away and brought back,
+    as the Terminal drawer under it can, without the graph moving on screen.
+    `tools/side_panels.js` loads sides.js and app.js with a stand-in for the
+    page; the markup has to carry the buttons and handles it works with."""
+    markup = (ROOT / "comfygmx" / "web" / "index.html").read_text()
+    for element in ("palette-hide", "palette-handle", "inspector-hide",
+                    "inspector-handle", "js/sides.js"):
+        check(element in markup, f"side panels: the page has no {element}")
+    node = shutil.which("node")
+    if not node:
+        print("side panels: markup present (behaviour test skipped -- node is not "
+              "installed)")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "side_panels.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the side-panel test failed:\n" + (proc.stdout or proc.stderr))
+    print("side panels: each put away and brought back, by button, edge tab or "
+          "Ctrl+[ and Ctrl+], with the graph staying put and the choice remembered")
+
+
 def check_workflow_tools() -> None:
     """A workflow says which programs it needs, and which versions it used.
 
@@ -3150,6 +3172,7 @@ CHECKS = (
     check_chunk_inputs,
     check_switch_off_editor,
     check_cached_tags,
+    check_side_panels,
     check_param_boxes,
     check_mdp_boxes,
     check_viewer_turn,

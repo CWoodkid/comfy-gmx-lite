@@ -96,6 +96,9 @@ const App = {
 
     Editor.init(this.defs);
     Terminal.init();
+    // Before the graph is restored below, so its saved view lands on the
+    // canvas at the width it will be seen at.
+    SidePanels.init();
     FileBrowser.init();
     // Cheap: no probing, just what is on disk. Enough to offer a node the
     // installations it could be pointed at.
@@ -818,6 +821,18 @@ const App = {
     if (inField) return;
 
     if (event.ctrlKey || event.metaKey) {
+      // The drawer under the canvas and the panels either side of it. Asked
+      // about here, before the letter keys below: those end by returning on
+      // any key they do not know, and Ctrl+` used to sit after them, where
+      // it was never reached.
+      const drawer = { '`': () => Terminal.toggle(), '~': () => Terminal.toggle(),
+                       '[': () => SidePanels.toggle('left'),
+                       ']': () => SidePanels.toggle('right') }[event.key];
+      if (drawer) {
+        event.preventDefault();
+        drawer();
+        return;
+      }
       if (event.key === 'Tab') {
         event.preventDefault();
         const index = Sessions.list.findIndex((s) => s.id === Sessions.activeId);
@@ -887,11 +902,6 @@ const App = {
         default:
           return;
       }
-    }
-    if ((event.ctrlKey || event.metaKey) && (event.key === '`' || event.key === '~')) {
-      event.preventDefault();
-      Terminal.toggle();
-      return;
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
@@ -1320,8 +1330,11 @@ const App = {
       : 'Run — every node is cached; nothing would be recomputed';
   },
 
-  /* Switch the inspector to a tab from code, keeping the tab strip in step. */
+  /* Switch the inspector to a tab from code, keeping the tab strip in step.
+     Only for something asked for, such as the problems Check found: a panel
+     that was put away comes back to show it. */
   showTab(name) {
+    SidePanels.reveal('right');
     const strip = document.getElementById('inspector-tabs');
     for (const tab of strip.querySelectorAll('.tab')) {
       tab.classList.toggle('active', tab.dataset.tab === name);
@@ -1512,8 +1525,10 @@ const App = {
         session.run.logPinned = true;
       }
       this.showLog(this.selectedNode);
+      // Kept up to date, quietly: the tab is already the one showing, and
+      // clicking a node must not bring back a panel that was put away.
       if (!document.getElementById('tab-command').classList.contains('hidden')) {
-        this.showCommand(this.selectedNode);
+        this.showCommand(this.selectedNode, true);
       }
     }
   },
@@ -1564,7 +1579,10 @@ const App = {
     }
   },
 
+  /* The same, for a command, a file or a picture somebody asked to see: a
+     panel that was put away comes back to show it. */
   activateTab(name) {
+    SidePanels.reveal('right');
     const container = document.getElementById('inspector-tabs');
     for (const tab of container.querySelectorAll('.tab')) {
       tab.classList.toggle('active', tab.dataset.tab === name);

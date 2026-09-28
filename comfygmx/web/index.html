@@ -59,6 +59,10 @@
   <aside id="palette">
     <div class="panel-head">
       <input id="palette-search" type="search" placeholder="Search nodes and chunks…" autocomplete="off">
+      <!-- Puts this panel away for more room for the graph; a tab on the
+           canvas's left edge brings it back (sides.js). -->
+      <button id="palette-hide" class="side-hide"
+              title="Hide this panel, for more room for the graph (Ctrl+[)">◂</button>
     </div>
     <div class="tabs" id="palette-tabs">
       <button class="tab active" data-tab="nodes">Nodes</button>
@@ -110,6 +114,13 @@
       <span id="handle-dot" class="t-dot"></span>
       <span id="handle-label">Terminal</span>
     </button>
+    <!-- The side panels, once put away, leave a tab like that one on their
+         own edge of the canvas. Each is named after the tab that was showing
+         in its panel (sides.js). -->
+    <button id="palette-handle" class="side-handle hidden"
+            title="Show the panel with Nodes, Chunks and Tutorials again (Ctrl+[)">Nodes</button>
+    <button id="inspector-handle" class="side-handle hidden"
+            title="Show the panel with Log, Problems, Command, Files, Viewer and Plot again (Ctrl+])">Log</button>
     <section id="terminal" class="hidden">
       <div id="terminal-grip" title="Drag to resize"></div>
       <header>
@@ -162,6 +173,8 @@
       <button class="tab" data-tab="files">Files</button>
       <button class="tab" data-tab="viewer">Viewer</button>
       <button class="tab" data-tab="plot">Plot</button>
+      <button id="inspector-hide" class="side-hide"
+              title="Hide this panel, for more room for the graph (Ctrl+])">▸</button>
     </div>
 
     <section id="tab-log" class="inspector-body">
@@ -325,6 +338,7 @@
 <script src="js/sessions.js"></script>
 <script src="js/vt.js"></script>
 <script src="js/terminal.js"></script>
+<script src="js/sides.js"></script>
 <script src="js/panels.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -3766,6 +3766,7 @@ const Panels = {
         <tr><th>Select</th><td>Click, shift-click, or drag a box on empty canvas.</td></tr>
         <tr><th>Find one</th><td><b>Ctrl + F</b> searches this graph — titles, types, and the values inside the nodes, so "which node points at that tpr" is answerable. The palette box up on the left searches the catalogue instead.</td></tr>
         <tr><th>Move freely</th><td>Hold <b>Ctrl</b> while dragging to bypass the 8&nbsp;px grid snap.</td></tr>
+        <tr><th>More room</th><td>Put the panels on either side away and the graph gets the whole width: <b>◂</b> beside the search box on the left, <b>▸</b> at the end of the tabs on the right, or <b>Ctrl + [</b> and <b>Ctrl + ]</b>. A hidden panel leaves a slim tab on its edge of the canvas, named after the tab that was showing in it; click that to bring the panel back. The right one also comes back by itself when you ask for something in it, such as the problems Check found or <i>Show command</i>. The graph stays where it is on screen, and the page remembers which panels you put away.</td></tr>
       </table>
       <h3>Groups</h3>
       <p>Select some nodes and press <b>Ctrl+G</b> to wrap them in a coloured box with a
@@ -3922,6 +3923,8 @@ const Panels = {
         <tr><th>Ctrl + M</th><td>Switch the selection off, or back on. A switched-off block is left out of checking and running, and so is anything that depends on it.</td></tr>
         <tr><th>Double-click an output</th><td>Put it on the right-hand wall of its box, or take it off again. Double-clicking an input unplugs it.</td></tr>
         <tr><th>Ctrl + Alt + click</th><td>Switch one block off or back on. On a box's title bar, the whole chunk. Cmd + Option + click on a Mac.</td></tr>
+        <tr><th>Ctrl + [ / Ctrl + ]</th><td>Put the panel on the left, or on the right, away for more room for the graph, or bring it back</td></tr>
+        <tr><th>Ctrl + &#96;</th><td>Open or close the Terminal drawer under the canvas</td></tr>
         <tr><th>Ctrl + D</th><td>Duplicate the selection</td></tr>
         <tr><th>Delete</th><td>Remove the selection</td></tr>
         <tr><th>Escape</th><td>Close a dialog, close the find box, stop renaming a tab, or clear the selection</td></tr>

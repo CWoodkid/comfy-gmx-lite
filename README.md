@@ -46,6 +46,9 @@ first-time user sees 25 blocks rather than hundreds.
   line (Bash) on the computer that runs the simulations, for looking at files,
   editing them with `nano`, or running `gmx` by hand. Several can be open at
   once, each in a tab of its own.
+- The panels on either side of the canvas can be put away, so the graph gets
+  the whole width: **◂** on the left, **▸** on the right, or **Ctrl+[** and
+  **Ctrl+]**. A slim tab left on the canvas's edge brings each one back.
 - The **Command**, **Log** and **Files** tabs show each block's exact
   commands, its output, and every file it wrote, ready to download.
 - Graphs are saved and shared as JSON files. **Export scripts** writes a graph

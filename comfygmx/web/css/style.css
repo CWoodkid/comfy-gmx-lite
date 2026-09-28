@@ -169,6 +169,28 @@ input[type="checkbox"] { width: auto; }
   grid-template-columns: 250px 1fr 380px;
   height: calc(100% - 42px - 30px - 24px);
 }
+/* Each of the three keeps its own column. A side panel that is put away
+   (sides.js) leaves its column empty and no wider than nothing, instead of
+   the canvas sliding into the panel's place and the other panel into the
+   canvas's. */
+#palette { grid-column: 1; }
+#canvas-wrap { grid-column: 2; }
+#inspector { grid-column: 3; }
+#layout.left-hidden { grid-template-columns: 0 1fr 380px; }
+#layout.right-hidden { grid-template-columns: 250px 1fr 0; }
+#layout.left-hidden.right-hidden { grid-template-columns: 0 1fr 0; }
+#layout.left-hidden > #palette, #layout.right-hidden > #inspector { display: none; }
+
+/* The button that puts a side panel away: small and quiet, like the ▾ that
+   closes the Terminal drawer. On the left it sits beside the search box, on
+   the right at the end of the tabs. */
+#palette > .panel-head { display: flex; align-items: center; gap: 4px; }
+#palette-search { flex: 1; min-width: 0; }
+.side-hide {
+  flex: 0 0 auto; align-self: center; background: none; border: none; border-radius: 3px;
+  padding: 0 7px; font-size: 12px; line-height: 22px; color: var(--text-faint);
+}
+.side-hide:hover:not(:disabled) { background: #232830; color: var(--text); }
 
 aside {
   background: var(--bg-panel);
@@ -1269,6 +1291,25 @@ textarea.code {
 #terminal-handle:hover { color: var(--text); border-color: var(--line-strong); }
 #terminal-handle.hidden { display: none; }
 #terminal-handle.busy { color: var(--accent); border-color: var(--accent-dim); }
+
+/* A side panel that has been put away leaves a tab like the drawer's on its
+   own edge of the canvas, standing on end. It sits below the find box in the
+   top-right corner and well above the zoom buttons and the Terminal tab at
+   the bottom, and it is as quiet as the Terminal tab until pointed at. The
+   words run up the left edge and down the right one, as the title on a book's
+   spine does. */
+.side-handle {
+  position: absolute; top: 56px; z-index: 5;
+  width: var(--handle-h); padding: 12px 0; box-sizing: border-box;
+  writing-mode: vertical-rl; white-space: nowrap;
+  background: var(--bg-panel); color: var(--text-dim);
+  border: 1px solid var(--line); font-size: 11px; line-height: 20px; cursor: pointer;
+}
+/* Turned half round so it reads upwards; the edge without a border is then
+   the one against the side of the canvas. */
+#palette-handle { left: 0; border-right: none; border-radius: 6px 0 0 6px; transform: rotate(180deg); }
+#inspector-handle { right: 0; border-right: none; border-radius: 6px 0 0 6px; }
+#palette-handle:hover, #inspector-handle:hover { color: var(--text); border-color: var(--line-strong); }
 #terminal-grip {
   height: 5px; margin-top: -3px; cursor: ns-resize; flex-shrink: 0;
 }
