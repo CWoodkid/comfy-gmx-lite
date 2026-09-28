@@ -1864,6 +1864,15 @@ const App = {
     } else {
       UI.toast(`${session.name}: run ${status}`, status === 'done' ? 'ok' : 'error', 9000);
     }
+    // The run has just stored what it made, so which blocks the next Run
+    // would reuse has changed, and every status the run sent redrew its
+    // block without the dashed "cached" tag. Ask again, as an edit does, or
+    // the tags stay off and the line beside Run keeps describing the graph
+    // as it was before the run. A run in another tab counts too: the graph
+    // on screen may share blocks with it. Not while the tab on screen is
+    // running, though: its own end asks, and a forecast has no place on a
+    // run that is still going.
+    if (!this._running) this.schedulePlan();
   },
 
   /* The Continue button appears only while something is actually waiting, so

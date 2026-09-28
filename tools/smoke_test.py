@@ -933,6 +933,23 @@ def check_switch_off_editor() -> None:
           "chunks, both shortcuts, and the reason shown on blocks left out")
 
 
+def check_cached_tags() -> None:
+    """The dashed "cached" tag on the blocks the next Run would reuse comes
+    back by itself when a run ends. It used to wait for the next edit, such
+    as dragging a box. `tools/cached_tags.js` loads the editor and the page
+    with a stand-in for the page and for the server."""
+    node = shutil.which("node")
+    if not node:
+        print("cached tags: skipped -- node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "cached_tags.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the cached-tag test failed:\n" + (proc.stdout or proc.stderr))
+    print("cached tags: back by themselves when a run ends, and the line beside "
+          "Run with them")
+
+
 def check_workflow_tools() -> None:
     """A workflow says which programs it needs, and which versions it used.
 
@@ -2915,6 +2932,7 @@ CHECKS = (
     check_wire_cutting,
     check_chunk_inputs,
     check_switch_off_editor,
+    check_cached_tags,
     check_param_boxes,
     check_mdp_boxes,
     check_viewer_turn,
