@@ -1001,8 +1001,11 @@ def check_workflow_tools() -> None:
             toolbox = FakeBox()
 
         was = boot._tool_status
+        # As the real one answers for GROMACS: where a run finds it, and the
+        # version read there (see check_gromacs_in_use).
         boot._tool_status = lambda box, tool_id: (
-            {"present": True, "where": "/opt/gromacs/bin/GMXRC"}
+            {"present": True, "where": "/opt/gromacs/bin/GMXRC",
+             "version": "2026.3", "how": "settings"}
             if present and tool_id == "gmx" else {"present": False, "where": ""})
         try:
             return workflow_tools(FakeApp(), graph, recorded, probe=probe)
@@ -1053,6 +1056,136 @@ def check_workflow_tools() -> None:
     print("workflow tools: GROMACS is the one program needed, it is reported "
           "missing where it is missing, and the version it was built with is "
           "offered alongside the newest")
+
+
+def check_gromacs_in_use() -> None:
+    """Setup, the Set up this machine window and a saved workflow name the
+    GROMACS a run will use.
+
+    A run sources the GMXRC saved in Settings, or else calls the gmx on the
+    command path. It never picks a build because it happens to be on disk.
+    The report used to take the first build found on disk instead: on a
+    machine with 2024.2 to 2026.3 it named 2024.2, an MPI build with no gmx
+    in it at all, while the runs used 2026.3, and it wrote 2024.2 into every
+    workflow saved there.
+
+    Pretend builds in a scratch folder, and the conda location pointed at an
+    empty one, so the answer does not depend on what the machine running the
+    tests has installed.
+    """
+    import contextlib
+    import io
+    import os
+    from argparse import Namespace
+    from comfygmx import bootstrap as boot
+    from comfygmx.__main__ import cmd_setup
+    from comfygmx.environments import Toolbox
+    from comfygmx.server import workflow_tools
+
+    folder = Path(tempfile.mkdtemp(prefix="gromacs-in-use-"))
+
+    def build(version: str, program: str) -> Path:
+        """A pretend install: GMXRC, one program that prints its version as
+        gmx does, and the file the version is read from without running it."""
+        prefix = folder / "gromacs" / f"gromacs-{version}"
+        (prefix / "bin").mkdir(parents=True)
+        (prefix / "bin" / "GMXRC").write_text(f'export PATH="{prefix}/bin:$PATH"\n')
+        exe = prefix / "bin" / program
+        exe.write_text("#!/bin/sh\n"
+                       f"echo ':-) GROMACS - {program}, {version} (-:'\n"
+                       f"echo 'GROMACS version:    {version}'\n")
+        exe.chmod(0o755)
+        cmake = prefix / "share" / "cmake" / "gromacs"
+        cmake.mkdir(parents=True)
+        (cmake / "gromacs-config-version.cmake").write_text(
+            f'set(PACKAGE_VERSION "{version}")\n')
+        return prefix
+
+    old = build("2024.2", "gmx_mpi")   # first on disk, as on the workstation
+    new = build("2026.3", "gmx")
+    plain = "/usr/bin:/bin"            # a command path with no GROMACS on it
+    graph = Graph({"nodes": [{"id": "box", "type": "gmx.editconf", "params": {}}],
+                   "links": []})
+
+    def settings_for(gmxrc: str, binary: str) -> Settings:
+        settings = Settings()
+        settings.update({"gmxrc": gmxrc, "gmx_binary": binary,
+                         "gmx_search_roots": [str(folder / "gromacs")],
+                         "conda_root": str(folder / "no-conda"),
+                         "tools": {"gmx": {"env": ""}}})
+        return settings
+
+    def answers(gmxrc: str, binary: str, path: str) -> dict:
+        """What setup reports, what a saved workflow records, what a run starts."""
+        os.environ["PATH"] = path
+        settings = settings_for(gmxrc, binary)
+        box = Toolbox(settings)
+
+        class App:
+            toolbox = box
+
+        gmx = next(t for t in boot.survey(settings)["tools"] if t["id"] == "gmx")
+        stamp = workflow_tools(App(), graph, {})["stamp"].get("gmx", {}).get("version", "")
+        ran = box.probe("gmx", timeout=20)
+        return {"first": (box.gmxrc_candidates() or [{}])[0].get("path", ""),
+                "present": gmx["present"], "where": gmx["where"], "stamp": stamp,
+                "found": [build["path"] for build in gmx.get("found", [])],
+                "ran": ran.get("version", "") if ran.get("found") else ""}
+
+    path_before = os.environ.get("PATH", "")
+    roots_before = Toolbox.DEFAULT_SEARCH_ROOTS
+    Toolbox.DEFAULT_SEARCH_ROOTS = ()   # only the pretend builds are found
+    try:
+        # Nothing saved; 2026.3 on the command path; 2024.2 first on disk.
+        here = answers("", "gmx", f"{new}/bin:{plain}")
+        check(here["first"] == str(old / "bin" / "GMXRC"),
+              f"gromacs in use: the test needs 2024.2 first on disk, got {here['first']}")
+        check("2026.3" in here["ran"], f"gromacs in use: a run started {here['ran']!r}")
+        check(here["present"] and here["where"] == str(new / "bin" / "gmx"),
+              "gromacs in use: setup names the first build on disk, not the gmx a run "
+              f"uses: {here['where']}")
+        check(here["stamp"] == "2026.3",
+              f"gromacs in use: a saved workflow would record {here['stamp']!r}, "
+              "though the runs use 2026.3")
+
+        # The 2024.2 GMXRC saved in Settings: runs source it, and so says setup.
+        saved = answers(str(old / "bin" / "GMXRC"), "gmx_mpi", f"{new}/bin:{plain}")
+        check("2024.2" in saved["ran"], f"gromacs in use: a run started {saved['ran']!r}")
+        check(saved["where"] == str(old / "bin" / "GMXRC") and saved["stamp"] == "2024.2",
+              f"gromacs in use: with a GMXRC saved, setup says {saved['where']} and "
+              f"a saved workflow {saved['stamp']!r}")
+
+        # Nothing saved and nothing on the command path: a run finds no GROMACS,
+        # so setup must not call it installed. It lists what it found instead.
+        lost = answers("", "gmx", plain)
+        check(not lost["ran"], f"gromacs in use: a run found GROMACS: {lost['ran']!r}")
+        check(not lost["present"] and lost["stamp"] == "",
+              f"gromacs in use: with no GROMACS a run can find, setup says "
+              f"{lost['where']!r} and a saved workflow records {lost['stamp']!r}")
+        check(str(new / "bin" / "GMXRC") in lost["found"] and not here["found"],
+              "gromacs in use: the builds found on disk are not handed to the page when "
+              f"no run would find GROMACS ({lost['found']}), or are when one would "
+              f"({here['found']})")
+        home = folder / "data"
+        settings = settings_for("", "gmx")
+        settings.path = home / "settings.json"
+        settings.save()
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            cmd_setup(Namespace(data_dir=str(home), yes=False, dry_run=True,
+                                if_needed=False, tools="", no_tools=True,
+                                with_system=False, init_shell=False))
+        text = printed.getvalue()
+        check("would not find it" in text and str(new / "bin" / "GMXRC") in text,
+              "gromacs in use: setup does not say that the builds it found are not in "
+              "use, or does not list them:\n" + text)
+    finally:
+        os.environ["PATH"] = path_before
+        Toolbox.DEFAULT_SEARCH_ROOTS = roots_before
+        shutil.rmtree(folder, ignore_errors=True)
+    print("gromacs in use: setup, the setup window and a saved workflow name the "
+          "GROMACS a run uses, whether it comes from Settings or the command path, "
+          "and say so when a run would find none")
 
 
 def check_node_stacking() -> None:
@@ -2927,6 +3060,7 @@ CHECKS = (
     check_forms,
     check_dialogs,
     check_workflow_tools,
+    check_gromacs_in_use,
     check_node_stacking,
     check_canvas_panning,
     check_wire_cutting,

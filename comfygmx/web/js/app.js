@@ -146,7 +146,8 @@ const App = {
     // without, and it is the one first-run setup deliberately does not install.
     const gmx = (state.tools || []).find((tool) => tool.id === 'gmx');
     if (gmx && !gmx.present) {
-      Panels.needGromacs(false, state.first_run ? () => Panels.setup(true) : null);
+      Panels.needGromacs(false, state.first_run ? () => Panels.setup(true) : null,
+                         gmx.found || []);
     } else if (state.first_run) {
       Panels.setup(true);
     }

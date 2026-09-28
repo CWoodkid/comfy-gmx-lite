@@ -392,18 +392,31 @@ const Panels = {
      then find out. This is the reminder, once per browser session, with both
      ways to fix it on it. The Set up button in the toolbar is the version that
      does not go away. */
-  needGromacs(force = false, andThen = null) {
+  needGromacs(force = false, andThen = null, found = []) {
     if (!force && sessionStorage.getItem('comfygmx-gromacs-notice') === 'seen') {
       if (andThen) andThen();
       return;
     }
     sessionStorage.setItem('comfygmx-gromacs-notice', 'seen');
 
+    // Builds on disk that no run would use: no GMXRC chosen in Settings, and
+    // no gmx on the command path. "Not installed" would be untrue there, and
+    // the list is what Settings should be pointed at.
+    const onDisk = (found || []).length > 0;
     const body = UI.el('div', {}, [
-      UI.el('p', { text:
-        'No GROMACS was found, and nothing in a graph will run without it. '
-        + 'Everything else works — you can build and check a graph now and get it '
-        + 'later.' }),
+      onDisk
+        ? UI.el('p', { text:
+          'GROMACS is on this machine, but a run would not find it: Settings name no '
+          + 'GMXRC that works, and there is no gmx on the command path. Nothing in a '
+          + 'graph will run until one is chosen. Found here:' })
+        : UI.el('p', { text:
+          'No GROMACS was found, and nothing in a graph will run without it. '
+          + 'Everything else works — you can build and check a graph now and get it '
+          + 'later.' }),
+      onDisk
+        ? UI.el('ul', {}, found.map((build) =>
+          UI.el('li', { text: `${build.version || '?'}   ${build.path}` })))
+        : null,
       UI.el('h3', { text: 'Two ways to get it' }),
       UI.el('p', {}, [
         UI.el('b', { text: 'Build it from source. ' }),
@@ -423,7 +436,7 @@ const Panels = {
         + 'for a week without noticing.' }),
     ]);
 
-    UI.modal('GROMACS is not installed', body, [
+    UI.modal(onDisk ? 'GROMACS is not in use' : 'GROMACS is not installed', body, [
       // On a genuine first run there is usually setup to do as well; putting it
       // behind "Later" keeps the two from stacking on top of each other.
       { label: 'Later', action: () => { if (andThen) setTimeout(andThen, 0); } },
@@ -435,7 +448,7 @@ const Panels = {
         label: 'Build from source…', primary: true,
         action: () => { this.gromacs(); return false; },
       },
-    ], { reopen: () => this.needGromacs(true) });
+    ], { reopen: () => this.needGromacs(true, null, found) });
   },
 
   /* Point a repo-backed tool at a checkout the user maintains.

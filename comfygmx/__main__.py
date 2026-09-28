@@ -151,14 +151,32 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # is a source build -- forty minutes, and flags that matter -- so it belongs
     # in the dialog where those are chosen rather than behind this one command.
     gmx = next((tool for tool in state["tools"] if tool["id"] == "gmx"), None)
-    if gmx and not gmx["present"]:
+    # Builds on disk that a run would not use: listed only when a run would
+    # find no GROMACS at all, so the one named below is always the one in use.
+    found = (gmx.get("found") or []) if gmx else []
+    saved = str(settings.get("gmxrc") or "").strip()
+    if gmx and not gmx["present"] and saved:
+        print(f"GROMACS: Settings name a GMXRC that is not there: {saved}")
+    if gmx and not gmx["present"] and found:
+        print("GROMACS is on this machine, but a run would not find it: there is no")
+        print("  GMXRC in Settings that works, and no gmx on the command path. Found:")
+        for build in found:
+            print(f"    {build['version'] or '?':<9} {build['path']}")
+        print("  Point Settings at one of these, or load one in this terminal")
+        print("  (source <the GMXRC>) and start Comfy-gmx again.")
+        print()
+    elif gmx and not gmx["present"]:
         print("GROMACS is not installed, and this will not install it.")
         print("  It is built from source, not put into an environment. Open the editor")
         print("  and use Environments -> Build from source, which asks for the version")
         print("  and the flags, or point Settings at a GMXRC you already have.")
         print()
     elif gmx:
-        print(f"GROMACS  {gmx['where']}")
+        # The one the runs will use, and how they find it.
+        how = {"settings": "the GMXRC in Settings",
+               "path": "the gmx on the command path"}.get(gmx.get("how", ""), "")
+        version = f"{gmx['version']}  " if gmx.get("version") else ""
+        print(f"GROMACS  {version}{gmx['where']}" + (f"  ({how})" if how else ""))
         print()
 
     wanted = [t["id"] for t in state["tools"] if t["default"]]

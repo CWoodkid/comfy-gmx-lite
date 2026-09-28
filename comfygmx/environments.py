@@ -539,6 +539,46 @@ class Toolbox:
 
         return sorted(found.values(), key=lambda row: row["path"])
 
+    def gromacs_in_use(self) -> Dict[str, str]:
+        """The GROMACS a run will use, found by the rule resolve() follows.
+
+        A run activates the conda environment set for GROMACS, if there is
+        one; otherwise it sources the GMXRC saved in Settings; otherwise it
+        calls the gmx on the command path. It never picks a build because it
+        happens to be on disk. So anything that names "the GROMACS here" --
+        first-run setup, the Set up this machine window, the version written
+        into a saved workflow -- asks this, not gmxrc_candidates(). The first
+        build found on disk is often a different one: on one machine it was
+        2024.2 while the runs used 2026.3.
+
+        "path" is the GMXRC or the program, and is empty when a run would not
+        find GROMACS at all. "version" is empty when it cannot be read without
+        running anything. "how" is "conda", "settings" or "path".
+        """
+        resolved = self.resolve("gmx")
+        if resolved.env:
+            # A conda GROMACS writes the same version file into its environment
+            # as a build does into its install folder.
+            prefix = next((Path(env["path"]) for env in self.conda_envs()
+                           if env["name"] == resolved.env), None)
+            return {"path": f"conda environment {resolved.env}",
+                    "version": _prefix_version(prefix) if prefix else "",
+                    "how": "conda"}
+        gmxrc = str(self.settings.get("gmxrc") or "").strip()
+        if gmxrc:
+            if not Path(gmxrc).is_file():
+                # Sourcing it fails, and the run with it.
+                return {"path": "", "version": "", "how": "settings"}
+            return {"path": gmxrc, "version": _prefix_version(Path(gmxrc).parent.parent),
+                    "how": "settings"}
+        name = shlex.split(resolved.command)[0] if resolved.command.strip() else "gmx"
+        program = shutil.which(name)
+        if not program:
+            return {"path": "", "version": "", "how": "path"}
+        return {"path": program,
+                "version": _prefix_version(Path(program).resolve().parent.parent),
+                "how": "path"}
+
     def probe(self, tool_id: str, timeout: float = 30.0) -> Dict[str, Any]:
         """Run the tool's version check inside its configured environment."""
         spec = CATALOG.get(tool_id)

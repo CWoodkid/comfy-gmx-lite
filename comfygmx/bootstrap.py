@@ -268,17 +268,24 @@ def _tool_status(box: Toolbox, tool_id: str) -> Dict[str, Any]:
         marker = spec.repo_marker
         if not source.is_dir() or (marker and not (source / marker).exists()):
             return {"present": False, "where": ""}
+    if tool_id == "gmx":
+        # The build a run will use, by the rule the runs follow: the GMXRC
+        # saved in Settings, or else the gmx on the command path. Not the
+        # first build found on disk: with several on one machine that is a
+        # different answer, and it was the one named here while the runs
+        # used another.
+        use = box.gromacs_in_use()
+        status = {"present": bool(use["path"]), "where": use["path"],
+                  "version": use["version"], "how": use["how"]}
+        if not use["path"]:
+            # Builds on disk that no run would use: what to point Settings at.
+            status["found"] = [{"version": build["version"], "path": build["path"]}
+                               for build in box.gmxrc_candidates()]
+        return status
     installs = box.installs_of(tool_id)
     live = [i for i in installs if not i.get("gone")]
     if live:
         return {"present": True, "where": f"conda environment {live[0]['env']}"}
-    if tool_id == "gmx":
-        configured = str(box.settings.get("gmxrc") or "").strip()
-        if configured and Path(configured).exists():
-            return {"present": True, "where": configured}
-        found = box.gmxrc_candidates()
-        if found:
-            return {"present": True, "where": found[0]["path"]}
     command = shlex.split(spec.command)[0] if spec.command else tool_id
     where = shutil.which(command) if command else ""
     if not where and spec.kind == "python" and command == "python":
@@ -349,6 +356,12 @@ def survey(settings: Settings) -> Dict[str, Any]:
             "suggested_env": env_name_for(spec) if spec.conda_installable else "",
             "present": status["present"],
             "where": status["where"],
+            # GROMACS only, for now: its version, whether a run finds it
+            # through Settings or on the command path, and -- when a run would
+            # find none -- the builds on disk that Settings could point at.
+            "version": status.get("version", ""),
+            "how": status.get("how", ""),
+            "found": status.get("found", []),
             "default": tool_id in DEFAULT_TOOLS and not status["present"],
             # Not everything is a checkbox. GROMACS is a source build, which is
             # its own dialog with its own choices.

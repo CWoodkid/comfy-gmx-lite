@@ -1104,14 +1104,17 @@ def workflow_tools(app, graph: Graph, recorded: Dict[str, Any],
             here = install.get("version") or install.get("guess") or ""
             if install.get("active"):
                 break
-        if not here and tool_id == "gmx":
-            # The build actually in use, not merely the first one found: with
-            # several GROMACS installations on a machine those are different
-            # answers, and the wrong one would be written into the workflow.
-            configured = str(box.settings.get("gmxrc") or "").strip()
-            found = box.gmxrc_candidates()
-            chosen = next((f for f in found if f.get("path") == configured), None)
-            here = ((chosen or (found[0] if found else {})).get("version") or "")
+        if tool_id == "gmx":
+            # The build actually in use, not merely one found: with several
+            # GROMACS installations on a machine those are different answers,
+            # and the wrong one would be written into the workflow. The status
+            # comes from Toolbox.gromacs_in_use, which follows the rule the
+            # runs follow: a conda environment set for GROMACS, the GMXRC in
+            # Settings, or else the gmx on the command path. For a conda
+            # environment whose folder has no version file, the one recorded
+            # for it above still stands.
+            here = status.get("version", "") or (
+                here if status.get("how") == "conda" else "")
         if probe and status["present"] and not here:
             # Asked for only when a workflow is being written out, because it
             # runs each tool's version check and that is a second or two each.
