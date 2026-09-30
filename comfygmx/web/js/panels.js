@@ -4070,23 +4070,45 @@ const Panels = {
       it cannot run without that file. The line beside Run counts both. Blocks that do
       run are remembered exactly as before, so their earlier results are still
       reused.</p>
-      <h3>Presets, and what is in them</h3>
-      <p>A run-parameters node starts from a preset — minimisation, NVT, NPT, production
-      — and its widgets are <i>deltas</i>: blank means "whatever the preset says". Which
-      was fine except that nothing said what the preset said, so thirteen boxes read
-      "preset default" over a file of thirty options nobody could see. Each box now shows
-      the preset's actual value as its placeholder: <code>5000000 (from lysozyme_md)</code>.</p>
-      <p>Editing any of them changes what the node is claiming, so it stops claiming it.
-      The mode switches from <b>preset</b> to <b>manual</b>, every other widget fills in
-      with the preset's value — so what is on screen is the whole parameter set rather
-      than one changed line over thirty invisible ones — and the file it writes is renamed
-      after the preset it grew out of: <code>lysozyme_md_edited.mdp</code>. Downstream
-      picks that up on its own, because grompp takes the file from the wire rather than by
-      name.</p>
-      <p>Changing the preset while editing refills from the new one but keeps anything you
-      actually typed: swapping the baseline under a value you set yourself should not throw
-      it away. Setting the mode back to <b>preset</b> empties the widgets and restores the
-      stock file name.</p>
+      <h3>Run parameters: presets, your own file, your own text</h3>
+      <p>A <b>Run parameters (.mdp)</b> block gets its settings from one of four places,
+      picked in <b>Settings come from</b>: a <b>preset</b> (minimisation, NVT, NPT,
+      production), a preset you <b>manual</b>ly edited, an .mdp
+      <b>file</b> you already have, or <b>raw</b> text you paste. It has a box for each of
+      65 common options, so most runs need no raw text at all: the kind of run, its length,
+      time step, temperature, pressure control, topology switches and how often a frame is
+      saved sit on the block, and the rest wait in <b>advanced</b>, in small drawers by topic
+      (Temperature, Pressure, Output, Electrostatics and so on).</p>
+      <p>Every box shows the value the run will use, and where it comes from:
+      <code>5000000 (from lysozyme_md)</code>, <code>1000 (GROMACS default)</code>. Leave a
+      box empty to keep that value. Boxes that do nothing for the run as it stands are
+      hidden: a minimisation shows no time step or thermostat, a run without pressure
+      control shows no pressure boxes, and choosing sd shows its random seed instead of a
+      thermostat. The grey name at the right of each box is the option's own name, as an
+      .mdp file and the GROMACS manual write it. Hold the pointer over a box's name, or
+      press the gear on the title bar, to read what it does, what its values mean and the
+      usual value for each kind of job.</p>
+      <p>The purple card under the first boxes says in words what the settings add up to:
+      <i>Dynamics: 50,000,000 steps of 2 fs = 100 ns</i>, the temperature, the pressure,
+      whether velocities are new, the frame interval, the electrostatics. Settings GROMACS
+      would refuse or warn about are named on the card in red before grompp ever sees them,
+      for example new velocities in a run that continues another, or one temperature for
+      two heat groups.</p>
+      <p>Typing in a box of a preset changes what the block claims, so it stops claiming
+      it. The mode switches from <b>preset</b> to <b>manual</b>, every other box fills in
+      with the preset's value, so what is on screen is the whole parameter set, and the file
+      is renamed after the preset it grew out of: <code>lysozyme_md_edited.mdp</code>.
+      Changing the preset while editing refills from the new one but keeps anything you
+      typed yourself. Setting the mode back to <b>preset</b> empties the boxes and restores
+      the stock file name.</p>
+      <p>In <b>raw</b> mode the text is the file, written out exactly as it is, comments and
+      all. The block shows the text and the card that sums it up; the boxes move into the
+      drawer under <b>Main settings</b>, and typing in one of them rewrites that line of
+      the text. Switching to raw empties the boxes, as switching back to preset does: the
+      run then takes everything from the text.</p>
+      <p>An option with no box of its own (pulling, walls, free energy) goes into
+      <b>Extra mdp lines</b>, in the <b>File and extra lines</b> drawer, one
+      <code>option = value</code> per line. In raw mode, type it into the text.</p>
 
       <h3>Several nodes at once</h3>
       <p>A node starts as soon as everything it depends on has finished, and up to

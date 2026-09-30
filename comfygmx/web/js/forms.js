@@ -562,7 +562,15 @@ Forms.setup = function setup(node) {
     const theirs = widget.querySelector('button.form-open');
     if (theirs) theirs.remove();
     block.appendChild(widget);
-    if (param.help) block.appendChild(F.hint(param.help));
+    // Help written in paragraphs, with the usual values as a small table
+    // under them (the run parameters), is laid out as such: paragraphs that
+    // fill the width, and the table in fixed-width type. Help written as one
+    // block stays exactly as it was.
+    if (param.help && /\n\s*\n/.test(param.help)) {
+      block.appendChild(UI.el('div', { class: 'hint setup-help' }, UI.prose(param.help)));
+    } else if (param.help) {
+      block.appendChild(F.hint(param.help));
+    }
     if (Forms.hasField(param.form)) {
       block.appendChild(UI.el('div', { class: 'row form-actions' }, [
         F.button('Fill this in with a form…', () => {
@@ -573,15 +581,44 @@ Forms.setup = function setup(node) {
     return block;
   };
 
-  const basic = (def.params || []).filter((p) => !p.advanced);
-  const advanced = (def.params || []).filter((p) => p.advanced);
-  for (const param of basic) body.appendChild(paramBlock(param));
-  if (advanced.length) {
-    const more = UI.el('details', { class: 'form-more' },
-      [UI.el('summary', { text: `Less usual settings (${advanced.length})` })]);
-    for (const param of advanced) more.appendChild(paramBlock(param));
-    body.appendChild(more);
-  }
+  /* Only the boxes the node itself shows, placed as it places them: a box
+     that does nothing for the node as it stands (a thermostat's time on a
+     run with no thermostat) is left out here too, and boxes that name a
+     section are grouped under it. They are drawn into a holder of their own,
+     so a change that shows or hides boxes can draw them again without
+     closing the window. */
+  const boxes = UI.el('div', { class: 'setup-boxes' });
+  body.appendChild(boxes);
+  const opened = new Set();
+  const shownNames = () => (def.params || [])
+    .filter((p) => Editor.paramShown(node, p)).map((p) => p.name).join(' ');
+  let drawn = '';
+  const drawBoxes = () => {
+    drawn = shownNames();
+    while (boxes.firstChild) boxes.removeChild(boxes.firstChild);
+    const placed = (def.params || []).filter((p) => Editor.paramShown(node, p))
+      .map((p) => ({ param: p, ...Editor._placement(node, p) }));
+    for (const x of placed.filter((y) => !y.advanced)) boxes.appendChild(paramBlock(x.param));
+    const advanced = placed.filter((x) => x.advanced);
+    const drawer = (key, title, items) => {
+      const more = UI.el('details', { class: 'form-more' }, [UI.el('summary', { text: title })]);
+      if (opened.has(key)) more.open = true;
+      more.addEventListener('toggle', () => {
+        if (more.open) opened.add(key); else opened.delete(key);
+      });
+      for (const x of items) more.appendChild(paramBlock(x.param));
+      boxes.appendChild(more);
+    };
+    const loose = advanced.filter((x) => !x.section);
+    if (loose.length) drawer('', `Less usual settings (${loose.length})`, loose);
+    const order = [];
+    for (const x of advanced) if (x.section && !order.includes(x.section)) order.push(x.section);
+    for (const section of order) {
+      const items = advanced.filter((x) => x.section === section);
+      drawer(section, `${section} (${items.length})`, items);
+    }
+  };
+  drawBoxes();
 
   // ---- and what all of that adds up to ----------------------------------
   const command = UI.el('pre', { class: 'form-preview', text: 'working it out…' });
@@ -607,6 +644,23 @@ Forms.setup = function setup(node) {
   body.addEventListener('change', () => {
     clearTimeout(timer);
     timer = setTimeout(refresh, 250);
+    // Draw the boxes again when the change showed or hid some, or on the run
+    // parameters, whose empty boxes all show values that one change can move
+    // (a new preset). Once the click that ended the edit has landed, with
+    // the focus put back where it went.
+    setTimeout(() => {
+      if (node.type !== 'util.mdp' && shownNames() === drawn) return;
+      const active = document.activeElement;
+      const holder = active && boxes.contains(active) && active.closest
+        ? active.closest('[data-param]') : null;
+      const focused = holder ? holder.getAttribute('data-param') : '';
+      drawBoxes();
+      if (focused) {
+        const again = boxes.querySelector(`[data-param="${focused}"] input, `
+          + `[data-param="${focused}"] select, [data-param="${focused}"] textarea`);
+        if (again) again.focus();
+      }
+    }, 0);
   });
   refresh();
 

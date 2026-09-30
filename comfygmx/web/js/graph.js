@@ -235,15 +235,33 @@ function mdpKey(param) {
   return ((Editor.mdp || {}).widgets || {})[param] || '';
 }
 
-/* The options a raw mdp text sets, by name. GROMACS reads a dash and an
-   underscore in a name as the same thing, so both are read as dashes. */
+/* An option name the way GROMACS compares them: case, dashes and underscores
+   make no difference, so vdw-type, vdw_type and vdwtype are one option. A
+   value is compared the same way (V-rescale and v_rescale are one
+   thermostat), except a number, which is compared as a number: -1 and 1 are
+   not the same seed. */
+function mdpSquash(text) {
+  return String(text === undefined || text === null ? '' : text)
+    .trim().toLowerCase().replace(/[-_]/g, '');
+}
+
+function mdpSame(value, wanted) {
+  const a = String(value === undefined || value === null ? '' : value).trim();
+  const b = String(wanted === undefined || wanted === null ? '' : wanted).trim();
+  if (a !== '' && b !== '' && Number.isFinite(Number(a)) && Number.isFinite(Number(b))) {
+    return Number(a) === Number(b);
+  }
+  return mdpSquash(a) === mdpSquash(b);
+}
+
+/* The options a raw mdp text sets, by name as GROMACS compares them. */
 function mdpRawOptions(text) {
   const found = {};
   for (const line of String(text || '').split('\n')) {
     const body = line.split(';')[0];
     const eq = body.indexOf('=');
     if (eq < 0) continue;
-    const key = body.slice(0, eq).trim().toLowerCase().replace(/_/g, '-');
+    const key = mdpSquash(body.slice(0, eq));
     if (key) found[key] = body.slice(eq + 1).trim();
   }
   return found;
@@ -253,14 +271,14 @@ function mdpRawOptions(text) {
    is changed where it stands, and its comment stays where it was; an option
    the text does not set yet gets a line of its own at the end. */
 function mdpSetRaw(text, key, value) {
-  const want = String(key).toLowerCase().replace(/_/g, '-');
+  const want = mdpSquash(key);
   const lines = String(text || '').split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const semi = lines[i].indexOf(';');
     const body = semi >= 0 ? lines[i].slice(0, semi) : lines[i];
     const eq = body.indexOf('=');
     if (eq < 0) continue;
-    if (body.slice(0, eq).trim().toLowerCase().replace(/_/g, '-') !== want) continue;
+    if (mdpSquash(body.slice(0, eq)) !== want) continue;
     const after = body.slice(eq + 1);
     const gap = (after.match(/^\s*/) || [''])[0] || ' ';
     let line = `${body.slice(0, eq + 1)}${gap}${value}`;
@@ -276,18 +294,356 @@ function mdpSetRaw(text, key, value) {
   return `${kept}${kept ? '\n' : ''}${key} = ${value}\n`;
 }
 
+/* The .mdp files that file-mode blocks point at, read once each so the block
+   can show what they say: the values in its boxes, which boxes matter, and
+   the summary. A path typed again is read again, so a file changed on disk
+   is picked up by retyping or re-picking it. */
+const MdpFiles = {
+  entries: new Map(),
+
+  get(path) {
+    const key = String(path || '').trim();
+    if (!key) return null;
+    let entry = this.entries.get(key);
+    if (!entry) {
+      entry = { state: 'reading' };
+      this.entries.set(key, entry);
+      this._read(key, entry);
+    }
+    return entry;
+  },
+
+  forget(path) {
+    this.entries.delete(String(path || '').trim());
+  },
+
+  async _read(key, entry) {
+    // Only in the page: the tests load this file without the server.
+    if (typeof API === 'undefined') { entry.state = 'unread'; return; }
+    try {
+      const data = await API.fileText(key);
+      entry.text = data.text || '';
+      entry.options = mdpRawOptions(entry.text);
+      entry.state = 'read';
+    } catch (err) {
+      entry.state = 'missing';
+      entry.error = err.message;
+    }
+    Editor.refreshOpenNodes('util.mdp');
+  },
+};
+
+/* Where each option's value comes from when its box is empty: the preset,
+   the raw text or the file, keyed by name as GROMACS compares them, with the
+   words an empty box uses to say so. Null while nobody can know: a file not
+   read yet, or the preset table not arrived from the server. */
+function mdpBase(node) {
+  const params = node.params || {};
+  if (params.mode === 'raw') {
+    return { options: mdpRawOptions(params.raw), from: 'from the raw text',
+             missing: 'not in the raw text' };
+  }
+  if (params.mode === 'file') {
+    const file = MdpFiles.get(params.path);
+    if (!file || !file.options) return null;
+    return { options: file.options, from: 'from the file', missing: 'not in the file' };
+  }
+  const preset = mdpPreset(node);
+  if (!preset) return null;
+  const options = {};
+  for (const [key, value] of Object.entries(preset)) options[mdpSquash(key)] = value;
+  return { options, from: `from ${params.preset}`, missing: `not set by ${params.preset}` };
+}
+
+const mdpKnown = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+
+/* Every option the run will use, by name as GROMACS compares them: what a box
+   holds, else what the preset, the text or the file says, else GROMACS's own
+   default. In raw mode only the text counts: the run writes it exactly as it
+   is and takes nothing from the boxes. `known` is false while the preset or
+   the file is not at hand, and then nothing should be hidden or claimed on
+   the strength of it. */
+function mdpEffective(node) {
+  const base = mdpBase(node);
+  const options = {};
+  for (const [key, value] of Object.entries((Editor.mdp || {}).gromacs_defaults || {})) {
+    options[mdpSquash(key)] = String(value);
+  }
+  if (base) {
+    for (const [key, value] of Object.entries(base.options)) {
+      if (mdpKnown(value)) options[key] = String(value);
+    }
+  }
+  const widgets = { ...((Editor.mdp || {}).widgets || {}), define: 'define' };
+  if ((node.params || {}).mode !== 'raw') {
+    for (const [param, key] of Object.entries(widgets)) {
+      const value = (node.params || {})[param];
+      if (mdpKnown(value)) options[mdpSquash(key)] = String(value);
+    }
+  }
+  return { known: Boolean(base), options };
+}
+
+/* The four facts the boxes' rules lean on, worked out from the options:
+   what kind of run it is, and whether a thermostat, a barostat and a
+   temperature schedule are at work. See mdp_options.py for the rules. */
+const MDP_MINIMISERS = ['steep', 'cg', 'lbfgs'];
+const MDP_DYNAMICS = ['md', 'mdvv', 'mdvvavek', 'sd', 'bd'];
+
+function mdpFacts(options) {
+  const integrator = mdpSquash(options.integrator || 'md');
+  let run = 'other';
+  if (MDP_MINIMISERS.includes(integrator)) run = 'minimise';
+  if (MDP_DYNAMICS.includes(integrator)) run = 'dynamics';
+  const off = (value) => ['', 'no'].includes(mdpSquash(value));
+  const friction = ['sd', 'bd'].includes(integrator);
+  return {
+    _run: run,
+    _thermostat: run === 'dynamics' && (friction || !off(options.tcoupl)) ? 'on' : 'off',
+    _barostat: run === 'dynamics' && !off(options.pcoupl) ? 'on' : 'off',
+    _annealing: String(options.annealing || '').split(/\s+/)
+      .some((word) => word && mdpSquash(word) !== 'no') ? 'on' : 'off',
+  };
+}
+
+/* The boxes of the run-parameters block that are not mdp options. Their
+   rules compare what the box itself holds; every other name in a rule is an
+   mdp option, or one of the four facts, and is compared with the value the
+   run will really use. */
+const MDP_PLAIN = ['mode', 'preset', 'path', 'raw', 'saved', 'filename', 'extra_flags'];
+
+function mdpShows(node, param) {
+  const rule = String(param.when || '').trim();
+  if (!rule) return true;
+  const effective = mdpEffective(node);
+  const facts = mdpFacts(effective.options);
+  return rule.split(' & ').every((clause) => {
+    const not = clause.indexOf('!=');
+    const eq = clause.indexOf('=');
+    if (eq < 0) return true;
+    const negated = not >= 0 && not < eq;
+    const name = clause.slice(0, negated ? not : eq).trim();
+    const listed = clause.slice(eq + 1).split('|');
+    let value;
+    if (MDP_PLAIN.includes(name)) {
+      value = (node.params || {})[name];
+    } else {
+      // Unknown until the preset or the file is at hand: show the box.
+      if (!effective.known) return true;
+      value = name in facts ? facts[name] : effective.options[mdpSquash(mdpKey(name) || name)];
+    }
+    const held = listed.some((wanted) => mdpSame(value, wanted));
+    return negated ? !held : held;
+  });
+}
+
+/* The name the block writes its file under: the same rule as MdpNode.plan. */
+function mdpFileName(node) {
+  const params = node.params || {};
+  const fallback = (Editor.mdp || {}).default_name || 'run.mdp';
+  let name = String(params.filename || '').trim() || fallback;
+  if (params.mode === 'manual' && name === fallback) name = `${params.preset || 'run'}_edited.mdp`;
+  return name.endsWith('.mdp') ? name : `${name}.mdp`;
+}
+
+/* A number of steps, a time step and a length of time, the way people say
+   them: 50,000 steps, 2 fs, 100 ps, 1 µs. */
+function mdpCount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString('en-US') : String(value);
+}
+
+function mdpTime(ps) {
+  const round = (x) => String(Number(x.toPrecision(3)));
+  if (!Number.isFinite(ps)) return '';
+  if (ps >= 1e6) return `${round(ps / 1e6)} µs`;
+  if (ps >= 1e3) return `${round(ps / 1e3)} ns`;
+  if (ps >= 1) return `${round(ps)} ps`;
+  return `${round(ps * 1000)} fs`;
+}
+
+/* A value the way the box's own list writes it, so the card and the boxes
+   agree: a preset's v-rescale reads V-rescale, cutoff reads Cut-off. A value
+   the list does not have is shown as it is written. */
+function mdpSpelled(param, value) {
+  const defs = (((Editor.defs || {})['util.mdp'] || {}).params || []);
+  const choices = ((defs.find((p) => p.name === param) || {}).choices || []).map(String);
+  const text = String(value === undefined || value === null ? '' : value);
+  return choices.find((c) => c && mdpSame(c, text)) || text;
+}
+
+/* A number as people write it: 1.0 bar is 1 bar. Anything else unchanged. */
+function mdpNumber(value) {
+  const text = String(value === undefined || value === null ? '' : value).trim();
+  return text !== '' && Number.isFinite(Number(text)) ? String(Number(text)) : text;
+}
+
+/* What the settings add up to, in words: the card under the first boxes.
+   Each line is one thing somebody checking a run wants to know, and the
+   warnings are combinations GROMACS 2026.3 refuses or warns about, caught
+   here instead of at grompp. */
+function mdpSummary(node) {
+  const params = node.params || {};
+  const title = mdpFileName(node);
+  const out = { title, source: '', lines: [], warnings: [] };
+  const mode = params.mode || 'preset';
+  if (mode === 'preset') out.source = `preset ${params.preset || ''}`;
+  if (mode === 'manual') out.source = `${params.preset || 'preset'}, edited here`;
+  if (mode === 'raw') out.source = 'your own text';
+  if (mode === 'file') out.source = String(params.path || '').split('/').pop() || 'a file';
+
+  if (mode === 'raw' && !String(params.raw || '').trim()) {
+    out.warnings.push('The text is empty: paste an .mdp file into the box below.');
+    return out;
+  }
+  if (mode === 'file') {
+    const file = MdpFiles.get(params.path);
+    if (!file) { out.warnings.push('No file chosen yet.'); return out; }
+    if (file.state === 'missing') {
+      out.warnings.push(`Cannot read ${params.path}: ${file.error || 'no such file'}.`);
+      return out;
+    }
+    if (file.state !== 'read') { out.lines.push('Read from the file when the block runs.'); return out; }
+  }
+  const { known, options } = mdpEffective(node);
+  if (!known) return out;
+  const o = (key) => options[mdpSquash(key)];
+  const facts = mdpFacts(options);
+  const integrator = mdpSquash(o('integrator'));
+  const words = (value) => String(value || '').trim().split(/\s+/).filter(Boolean);
+  const refT = words(o('ref-t'));
+  const groups = words(o('tc-grps'));
+
+  if (facts._run === 'minimise') {
+    const how = { steep: 'steepest descent', cg: 'conjugate gradients', lbfgs: 'L-BFGS' }[integrator];
+    out.lines.push(`Energy minimisation (${how}): up to ${mdpCount(o('nsteps'))} steps, `
+      + `until no force is above ${o('emtol')} kJ/mol/nm`);
+  } else if (facts._run === 'dynamics') {
+    const how = { md: 'Dynamics', mdvv: 'Dynamics (velocity Verlet)',
+                  mdvvavek: 'Dynamics (velocity Verlet)', sd: 'Stochastic dynamics',
+                  bd: 'Brownian dynamics' }[integrator];
+    const steps = Number(o('nsteps'));
+    const dt = Number(o('dt'));
+    out.lines.push(steps < 0
+      ? `${how}, ${mdpTime(dt)} steps, until it is stopped`
+      : `${how}: ${mdpCount(steps)} steps of ${mdpTime(dt)} = ${mdpTime(steps * dt)}`);
+    if (facts._thermostat === 'on') {
+      const temps = [...new Set(refT.map(mdpNumber))];
+      const holder = ['sd', 'bd'].includes(integrator) ? `held by the friction of ${integrator}`
+        : mdpSpelled('tcoupl', o('tcoupl'));
+      const several = groups.length > 1 ? `, ${groups.length} heat groups` : '';
+      if (facts._annealing === 'on') {
+        const points = words(o('annealing-temp'));
+        const times = words(o('annealing-time'));
+        out.lines.push(`Temperature follows a schedule: ${points.join(' → ')} K over `
+          + `${times[times.length - 1] || '?'} ps (${holder}${several})`);
+      } else {
+        out.lines.push(`${temps.length ? temps.join(', ') : '?'} K (${holder}${several})`);
+      }
+    } else {
+      out.lines.push('No thermostat: the temperature is free to drift');
+    }
+    if (facts._barostat === 'on') {
+      const pressure = mdpNumber(words(o('ref-p'))[0]) || '?';
+      out.lines.push(`${pressure} bar, ${mdpSpelled('pcoupltype', o('pcoupltype'))} `
+        + `(${mdpSpelled('pcoupl', o('pcoupl'))})`);
+    } else {
+      out.lines.push('Fixed box size: no pressure control');
+    }
+    if (mdpSquash(o('gen-vel')) === 'yes') {
+      const seed = Number(o('gen-seed'));
+      out.lines.push(`New random velocities at ${mdpNumber(o('gen-temp'))} K`
+        + `${Number.isFinite(seed) && seed !== -1 ? `, seed ${seed}` : ''}`);
+    } else if (mdpSquash(o('continuation')) === 'yes') {
+      out.lines.push('Continues from the run before it');
+    }
+  } else {
+    out.lines.push(`${o('integrator')} run, ${mdpCount(o('nsteps'))} steps`);
+  }
+
+  const define = String(o('define') || '').trim();
+  if (define) {
+    out.lines.push(/-DPOSRES\b/.test(define)
+      ? `Position restraints on (${define})` : `Topology switches: ${define}`);
+  }
+  const every = Number(o('nstxout-compressed'));
+  if (every > 0) {
+    out.lines.push(facts._run === 'dynamics'
+      ? `A frame every ${mdpTime(every * Number(o('dt')))}`
+      : `A frame every ${mdpCount(every)} steps`);
+  }
+  const coulomb = mdpSquash(o('coulombtype'));
+  const cutoffs = [...new Set([o('rcoulomb'), o('rvdw')].map((v) => String(Number(v))))]
+    .join(' and ');
+  if (coulomb === 'pme') out.lines.push(`PME electrostatics, cut-offs ${cutoffs} nm`);
+  else if (coulomb === 'reactionfield') {
+    out.lines.push(`Reaction field, dielectric ${mdpNumber(o('epsilon-r'))}, cut-offs ${cutoffs} nm`);
+  } else out.lines.push(`${mdpSpelled('coulombtype', o('coulombtype'))} electrostatics, cut-offs ${cutoffs} nm`);
+
+  // What GROMACS 2026.3 refuses or warns about, said before grompp does.
+  const w = out.warnings;
+  if (facts._run === 'dynamics') {
+    if (mdpSquash(o('gen-vel')) === 'yes' && mdpSquash(o('continuation')) === 'yes') {
+      w.push('GROMACS refuses new velocities together with continuation = yes.');
+    }
+    if (facts._thermostat === 'on' && groups.length) {
+      if (refT.length !== groups.length) {
+        w.push(`ref-t needs one value per heat group: ${groups.length} groups, ${refT.length} values.`);
+      }
+      const tauT = words(o('tau-t'));
+      if (tauT.length !== groups.length) {
+        w.push(`tau-t needs one value per heat group: ${groups.length} groups, ${tauT.length} values.`);
+      }
+    }
+    if (facts._barostat === 'on') {
+      const need = { isotropic: 1, semiisotropic: 2, anisotropic: 6, surfacetension: 2 }[
+        mdpSquash(o('pcoupltype'))];
+      for (const key of ['ref-p', 'compressibility']) {
+        if (need && words(o(key)).length !== need) {
+          w.push(`${o('pcoupltype')} pressure needs ${need} value${need > 1 ? 's' : ''} `
+            + `in ${key}, not ${words(o(key)).length}.`);
+        }
+      }
+      if (/-DPOSRES\b/.test(define) && mdpSquash(o('refcoord-scaling')) === 'no') {
+        w.push('With -DPOSRES and pressure control, set refcoord-scaling to com; '
+          + 'GROMACS warns otherwise.');
+      }
+      if (mdpSquash(o('pcoupl')) === 'mttk' && !integrator.startsWith('mdvv')) {
+        w.push('MTTK pressure control needs the md-vv integrator.');
+      }
+    }
+    if (mdpSquash(o('tcoupl')).startsWith('andersen') && !integrator.startsWith('mdvv')) {
+      w.push('The Andersen thermostat needs the md-vv integrator.');
+    }
+    if (mdpSquash(o('gen-vel')) === 'yes' && refT.length
+        && !mdpSame(o('gen-temp'), refT[0])) {
+      w.push(`New velocities are drawn at ${o('gen-temp')} K but the thermostat holds `
+        + `${refT[0]} K; set gen-temp to match.`);
+    }
+  }
+  if (Number(o('verlet-buffer-tolerance')) === -1
+      && Number(o('rlist')) < Math.max(Number(o('rcoulomb')), Number(o('rvdw')))) {
+    w.push('rlist is smaller than the cut-offs; GROMACS refuses that when '
+      + 'verlet-buffer-tolerance is -1.');
+  }
+  return out;
+}
+
 /* Every widget filled in from the preset, so an edited node holds the whole
-   parameter set instead of a diff against something invisible. */
+   parameter set instead of a diff against something invisible. A dropdown
+   gets the preset's value in its own spelling, so V-rescale is picked for a
+   preset that writes v-rescale. */
 function mdpFill(node) {
   const preset = mdpPreset(node);
   const widgets = (Editor.mdp || {}).widgets || {};
   const filled = {};
   if (!preset) return filled;
+  const presetOptions = {};
+  for (const [key, value] of Object.entries(preset)) presetOptions[mdpSquash(key)] = value;
   for (const [param, key] of Object.entries(widgets)) {
-    const value = preset[key];
-    if (value !== undefined && value !== null && String(value) !== '') {
-      filled[param] = String(value);
-    }
+    const value = presetOptions[mdpSquash(key)];
+    if (value === undefined || value === null || String(value) === '') continue;
+    filled[param] = mdpSpelled(param, value);
   }
   return filled;
 }
@@ -323,12 +679,16 @@ const PARAM_FOLLOWS = {
         return { ...filled, ...(named ? { filename: `${raw}_edited.mdp` } : {}) };
       },
       mode(node, raw) {
-        if (raw !== 'preset') return null;
+        if (raw !== 'preset' && raw !== 'raw') return null;
         // Back to the stock preset: the widgets go quiet again, since a blank
-        // widget is what "whatever the preset says" looks like.
-        const widgets = (Editor.mdp || {}).widgets || {};
+        // widget is what "whatever the preset says" looks like. On to raw
+        // text, the same and the define box with them: the text is then the
+        // whole file, and a value left in a box from an edited preset would
+        // look set while the run ignored it.
+        const widgets = Object.keys((Editor.mdp || {}).widgets || {});
+        if (raw === 'raw') widgets.push('define');
         const cleared = {};
-        for (const param of Object.keys(widgets)) {
+        for (const param of widgets) {
           if (String(node.params[param] || '')) cleared[param] = '';
         }
         if (/_edited\.mdp$/.test(String(node.params.filename || ''))) {
@@ -358,11 +718,12 @@ const PARAM_FOLLOWS = {
       }
       return changes;
     };
-    for (const param of ['nsteps', 'dt', 'ref_t', 'tc_grps', 'tau_t', 'pcoupl',
-      'pcoupltype', 'ref_p', 'nstxout_compressed', 'nstenergy', 'nstlog',
-      'gen_vel', 'gen_seed', 'define']) {
-      rules[param] = (node, raw) => touched(node, raw, param);
-    }
+    // One rule for every value box, all the same rule. Looked up by name as
+    // the boxes are used rather than listed here, because which boxes there
+    // are comes from the server (MdpNode._WIDGET_MAP), and a hand-kept list
+    // here missed every box added after it was written.
+    rules.anyValue = (param) => (mdpKey(param)
+      ? (node, raw) => touched(node, raw, param) : null);
     return rules;
   })(),
 };
@@ -1150,31 +1511,22 @@ const Editor = {
     body.appendChild(ports);
 
     const shown = def.params.filter((p) => this.paramShown(node, p));
-    const basic = shown.filter((p) => !p.advanced);
-    const advanced = shown.filter((p) => p.advanced);
-    if (basic.length) body.appendChild(this._buildWidgets(node, basic));
-    if (advanced.length) {
-      /* Say how many of the hidden boxes have actually been filled in. A
-         workflow somebody hands you can set half a dozen of them, and a
-         closed panel that says only "advanced (6)" looks the same whether
-         they are all at their defaults or all changed -- so the settings
-         doing the work are the ones you cannot see. The names go in the
-         tooltip; the count goes on the line, where it costs no height. */
-      const changed = advanced.filter((p) => this.paramSet(node, p));
-      const summary = changed.length
-        ? `advanced (${advanced.length}) · ${changed.length} set`
-        : `advanced (${advanced.length})`;
-      const details = UI.el('details', { class: 'advanced' }, [
-        UI.el('summary', {
-          text: summary,
-          title: changed.length
-            ? 'not at its default: ' + changed.map((p) => p.label).join(', ')
-            : 'all at their defaults',
-        }),
-      ]);
-      details.appendChild(this._buildWidgets(node, advanced));
-      body.appendChild(details);
+    const placed = shown.map((p) => ({ param: p, ...this._placement(node, p) }));
+    const basic = placed.filter((x) => !x.advanced).map((x) => x.param);
+    const advanced = placed.filter((x) => x.advanced);
+    if (node.type === 'util.mdp') {
+      // Where the settings come from, then what they add up to in words, and
+      // only then the boxes: the card is what somebody looking at a finished
+      // graph wants first, and in raw mode it explains the text under it.
+      const head = basic.filter((p) => ['mode', 'preset', 'path'].includes(p.name));
+      const rest = basic.filter((p) => !head.includes(p));
+      if (head.length) body.appendChild(this._buildWidgets(node, head));
+      body.appendChild(this._buildMdpSummary(node));
+      if (rest.length) body.appendChild(this._buildWidgets(node, rest));
+    } else if (basic.length) {
+      body.appendChild(this._buildWidgets(node, basic));
     }
+    if (advanced.length) body.appendChild(this._buildAdvanced(node, advanced));
 
     // The picture goes under the parameters and above the status lines, so a
     // note or an error is never hidden behind it.
@@ -1221,6 +1573,99 @@ const Editor = {
       this._nodeMenu(event, node);
     });
     return el;
+  },
+
+  /* Whether a box goes on the face of the node or into its drawer, and under
+     which heading there. In raw mode the run-parameters block shows its text
+     and a summary of it; the value boxes, which only change lines of that
+     text, move into the drawer under "Main settings" instead of repeating
+     the text beside it. */
+  _placement(node, param) {
+    if (node.type === 'util.mdp' && (node.params || {}).mode === 'raw'
+        && !param.advanced && mdpKey(param.name)) {
+      return { advanced: true, section: 'Main settings' };
+    }
+    return { advanced: Boolean(param.advanced), section: param.section || '' };
+  },
+
+  /* The drawer of less usual boxes.
+
+     It says how many of them have actually been filled in. A workflow
+     somebody hands you can set half a dozen of them, and a closed drawer that
+     says only "advanced (6)" looks the same whether they are all at their
+     defaults or all changed, so the settings doing the work would be the
+     ones you cannot see. The names go in the tooltip; the count goes on the
+     line, where it costs no height.
+
+     Boxes that name a section get a small drawer of their own inside it, so
+     opening "advanced" on the run parameters shows a dozen headings rather
+     than fifty boxes. */
+  _buildAdvanced(node, advanced) {
+    const params = advanced.map((x) => x.param);
+    const changed = params.filter((p) => this.paramSet(node, p));
+    const details = this._drawer(node, 'advanced', 'advanced',
+      changed.length ? `advanced (${params.length}) · ${changed.length} set`
+        : `advanced (${params.length})`,
+      changed.length ? 'not at its default: ' + changed.map((p) => p.label).join(', ')
+        : 'all at their defaults');
+    const loose = advanced.filter((x) => !x.section).map((x) => x.param);
+    if (loose.length) details.appendChild(this._buildWidgets(node, loose));
+    const order = [];
+    for (const x of advanced) if (x.section && !order.includes(x.section)) order.push(x.section);
+    for (const section of order) {
+      const inside = advanced.filter((x) => x.section === section).map((x) => x.param);
+      const set = inside.filter((p) => this.paramSet(node, p));
+      const drawer = this._drawer(node, `section:${section}`, 'section',
+        `${section} (${inside.length})${set.length ? ` · ${set.length} set` : ''}`,
+        set.length ? 'not at its default: ' + set.map((p) => p.label).join(', ') : '');
+      drawer.appendChild(this._buildWidgets(node, inside));
+      details.appendChild(drawer);
+    }
+    return details;
+  },
+
+  /* One drawer. Whether it is open is kept on the node, because every change
+     to a box that shows or hides others builds the node again, and drawers
+     that snapped shut each time would have to be reopened after every
+     edit. */
+  _drawer(node, key, cls, text, title) {
+    const details = UI.el('details', { class: cls }, [UI.el('summary', { text, title })]);
+    if (!node._drawers) node._drawers = new Set();
+    if (node._drawers.has(key)) details.open = true;
+    details.addEventListener('toggle', () => {
+      if (details.open) node._drawers.add(key); else node._drawers.delete(key);
+    });
+    return details;
+  },
+
+  /* The card on the run-parameters block that says in words what its
+     settings add up to (mdpSummary above), with anything GROMACS would
+     refuse or warn about in red under it. */
+  _buildMdpSummary(node) {
+    const summary = mdpSummary(node);
+    const card = UI.el('div', { class: 'mdp-summary' }, [
+      UI.el('div', { class: 'mdp-summary-title' }, [
+        UI.el('b', { text: summary.title }),
+        UI.el('span', { class: 'mdp-summary-source',
+                        text: summary.source ? ` · ${summary.source}` : '' }),
+      ]),
+    ]);
+    for (const line of summary.lines) card.appendChild(UI.el('div', { text: line }));
+    for (const line of summary.warnings) {
+      card.appendChild(UI.el('div', { class: 'mdp-summary-warn', text: line }));
+    }
+    return card;
+  },
+
+  /* Redraw a node once the click that ended an edit has landed. A box you
+     type in commits when you leave it, and redrawing there and then would
+     rebuild the box you were moving to under the pointer, so the click that
+     should have put you in it would go nowhere. */
+  _refreshSoon(node) {
+    clearTimeout(node._refreshTimer);
+    node._refreshTimer = setTimeout(() => {
+      if (node._el && this.nodes.get(node.id) === node) this._refreshNodeElement(node);
+    }, 0);
   },
 
   /* Drag the corner of a preview node to make the picture bigger. Only
@@ -1304,6 +1749,10 @@ const Editor = {
   },
 
   paramShown(node, param) {
+    // The run-parameters block reads its rules against the value the run
+    // will really use (from a box, the preset, the text or the file),
+    // because most of its boxes are empty on purpose.
+    if (node.type === 'util.mdp') return mdpShows(node, param);
     return whenHolds(String(param.when || ''), node.params || {});
   },
 
@@ -1347,8 +1796,8 @@ const Editor = {
      usual case. */
   _mdpNotSet(node, param) {
     if (node.type !== 'util.mdp' || !mdpKey(param.name) || param.name === 'define') return '';
-    if (node.params.mode === 'raw') return 'not in the raw text';
-    return mdpPreset(node) ? `not set by ${node.params.preset}` : '';
+    const base = mdpBase(node);
+    return base ? base.missing : '';
   },
 
   /* The value an empty run-parameters box stands for, and where it comes
@@ -1360,27 +1809,26 @@ const Editor = {
     if (node.type !== 'util.mdp') return null;
     const key = mdpKey(param.name);
     if (!key) return null;
-    const mode = node.params.mode;
-    // The file is read when the node runs, not here.
-    if (mode === 'file') return { value: 'as in the file', from: '' };
-    const known = (value) => value !== undefined && value !== null && String(value) !== '';
-    if (mode === 'raw') {
-      const value = mdpRawOptions(node.params.raw)[key];
-      if (known(value)) return { value: String(value), from: 'from the raw text' };
-    } else {
-      const preset = mdpPreset(node);
-      const value = preset ? preset[key] : undefined;
-      if (known(value)) return { value: String(value), from: `from ${node.params.preset}` };
+    const base = mdpBase(node);
+    // A file not read yet: it is read when the node runs, whatever this says.
+    if (node.params.mode === 'file' && !base) return { value: 'as in the file', from: '' };
+    if (base) {
+      const value = base.options[mdpSquash(key)];
+      if (mdpKnown(value)) return { value: String(value), from: base.from };
     }
     const fallback = ((Editor.mdp || {}).gromacs_defaults || {})[key];
-    return known(fallback) ? { value: String(fallback), from: 'GROMACS default' } : null;
+    return mdpKnown(fallback) ? { value: String(fallback), from: 'GROMACS default' } : null;
   },
 
   _buildWidget(node, param) {
     const value = node.params[param.name];
+    // On the run parameters, the option's own name beside the plain words:
+    // it is what a published protocol, the manual and an .mdp file call it.
+    const key = node.type === 'util.mdp' ? mdpKey(param.name) : '';
     const label = UI.el('label', {}, [
       UI.el('span', param.help ? { class: 'why', title: param.help, text: param.label }
         : { text: param.label }),
+      key ? UI.el('span', { class: 'mdp-key', text: key }) : null,
     ]);
 
     let input;
@@ -1409,10 +1857,16 @@ const Editor = {
         (other) => whenNames(other.when).includes(param.name))
         || (def.inputs || []).concat(def.outputs || []).some(
           (port) => whenNames(port.when).includes(param.name));
-      // The empty run-parameter boxes show what the preset, the mode or the
-      // raw text says, so a change to any of those has to redraw them too.
-      const shows = node.type === 'util.mdp' && ['preset', 'mode', 'raw'].includes(param.name);
-      if (followed || carries || controls || shows) this._refreshNodeElement(node);
+      // The empty run-parameter boxes show what the preset, the mode, the raw
+      // text or the file says, so a change to any of those has to redraw
+      // them too. So does any other box there: the summary card says what
+      // they all add up to, and one value can show or hide other boxes (a
+      // thermostat's boxes go with the thermostat).
+      const mdp = node.type === 'util.mdp';
+      if (mdp && param.name === 'path') MdpFiles.forget(raw);
+      const shows = mdp && ['preset', 'mode'].includes(param.name);
+      if (shows || (!mdp && (followed || carries || controls))) this._refreshNodeElement(node);
+      else if (mdp) this._refreshSoon(node);
       if (carries) this.drawWires();
     };
 
@@ -1456,13 +1910,19 @@ const Editor = {
         // field installed on the machine it was built on, a version since
         // removed. Dropping it would leave the box blank and quietly change
         // what the graph does, so it is kept and marked instead.
-        const now = value === null || value === undefined ? '' : String(value);
+        let now = value === null || value === undefined ? '' : String(value);
+        // A run parameter written another way (v-rescale for V-rescale) is
+        // the same value to GROMACS, and is picked as such rather than added
+        // as a second entry. One the list does not have is still a value
+        // GROMACS may know, not something missing from this machine.
+        const mdp = node.type === 'util.mdp';
+        if (mdp && now) now = choices.find((c) => c && mdpSame(c, now)) || now;
         if (now && !choices.includes(now)) choices.unshift(now);
         for (const choice of choices) {
           input.appendChild(UI.el('option', {
             value: choice,
             text: (choice && !param.choices.map(String).includes(choice))
-              ? `${choice} (not on this machine)`
+              ? (mdp ? choice : `${choice} (not on this machine)`)
               : (choice || (blank ? `(${blank})` : '(default)')),
           }));
         }
@@ -1613,7 +2073,7 @@ const Editor = {
      questions. The box itself stays exactly as it was: typing is still faster
      for anybody who knows the words. */
   _wrapWidget(node, param, parts) {
-    const widget = UI.el('div', { class: 'widget' }, parts);
+    const widget = UI.el('div', { class: 'widget', 'data-param': param.name }, parts);
 
     /* A helper button under one particular box, for the boxes where a picture
        answers the question better than a number does. Right-clicking the node
@@ -1647,6 +2107,11 @@ const Editor = {
 
   _refreshNodeElement(node) {
     const old = node._el;
+    // The box being typed in, by name, so it can have the focus back.
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    const holder = old && active && old.contains && old.contains(active) && active.closest
+      ? active.closest('[data-param]') : null;
+    const focused = holder ? holder.getAttribute('data-param') : '';
     this._unwatchSize(old);
     const fresh = this._buildNode(node);
     // Watch the new one. Without this line a node stopped being measured the
@@ -1659,12 +2124,18 @@ const Editor = {
     if (this.selection.has(node.id)) fresh.classList.add('selected');
     this.applyNodeStatus(node);
     this.refreshPortStates();
+    if (focused && fresh.querySelector) {
+      const again = fresh.querySelector(`[data-param="${focused}"] input, `
+        + `[data-param="${focused}"] select, [data-param="${focused}"] textarea`);
+      if (again) again.focus();
+    }
   },
 
   /* One parameter changing another. Returns true when something else moved,
      so the caller knows the node has to be redrawn. */
   applyFollows(node, name, raw) {
-    const rule = (PARAM_FOLLOWS[node.type] || {})[name];
+    const table = PARAM_FOLLOWS[node.type] || {};
+    const rule = table[name] || (table.anyValue && table.anyValue(name));
     const changes = rule ? rule(node, raw) : null;
     if (!changes) return false;
     Object.assign(node.params, changes);

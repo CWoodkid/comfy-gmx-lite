@@ -4,10 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..mdp_options import BOXES, GROMACS_DEFAULTS, Box, _h
 from ..templates import PRESET_INFO, PRESETS, merge_extra, parse_mdp, render_mdp
 from .base import Node, NodeError, Param, PlanContext, Plan, Port, local_path
 
 CATEGORY = "Parameters & scripting"
+
+
+def _box_param(box: Box) -> Param:
+    """A box from the table in mdp_options.py, as a parameter of the block."""
+    return Param(box.param, box.kind, box.label, "",
+                 choices=list(box.choices), help=box.help, when=box.when,
+                 placeholder=box.placeholder,
+                 advanced=bool(box.section), section=box.section)
 
 
 class MdpNode(Node):
@@ -17,119 +26,128 @@ class MdpNode(Node):
     color = "#6b5b8a"
     tool = "shell"
     description = (
-        "The settings for a simulation: how long, how warm, what pressure, what to "
-        "save and how often. Start from a preset -- minimisation, NVT, NPT, "
-        "production -- and change only the handful of things you care about. Anything "
-        "left blank keeps the preset's value."
+        "The settings for a simulation: what kind of run, how long, how warm, what "
+        "pressure, what to save and how often. Start from a preset (minimisation, "
+        "NVT, NPT, production), from an .mdp file you already have, or from your "
+        "own text, and change only what you care about. Every box shows the value "
+        "the run will use; leave it empty to keep that value. The summary under "
+        "the first boxes says in words what the settings add up to."
     )
     docs = "https://manual.gromacs.org/current/user-guide/mdp-options.html"
     outputs = (Port("mdp", "mdp", "mdp"),)
     params = (
-        Param("preset", "choice", "Preset", "md_atomistic", choices=list(PRESETS.keys()),
-              help="Starting point. Hover the node description for what each one assumes."),
-        Param("mode", "choice", "Mode", "preset",
+        Param("mode", "choice", "Settings come from", "preset",
               choices=["preset", "manual", "file", "raw"],
-              help="'preset' is the published settings, untouched: the widgets below "
-                   "show what they contain and stay empty. Editing any of them switches "
-                   "to 'manual', which fills every widget in with the preset's value so "
-                   "the node holds the whole parameter set rather than a diff against "
-                   "something you cannot see -- and names its file after the preset it "
-                   "came from. 'file' starts from an .mdp you already have and applies "
-                   "the widgets on top of it, which is how one hand-tuned file becomes "
-                   "three replicas with different seeds. 'raw' writes the text box "
-                   "verbatim; the boxes show what it says, and typing in one "
-                   "changes that line of the text."),
-        Param("path", "str", "Existing .mdp", "", placeholder="/path/to/eq1_nvt.mdp",
-              help="Read when Mode = file. Values are parsed out and written back "
-                   "through the same renderer as a preset, so the options survive but "
-                   "the file's own comments do not."),
-        Param("nsteps", "str", "nsteps", "", placeholder="preset default",
-              help="Number of integration steps. Blank keeps the preset value."),
-        Param("dt", "str", "dt (ps)", "", placeholder="preset default",
-              help="The time step: how far the simulation moves time on between "
-                   "one calculation of the forces and the next, in picoseconds "
-                   "(1 ps is a millionth of a millionth of a second). The run "
-                   "lasts nsteps times dt: 50,000 steps of 0.002 ps is 100 ps. "
-                   "0.002 ps (2 femtoseconds) is usual when the bonds to "
-                   "hydrogen are held at a fixed length. A longer step reaches "
-                   "further for the same computer time, but too long and the "
-                   "atoms move too far in one step and the run falls apart."),
-        Param("ref_t", "str", "ref-t (K)", "", placeholder="preset default",
-              help="One value per tc-grp, space separated."),
-        Param("tc_grps", "str", "tc-grps", "", placeholder="preset default"),
-        Param("tau_t", "str", "tau-t (ps)", "", placeholder="preset default", advanced=True),
-        Param("pcoupl", "choice", "pcoupl", "", advanced=True,
-              choices=["", "no", "C-rescale", "Parrinello-Rahman", "Berendsen"]),
-        Param("pcoupltype", "choice", "pcoupltype", "", advanced=True,
-              choices=["", "isotropic", "semiisotropic", "anisotropic", "surface-tension"]),
-        Param("ref_p", "str", "ref-p (bar)", "", placeholder="preset default", advanced=True),
-        Param("nstxout_compressed", "str", "nstxout-compressed", "", placeholder="preset default",
-              help="Trajectory write interval in steps."),
+              help=_h("""
+                  Where this block gets its settings.
+
+                  preset: a finished set of settings for a common job, used
+                  exactly as published. The boxes show what it contains;
+                  leave them empty to keep it that way.
+
+                  manual: a preset edited here. Typing in any box while on
+                  preset switches to this by itself, fills every box with the
+                  preset's value, and names the file after the preset with
+                  _edited added, so an edited file never passes for the
+                  published one.
+
+                  file: an .mdp file you already have. Its settings are read in,
+                  and any box you fill in changes that setting on top of it.
+                  That is how one hand-tuned file becomes three replicas with
+                  different seeds.
+
+                  raw: text you paste or type, written out exactly as it is,
+                  comments and all. The boxes in the advanced drawer, under
+                  Main settings and the other headings, show what the text
+                  says, and typing in one of them rewrites that line of the
+                  text.
+                  """)),
+        Param("preset", "choice", "Preset", "md_atomistic", choices=list(PRESETS.keys()),
+              when="mode=preset|manual",
+              help=_h("""
+                  The published settings to start from. The name says the
+                  job:
+
+                      em_...    energy minimisation: removes clashes before anything moves
+                      nvt_...   first warm-up: heats the system at a fixed volume
+                      npt_...   second warm-up: lets the box settle at the right pressure
+                      md_...    production: the run you analyse
+
+                  The atomistic presets are for all-atom force fields such as
+                  CHARMM36 or AMBER. The lysozyme_ presets copy the Lysozyme
+                  tutorial exactly, one for each of its steps: ions, min, nvt,
+                  npt and md. The summary under these boxes says what the
+                  chosen one does.
+                  """)),
+        Param("path", "file", "The .mdp file", "", placeholder="/path/to/eq1_nvt.mdp",
+              when="mode=file",
+              help=_h("""
+                  The .mdp file to start from, on this machine. Its options are
+                  read in and written back out through the same writer as a
+                  preset, with any box you fill in changed on top, so the
+                  options survive but the file's own comments do not. For a
+                  file on the web, put a Download file block in front of
+                  grompp instead.
+                  """)),
+        Param("raw", "text", "The mdp text", "", rows=10, when="mode=raw",
+              placeholder="; paste an .mdp file here\nintegrator = steep\nnsteps     = 5000",
+              help=_h("""
+                  The whole .mdp file, written out exactly as it is here,
+                  comments included. Each line is an option, an equals sign and
+                  a value; anything after a semicolon is a comment.
+
+                  The summary above says in words what these settings do. The
+                  boxes in the advanced drawer show the values the text sets,
+                  and typing in one of them changes that line here instead of
+                  adding a second one.
+                  """)),
+        *[_box_param(box) for box in BOXES if not box.section],
         Param("saved", "choice", "What goes into the trajectory", "",
               choices=["", "the whole system", "everything except the water"],
-              help="Decide this before the run, not after. Leaving the water "
-                   "out makes the file about three times smaller and is the "
-                   "usual choice -- but it also means you cannot start a new "
-                   "run from a moment in the middle of this one, because there "
-                   "is no water in the file to start from. That matters if you "
-                   "ever want to go back to an interesting moment and repeat it "
-                   "with different velocities. For a 25,000-particle system the "
-                   "difference is about 110 MB against 330 MB per microsecond, "
-                   "which is nothing. Blank keeps whatever the preset says."),
-        Param("nstenergy", "str", "nstenergy", "", placeholder="preset default", advanced=True),
-        Param("nstlog", "str", "nstlog", "", placeholder="preset default", advanced=True),
-        Param("define", "str", "define", "", placeholder="e.g. -DPOSRES", advanced=True,
-              help="Preprocessor defines. Type NONE to clear a preset's define line."),
-        Param("gen_vel", "choice", "gen-vel", "", choices=["", "yes", "no"], advanced=True),
-        Param("gen_seed", "str", "gen-seed", "", placeholder="preset default",
-              help="The velocity seed. Give each replica its own and they diverge "
-                   "reproducibly; -1 picks a new one every time, which cannot be "
-                   "reproduced."),
-        Param("filename", "str", "File name", "run.mdp", advanced=True),
-        Param("raw", "text", "Raw mdp text", "", rows=10, advanced=True,
-              placeholder="; used only when Mode = raw"),
-        Param("extra_flags", "text", "Extra mdp lines", "", rows=4,
+              when="mode!=raw",
+              help=_h("""
+                  Decide this before the run, not after. Leaving the water out
+                  makes the file about three times smaller and is the usual
+                  choice, but it also means you cannot start a new run from a
+                  moment in the middle of this one, because there is no water
+                  in the file to start from. That matters if you ever want to
+                  go back to an interesting moment and repeat it with
+                  different velocities.
+
+                  For a 25,000-particle system the difference is about 110 MB
+                  against 330 MB per microsecond. Empty keeps whatever the
+                  preset says.
+                  """)),
+        *[_box_param(box) for box in BOXES if box.section],
+        Param("filename", "str", "File name", "run.mdp", advanced=True,
+              section="File and extra lines",
+              help=_h("""
+                  The name the settings are written under in the run folder,
+                  which is also the file grompp is given. run.mdp when nobody
+                  says; an edited preset writes itself as its name plus
+                  _edited.mdp.
+                  """)),
+        Param("extra_flags", "text", "Extra mdp lines", "", rows=4, advanced=True,
+              section="File and extra lines", when="mode!=raw",
               placeholder="pull = yes\npull-ngroups = 2",
-              help="Appended on top of the preset as real mdp options; these win over "
-                   "everything above."),
+              help=_h("""
+                  Any mdp option that has no box here, one per line as option
+                  = value: pulling, walls, free-energy settings, electric fields
+                  and the rest. They are added last and win over everything
+                  above. In raw mode, type them into the text instead.
+                  """)),
     )
 
-    _WIDGET_MAP = {
-        "nsteps": "nsteps",
-        "dt": "dt",
-        "ref_t": "ref-t",
-        "tc_grps": "tc-grps",
-        "tau_t": "tau-t",
-        "pcoupl": "pcoupl",
-        "pcoupltype": "pcoupltype",
-        "ref_p": "ref-p",
-        "nstxout_compressed": "nstxout-compressed",
-        "nstenergy": "nstenergy",
-        "nstlog": "nstlog",
-        "gen_vel": "gen-vel",
-        "gen_seed": "gen-seed",
-    }
+    #: Which box sets which mdp option. define is kept apart: it is not
+    #: filled in with the others when a preset is edited, and NONE in it
+    #: removes the preset's line rather than writing one.
+    _WIDGET_MAP = {box.param: box.key for box in BOXES if box.param != "define"}
 
-    #: GROMACS's own value for each widget's option, used where neither the
-    #: preset nor the raw text sets it -- so a box shows the number the run will
-    #: really use rather than the words "preset default". Read from the
-    #: mdout.mdp that gmx grompp 2026.3 writes for an empty .mdp, and checked
-    #: against the 2026.3 manual's list of mdp options. gen-seed is the one
-    #: taken from the manual alone: its default, -1, means a new random seed
-    #: every time, so mdout.mdp shows the seed that was drawn instead. ref-t,
-    #: tc-grps, tau-t and ref-p have none: they are only read once a
-    #: thermostat or barostat is switched on, and then they must be given.
-    _GROMACS_DEFAULTS = {
-        "nsteps": "0",
-        "dt": "0.001",
-        "pcoupl": "no",
-        "pcoupltype": "isotropic",
-        "nstxout-compressed": "0",
-        "nstenergy": "1000",
-        "nstlog": "1000",
-        "gen-vel": "no",
-        "gen-seed": "-1",
-    }
+    #: GROMACS's own value for each box's option, used where neither the
+    #: preset, the raw text nor the file sets it, so a box shows the number
+    #: the run will really use rather than nothing. Where the numbers come
+    #: from is said beside the table, in mdp_options.py.
+    _GROMACS_DEFAULTS = dict(GROMACS_DEFAULTS)
 
     #: What the file is called when nobody has said. Kept as a constant because
     #: the browser renames it on the same rule when a preset is edited.
@@ -155,9 +173,8 @@ class MdpNode(Node):
                 raise NodeError("mode is 'raw' but the raw mdp text box is empty")
             plan.files[name] = body.rstrip() + "\n"
             plan.outputs["mdp"] = name
-            plan.notes.append("raw mode: the raw text is the whole file. The value "
-                              "boxes change its lines; 'What goes into the "
-                              "trajectory' and 'Extra mdp lines' are not used")
+            plan.notes.append("raw mode: the text is written out exactly as it is. "
+                              "The boxes in the advanced drawer change its lines")
             return plan
 
         if ctx.pstr("mode") == "file":

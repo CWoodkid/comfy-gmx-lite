@@ -39,8 +39,12 @@ first-time user sees 25 blocks rather than hundreds.
 - Finished results are stored. A block whose settings and inputs have not
   changed is not run again: it is marked **cached** and its stored result is
   reused. Changing one setting reruns only the blocks that depend on it.
-- Run-parameter blocks show the value each setting will have in the run,
-  including the GROMACS default for a setting left empty.
+- Run-parameter blocks have a box for each of 65 common GROMACS settings: the
+  most used on the block, the rest in drawers by topic, each explained with
+  the values usually used. Every box shows the value the setting will have in
+  the run, including the GROMACS default for a setting left empty, and a
+  summary on the block says in words what the settings add up to. An `.mdp`
+  file of your own, or pasted text, works too.
 - The **Terminal** drawer under the canvas has two tabs. **Run** follows a
   run as it happens, with every command and its output. **Shell** is a command
   line (Bash) on the computer that runs the simulations, for looking at files,

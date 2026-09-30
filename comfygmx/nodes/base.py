@@ -142,6 +142,13 @@ class Param:
     step: Optional[float] = None
     help: str = ""
     advanced: bool = False     # hidden until the node is expanded
+    #: For a hidden box: the heading it sits under inside the node's advanced
+    #: drawer. A node with dozens of hidden boxes (the run parameters have
+    #: more than fifty) is unusable as one long list, so boxes that share a
+    #: section get a small drawer of their own there ("Temperature",
+    #: "Output"), and only the one you open takes up room. Empty keeps the
+    #: plain single list every other node has.
+    section: str = ""
     #: When this box is shown at all: ``"source=the Protein Data Bank"`` means
     #: it appears only while the box called ``source`` holds that value.
     #: Several values are separated by ``|``. Empty means always.
@@ -184,6 +191,7 @@ class Param:
             "step": self.step,
             "help": self.help,
             "advanced": self.advanced,
+            "section": self.section,
             "when": self.when,
             "rows": self.rows,
             "grow": self.grow,

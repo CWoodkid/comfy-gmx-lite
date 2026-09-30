@@ -15,10 +15,11 @@ from typing import Dict, Iterable, List, Tuple
 SECTIONS: List[Tuple[str, List[str]]] = [
     ("Run control", [
         "title", "integrator", "dt", "nsteps", "tinit", "init-step", "comm-mode", "nstcomm",
-        "comm-grps", "emtol", "emstep", "nstcgsteep",
+        "comm-grps", "emtol", "emstep", "nstcgsteep", "ld-seed", "bd-fric",
     ]),
     ("Output control", [
-        "nstxout", "nstvout", "nstfout", "nstlog", "nstenergy", "nstxout-compressed",
+        "nstxout", "nstvout", "nstfout", "nstlog", "nstcalcenergy", "nstenergy",
+        "nstxout-compressed",
         "compressed-x-precision", "compressed-x-grps", "energygrps",
     ]),
     ("Neighbour searching", [
@@ -32,17 +33,21 @@ SECTIONS: List[Tuple[str, List[str]]] = [
         "vdwtype", "vdw-modifier", "rvdw", "rvdw-switch", "dispcorr",
     ]),
     ("Temperature coupling", [
-        "tcoupl", "tc-grps", "tau-t", "ref-t",
+        "tcoupl", "nsttcouple", "tc-grps", "tau-t", "ref-t",
+    ]),
+    ("Heating and cooling", [
+        "annealing", "annealing-npoints", "annealing-time", "annealing-temp",
     ]),
     ("Pressure coupling", [
-        "pcoupl", "pcoupltype", "tau-p", "compressibility", "ref-p", "refcoord-scaling",
+        "pcoupl", "pcoupltype", "nstpcouple", "tau-p", "compressibility", "ref-p",
+        "refcoord-scaling",
     ]),
     ("Velocity generation", [
         "gen-vel", "gen-temp", "gen-seed",
     ]),
     ("Bonds", [
         "constraints", "constraint-algorithm", "continuation", "lincs-order",
-        "lincs-iter", "lincs-warnangle",
+        "lincs-iter", "lincs-warnangle", "mass-repartition-factor",
     ]),
     ("Restraints / pulling", [
         "define", "freezegrps", "freezedim", "pull", "pull-ngroups", "pull-ncoords",

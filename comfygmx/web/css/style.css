@@ -437,6 +437,35 @@ aside {
 .node details[open].advanced > summary::before { content: "▾ "; }
 .node details.advanced .widgets { padding: 5px 0 0; }
 
+/* The drawers inside "advanced", one per topic, on nodes whose boxes name one
+   (the run parameters: Temperature, Pressure, Output and so on). Indented a
+   little and set in a lighter colour than the drawer they sit in, so the two
+   levels read as two levels. */
+.node details.advanced details.section { margin: 3px 0 0 8px; }
+.node details.section > summary {
+  font-size: 10.5px; color: var(--text-dim); cursor: pointer; list-style: none;
+  padding: 2px 0;
+}
+.node details.section > summary::before { content: "▸ "; color: var(--text-faint); }
+.node details[open].section > summary::before { content: "▾ "; }
+.node details.section .widgets { padding: 3px 0 5px; }
+
+/* What the run parameters add up to, in words. A card rather than a box,
+   because it is there to be read, not filled in; the red lines under it are
+   combinations GROMACS would refuse or warn about. */
+.node .mdp-summary {
+  margin: 6px 9px 0; padding: 5px 7px; font-size: 10.5px; line-height: 1.4;
+  background: rgba(107,91,138,.16); border-left: 2px solid #8a7fd0;
+  color: var(--text); border-radius: 3px; overflow-wrap: anywhere;
+}
+.node .mdp-summary-title b { font-family: var(--mono); font-weight: 600; }
+.node .mdp-summary-source { color: var(--text-faint); }
+.node .mdp-summary-warn { color: #e8b0a5; }
+/* The option's own name, at the right-hand end of a box's plain label. */
+.widget > label .mdp-key {
+  margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--text-faint);
+}
+
 /* Capped, because this block is as tall as whatever is written in it and a
    long note otherwise renders a 1000 px node that pushes everything around it
    out of the way. Twenty-odd lines is enough to read; the rest scrolls. */
@@ -1657,6 +1686,11 @@ button.small.link:hover { color: var(--text); }
 .node-setup .setup-param:last-child { border-bottom: 0; }
 .node-setup .widget > label { font-size: 12px; color: var(--text); }
 .node-setup .hint { line-height: 1.45; white-space: pre-wrap; }
+/* Help written in paragraphs: a little air between them, and the table of
+   usual values in a box of its own, a size smaller than a command. */
+.node-setup .setup-help p { margin: 0 0 6px; }
+.node-setup .setup-help p:last-child { margin-bottom: 0; }
+.node-setup .setup-help .prose-code { font-size: 11px; margin: 4px 0 8px; }
 .node-setup .info-table { margin-bottom: 14px; }
 .node-setup .info-table td.warned { color: var(--warn); }
 

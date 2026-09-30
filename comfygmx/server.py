@@ -529,30 +529,37 @@ def h_open_folder(self: Handler) -> None:
     self._json({"opened": True, "path": str(resolved)})
 
 
-def h_mdp_presets(self: Handler) -> None:
+def mdp_presets_table() -> Dict[str, Any]:
     """Every preset's actual options, so the editor can show them.
 
-    The run-parameters node has thirteen widgets and a preset has thirty-odd
-    options; leaving the widgets blank means "keep the preset's value", which
-    is right but says nothing about what that value *is*. With the table here
-    the node can show it -- and can fill it in the moment somebody edits one,
-    so an edited preset is a complete parameter set rather than a diff against
-    something invisible.
+    The run-parameters node has a box for every common mdp option (sixty-odd,
+    most of them in drawers), and leaving one blank means "keep the preset's
+    value", which is right but says nothing about what that value *is*. With
+    the table here the node can show it, can say in words what the whole set
+    adds up to, can hide the boxes that do nothing for the run as it stands,
+    and can fill every box in the moment somebody edits one, so an edited
+    preset is a complete parameter set rather than a diff against something
+    invisible. tools/mdp_boxes.js tests the page against this same table.
     """
     from .templates import PRESETS, PRESET_INFO
     from .nodes.util_nodes import MdpNode
-    self._json({"presets": {name: {str(k): v for k, v in options.items()}
-                            for name, options in PRESETS.items()},
-                "info": dict(PRESET_INFO),
-                # Which widget corresponds to which mdp option, from the node
-                # itself rather than a second copy in the browser: the same map
-                # in two languages drifts, and this one decides what a preset
-                # shows you.
-                "widgets": dict(MdpNode._WIDGET_MAP),
-                # What GROMACS uses for an option nobody set, so a box can show
-                # that number too instead of the words "preset default".
-                "gromacs_defaults": dict(MdpNode._GROMACS_DEFAULTS),
-                "default_name": MdpNode.DEFAULT_NAME})
+    return {"presets": {name: {str(k): v for k, v in options.items()}
+                        for name, options in PRESETS.items()},
+            "info": dict(PRESET_INFO),
+            # Which widget corresponds to which mdp option, from the node
+            # itself rather than a second copy in the browser: the same map
+            # in two languages drifts, and this one decides what a preset
+            # shows you.
+            "widgets": dict(MdpNode._WIDGET_MAP),
+            # What GROMACS uses for an option nobody set, so a box can show
+            # that number too instead of the words "preset default".
+            "gromacs_defaults": dict(MdpNode._GROMACS_DEFAULTS),
+            "default_name": MdpNode.DEFAULT_NAME}
+
+
+def h_mdp_presets(self: Handler) -> None:
+    """The table above, for the editor (/api/mdp/presets)."""
+    self._json(mdp_presets_table())
 
 
 def h_flags(self: Handler) -> None:

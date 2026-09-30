@@ -11,6 +11,7 @@ required inputs are satisfied with dummy values.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -775,23 +776,156 @@ def check_mdp_boxes() -> None:
     Left empty, a box on "Run parameters (.mdp)" means "whatever the preset
     says", and used to say only "preset default" wherever the preset was
     silent -- and, in raw mode, everywhere, while quietly ignoring anything
-    typed there. tools/mdp_boxes.js checks the editor's side. Here: every
-    GROMACS default the server sends belongs to a box, so none is sent for
-    nothing.
+    typed there. tools/mdp_boxes.js checks the editor's side: the values the
+    boxes show, which boxes a run hides, the summary card and its warnings,
+    and the raw-mode layout, against the real presets. Here: every GROMACS
+    default the server sends belongs to a box, so none is sent for nothing,
+    and every box is held to what GROMACS 2026.3 itself accepts.
     """
     from comfygmx.nodes.util_nodes import MdpNode
+    from comfygmx import mdp_options as options
     stray = sorted(set(MdpNode._GROMACS_DEFAULTS) - set(MdpNode._WIDGET_MAP.values()))
     check(not stray, f"GROMACS defaults for options no box shows: {stray}")
+
+    # Every box is held to what GROMACS 2026.3 itself said: the option names
+    # it writes into mdout.mdp, and the values it lists as allowed. A box for
+    # an option GROMACS does not know would be written into every file and
+    # refused by grompp; a dropdown value it does not know, the same.
+    unknown = [b.key for b in options.BOXES
+               if options.squash(b.key) not in options.GROMACS_OPTIONS]
+    check(not unknown, f"run-parameter boxes for options GROMACS 2026.3 does not know: {unknown}")
+    refused = [(b.key, c) for b in options.BOXES if b.kind == "choice" for c in b.choices
+               if c and c.lower() not in {v.lower() for v in options.GROMACS_CHOICES.get(b.key, ())}]
+    check(not refused, f"dropdown values GROMACS 2026.3 would refuse: {refused}")
+    # Every box explained, and in the words the task asked for: what it is,
+    # and for most, the value usually used for each kind of run.
+    bare = [b.param for b in options.BOXES if len(b.help) < 120]
+    check(not bare, f"run-parameter boxes without a real explanation: {bare}")
+    # Drawers only from the list, and rules that name real boxes or the four
+    # facts the browser works out (see mdp_options.py).
+    names = {p.name for p in MdpNode.params} | {"_run", "_thermostat", "_barostat", "_annealing"}
+    loose = [b.section for b in options.BOXES if b.section and b.section not in options.SECTIONS]
+    check(not loose, f"run-parameter boxes in a drawer that is not listed: {loose}")
+    for param in MdpNode.params:
+        for clause in filter(None, str(param.when or "").split(" & ")):
+            name = clause.split("!=")[0].split("=")[0].strip()
+            check(name in names, f"box {param.name} is shown by a rule about '{name}', "
+                                 "which is neither a box nor a fact the page works out")
     node = shutil.which("node")
     if not node:
         print("run-parameter boxes: skipped -- node is not installed")
         return
+    # The test reads the real presets through Python: this same one.
     proc = subprocess.run([node, str(ROOT / "tools" / "mdp_boxes.js")],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True,
+                          env=dict(os.environ, COMFYGMX_PYTHON=sys.executable))
     check(proc.returncode == 0,
           "the run-parameter box test failed:\n" + (proc.stdout or proc.stderr))
-    print("run-parameter boxes: every value on show from the start, and raw mode "
-          "edits the text")
+    print("run-parameter boxes: every value on show from the start, only the boxes "
+          "the run uses, a true summary, and raw mode edits the text")
+
+
+def check_mdp_with_gromacs() -> None:
+    """GROMACS 2026.3 itself takes what the run-parameters block writes.
+
+    The self test above holds every box to the option names and values
+    GROMACS printed. This hands it the files: one run with every dynamics
+    box filled in with a usual value, one steepest-descent and one
+    conjugate-gradient minimisation, an sd run with reaction-field
+    electrostatics and a Brownian dynamics run, each written by the block
+    and read by gmx grompp on a small box of water, with no warning allowed.
+    Only where gmx is on the command path; the data folder is a new empty one.
+    """
+    gmx = shutil.which("gmx")
+    if not gmx:
+        print("run parameters with GROMACS: skipped, no gmx on the command path")
+        return
+    work = Path(tempfile.mkdtemp(prefix="mdp-grompp-"))
+    try:
+        _mdp_with_gromacs(gmx, work)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _mdp_with_gromacs(gmx: str, work: Path) -> None:
+    """check_mdp_with_gromacs, inside a work folder that is removed after."""
+    from comfygmx.nodes.util_nodes import MdpNode
+
+    env = dict(os.environ, LC_ALL="C")
+
+    def gmx_run(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run([gmx, *args], cwd=work, env=env,
+                              capture_output=True, text=True)
+
+    made = gmx_run("solvate", "-cs", "spc216.gro", "-box", "3.2", "3.2", "3.2",
+                   "-o", "water.gro")
+    if made.returncode:
+        check(False, "gmx solvate could not make the box of water:\n" + made.stderr[-600:])
+        return
+    waters = int((work / "water.gro").read_text().splitlines()[1]) // 3
+    (work / "water.top").write_text(
+        '#include "oplsaa.ff/forcefield.itp"\n#include "oplsaa.ff/spce.itp"\n\n'
+        f"[ system ]\nwater\n\n[ molecules ]\nSOL {waters}\n")
+
+    full = dict(
+        integrator="md", nsteps="100", dt="0.002", ref_t="300", pcoupl="C-rescale",
+        nstxout_compressed="50", tcoupl="V-rescale",
+        tc_grps="System", tau_t="0.1", nsttcouple="10", ref_p="1.0",
+        pcoupltype="isotropic", tau_p="5", compressibility="4.5e-5", nstpcouple="10",
+        refcoord_scaling="com", gen_vel="yes", gen_temp="300", gen_seed="7",
+        continuation="no", nstlog="100", nstenergy="100", nstcalcenergy="100",
+        nstxout="0", nstvout="0", nstfout="0", compressed_x_precision="1000",
+        nstlist="10", verlet_buffer_tolerance="-1", rlist="1.2", coulombtype="PME",
+        coulomb_modifier="Potential-shift", rcoulomb="1.0", epsilon_r="1",
+        fourierspacing="0.12", pme_order="4", ewald_rtol="1e-5", vdwtype="Cut-off",
+        vdw_modifier="Force-switch", rvdw="1.0", rvdw_switch="0.8", dispcorr="EnerPres",
+        constraints="h-bonds", constraint_algorithm="LINCS", lincs_order="4",
+        lincs_iter="1", lincs_warnangle="30", mass_repartition_factor="1",
+        comm_mode="Linear", nstcomm="100", comm_grps="System", annealing="single",
+        annealing_npoints="2", annealing_time="0 0.2", annealing_temp="300 310")
+    runs = {
+        "full": ("md_atomistic", full),
+        # -DFLEXIBLE because the water's topology uses it: GROMACS warns
+        # about a switch the topology does not use.
+        "steep": ("em_atomistic", dict(integrator="steep", nsteps="10", emtol="100",
+                                       emstep="0.01", define="-DFLEXIBLE",
+                                       energygrps="System",
+                                       freezegrps="System", freezedim="N N Y")),
+        "cg": ("em_atomistic", dict(integrator="cg", nsteps="10", emtol="100",
+                                    nstcgsteep="1000")),
+        "sd": ("md_atomistic", dict(integrator="sd", nsteps="100", dt="0.002",
+                                    tc_grps="System", tau_t="2", ref_t="300",
+                                    ld_seed="3", coulombtype="Reaction-Field",
+                                    epsilon_rf="0", epsilon_r="15", rcoulomb="1.1",
+                                    rvdw="1.1")),
+        "bd": ("md_atomistic", dict(integrator="bd", nsteps="100", dt="0.002",
+                                    tc_grps="System", tau_t="1", ref_t="300",
+                                    ld_seed="5", bd_fric="0")),
+    }
+    # Every box is in at least one of the runs, so none goes untried.
+    tried = set().union(*(set(boxes) for _, boxes in runs.values()))
+    untried = sorted((set(MdpNode._WIDGET_MAP) | {"define"}) - tried)
+    check(not untried, f"run-parameter boxes no GROMACS run tries: {untried}")
+
+    node = MdpNode()
+    for name, (preset, boxes) in runs.items():
+        params = dict(MdpNode.defaults())
+        params.update(mode="manual", preset=preset, filename=f"{name}.mdp", **boxes)
+        plan = node.plan(PlanContext("mdp", "util.mdp", params, {}, work, lambda p: p))
+        written = plan.outputs["mdp"]
+        (work / written).write_text(plan.files[written])
+        ran = gmx_run("grompp", "-f", written, "-c", "water.gro", "-p", "water.top",
+                      "-o", f"{name}.tpr", "-po", f"{name}_out.mdp", "-maxwarn", "0")
+        said = [line for line in (ran.stdout + ran.stderr).splitlines()
+                if line.startswith(("WARNING", "ERROR", "Fatal error"))]
+        check(ran.returncode == 0 and not said,
+              f"gmx grompp refused the {name} run the block wrote ({said}):\n"
+              + (ran.stdout + ran.stderr)[-800:])
+    version = subprocess.run([gmx, "--version"], capture_output=True, text=True).stdout
+    found = next((line.split(":", 1)[1].strip() for line in version.splitlines()
+                  if line.startswith("GROMACS version")), "?")
+    print(f"run parameters with GROMACS: {len(runs)} files the block wrote, every box "
+          f"filled in at least once, all taken by gmx grompp {found} with no warning")
 
 
 def check_trajectory_groups() -> None:
@@ -3175,6 +3309,7 @@ CHECKS = (
     check_side_panels,
     check_param_boxes,
     check_mdp_boxes,
+    check_mdp_with_gromacs,
     check_viewer_turn,
     check_file_picker,
     check_port_in_use,
