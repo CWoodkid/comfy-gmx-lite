@@ -606,6 +606,131 @@ def check_export() -> None:
           f"-maxh {chain.get('maxh', 0):g}")
 
 
+def check_same_name_inputs() -> None:
+    """Two different files with the same name reach a block as two files.
+
+    Everything a block is given is put into its one work folder under its own
+    name. Two files called conf.gro -- a box and a molecule from two other
+    blocks -- used to land on top of each other, and Insert molecules put the
+    box into itself. Compare graphs named its own inputs, but only in a run:
+    the command preview and an exported folder still used the old names, and
+    the exported script copied files that were not there. The second file now
+    arrives as 2_conf.gro -- in a run, in the preview and in an export alike.
+    """
+    from comfygmx.executor import make_stage, preview_node
+    from comfygmx.export import ExportError, export_workflow
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for run, text in (("runA", "first run\n"), ("runB", "second run\n"),
+                          ("runC", "third run\n")):
+            (root / run).mkdir()
+            (root / run / "md.xtc").write_text(text)
+            (root / run / "conf.gro").write_text(
+                f"{run}\n    1\n    1SOL     OW    1   0.100   0.100   0.100\n"
+                "   3.00000   3.00000   3.00000\n")
+            (root / run / "rmsd.xvg").write_text(f"0 {len(run)}\n")
+        (root / "runA" / "posre.itp").write_text("; restraints\n")
+
+        # Staging itself, as a run does it.
+        work = root / "work"
+        work.mkdir()
+        stage = make_stage(work, dry=False)
+        names = [
+            stage({"kind": "file", "path": str(root / "runA" / "md.xtc"),
+                   "name": "md.xtc", "extra": [str(root / "runA" / "posre.itp")]}),
+            stage({"kind": "file", "path": str(root / "runB" / "md.xtc"),
+                   "name": "md.xtc"}),
+            stage(str(root / "runC" / "md.xtc")),
+            # The same file twice is one file, under one name.
+            stage({"kind": "file", "path": str(root / "runA" / "md.xtc"),
+                   "name": "md.xtc"}),
+        ]
+        check(names == ["md.xtc", "2_md.xtc", "3_md.xtc", "md.xtc"],
+              f"three runs' md.xtc were staged as {names}")
+        held = {name: (work / name).read_text() if (work / name).is_file() else None
+                for name in ("md.xtc", "2_md.xtc", "3_md.xtc")}
+        check(held == {"md.xtc": "first run\n", "2_md.xtc": "second run\n",
+                       "3_md.xtc": "third run\n"},
+              f"the staged copies do not hold their own runs: {held}")
+        check((work / "posre.itp").is_file(),
+              "a file travelling with an input did not arrive under its own name")
+        asked = stage({"kind": "file", "path": str(root / "runB" / "md.xtc"),
+                       "name": "md.xtc"}, as_name="second.xtc")
+        check(asked == "second.xtc" and (work / "second.xtc").is_file()
+              and (work / "second.xtc").read_text() == "second run\n",
+              f"a file asked for as second.xtc arrived as {asked}")
+
+        # A box and a molecule both called conf.gro, and two graphs both
+        # called rmsd.xvg, planned the way the preview and the check do it.
+        graph = {"nodes": [
+            {"id": "box_a", "type": "io.file", "pos": [0, 0],
+             "params": {"path": str(root / "runA" / "conf.gro")}},
+            {"id": "mol_b", "type": "io.file", "pos": [0, 250],
+             "params": {"path": str(root / "runB" / "conf.gro")}},
+            {"id": "fill", "type": "gmx.insert_molecules", "pos": [300, 0],
+             "params": {}},
+            {"id": "rmsd_a", "type": "io.file", "pos": [0, 500],
+             "params": {"path": str(root / "runA" / "rmsd.xvg")}},
+            {"id": "rmsd_b", "type": "io.file", "pos": [0, 750],
+             "params": {"path": str(root / "runB" / "rmsd.xvg")}},
+            {"id": "both", "type": "view.compare", "pos": [300, 500],
+             "params": {}}],
+            "links": [
+            {"from_node": "box_a", "from_port": "file", "to_node": "fill",
+             "to_port": "structure"},
+            {"from_node": "mol_b", "from_port": "file", "to_node": "fill",
+             "to_port": "insert"},
+            {"from_node": "rmsd_a", "from_port": "file", "to_node": "both",
+             "to_port": "first"},
+            {"from_node": "rmsd_b", "from_port": "file", "to_node": "both",
+             "to_port": "second"}]}
+        plans = dry_plan(Graph(graph), Settings())
+        for node_id in ("fill", "both"):
+            check(not plans[node_id].get("error"),
+                  f"{node_id} would not plan: {plans[node_id].get('error')}")
+        if plans["fill"].get("error") or plans["both"].get("error"):
+            return
+        filled = " ".join(plans["fill"]["_plan"].steps[0].argv)
+        check("-ci conf.gro " in filled and "-f 2_conf.gro " in filled,
+              f"insert-molecules is not given the box and the molecule: {filled}")
+        compared = " ".join(plans["both"]["_plan"].steps[0].argv)
+        check(" first_rmsd.xvg " in compared and " second_rmsd.xvg " in compared,
+              f"the preview of compare graphs does not use the names the run "
+              f"uses: {compared}")
+        preview = preview_node(Graph(graph), "fill", Settings())
+        shown = " ".join(step["command"] for step in preview.get("steps", []))
+        check("-ci conf.gro " in shown and "-f 2_conf.gro " in shown,
+              f"the command preview does not match the run: {shown}")
+
+        # Exported, each file is copied from where it really is.
+        dest = root / "bundle"
+        try:
+            export_workflow(graph, Settings(), dest)
+        except ExportError as exc:
+            failures.append(f"same-name export: {exc}")
+            return
+        steps = [f for f in dest.iterdir() if f.is_dir() and re.match(r"\d+_", f.name)]
+        scripts = {f.name.split("_", 1)[1]: (f / "command.sh").read_text() for f in steps}
+        folder = {f.name.split("_", 1)[1]: f.name for f in steps}
+        check(f"cp -f ../{folder['mol_b']}/conf.gro ./conf.gro" in scripts["fill"]
+              and f"cp -f ../{folder['box_a']}/conf.gro ./2_conf.gro" in scripts["fill"],
+              "the exported insert-molecules does not copy the box and the "
+              "molecule from where they are")
+        check(f"cp -f ../{folder['rmsd_a']}/rmsd.xvg ./first_rmsd.xvg" in scripts["both"]
+              and f"cp -f ../{folder['rmsd_b']}/rmsd.xvg ./second_rmsd.xvg" in scripts["both"],
+              "THE POINT: the exported compare graphs copies files that the steps "
+              "before it never write")
+        stored = {p.name: p.read_text().splitlines()[0] for p in (dest / "inputs").iterdir()
+                  if p.name.endswith(".gro")}
+        check(stored == {"conf.gro": "runA", "2_conf.gro": "runB"},
+              f"inputs/ does not hold both structures: {stored}")
+
+    print("same-name inputs: 3 runs' md.xtc kept apart; a box and a molecule "
+          "both called conf.gro, and two rmsd.xvg compared, alike in a run, a "
+          "preview and an export")
+
+
 def check_forms() -> None:
     """Every box that names a fill-in-the-blanks form has one.
 
@@ -3527,6 +3652,7 @@ CHECKS = (
     check_plans,
     check_dry_run,
     check_export,
+    check_same_name_inputs,
     check_chain_names,
     check_load_structure,
     check_clean_cif,

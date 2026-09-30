@@ -71,6 +71,13 @@ class Staged:
     is_dir: bool = False
     #: Node id that produces it, or "" when it comes from outside the export.
     origin: str = ""
+    #: Where it sits in the folder of the node that writes it. Not always
+    #: ``name``: a file that arrives here as 2_md.xtc, because another input
+    #: was already called md.xtc, is still md.xtc over there.
+    inside: str = ""
+    #: Its name in inputs/, for a file from outside the export. Two outside
+    #: files with the same name are given different ones.
+    stored: str = ""
 
 
 @dataclass
@@ -397,9 +404,9 @@ def _command_script(item: Exported, dirnames: Dict[str, str], toolbox: Toolbox,
     copies: List[str] = []
     for staged in item.staged:
         if staged.origin:
-            source = f"../{dirnames[staged.origin]}/{staged.name}"
+            source = f"../{dirnames[staged.origin]}/{staged.inside or staged.name}"
         else:
-            source = f"../inputs/{staged.name}"
+            source = f"../inputs/{staged.stored or staged.name}"
         flag = "-r " if staged.is_dir else ""
         copies.append(f"cp -f {flag}{shlex.quote(source)} ./{shlex.quote(staged.name)}")
     for origin, pattern in item.globs:
@@ -425,6 +432,7 @@ def _command_script(item: Exported, dirnames: Dict[str, str], toolbox: Toolbox,
             out.append(f"sed{expr} {shlex.quote(name + '.in')} > {shlex.quote(name)}")
         out.append("")
 
+    stored = {str(e.source): e.stored for e in item.imported if e.stored}
     last_tool = ""
     for step in item.plan.steps:
         if step.imports:
@@ -432,7 +440,8 @@ def _command_script(item: Exported, dirnames: Dict[str, str], toolbox: Toolbox,
             # this. Rewritten to the copy that travelled in inputs/, which is
             # the whole point of putting the file there.
             for entry in step.imports:
-                name = Path(entry["source"]).name
+                source = Path(entry["source"])
+                name = stored.get(str(source), source.name)
                 out.append(f"cp -f ../inputs/{shlex.quote(name)} "
                            f"./{shlex.quote(entry['local'])}")
             out.append("")
@@ -1003,7 +1012,7 @@ def _methods(items: Sequence[Exported], toolbox: Toolbox, graph_data: Dict[str, 
                 human = f"{size/1e6:.1f} MB" if size >= 1e6 else f"{size/1e3:.1f} kB"
             except OSError:
                 human = "?"
-            lines.append(f"| `{staged.name}` | {human} | `{staged.source}` |")
+            lines.append(f"| `{staged.stored or staged.name}` | {human} | `{staged.source}` |")
 
     lines += ["", "## The graph", "",
               "`workflow.json` is the workflow this came from; opening it in "
@@ -1113,10 +1122,11 @@ def export_workflow(
                     continue
                 root = scratch / dirnames[source_id]
                 try:
-                    entry.source.relative_to(root)
+                    inside = entry.source.relative_to(root)
                 except ValueError:
                     continue
                 entry.origin = source_id
+                entry.inside = inside.as_posix()
                 break
 
         item = Exported(node_id=node_id, node_type=graph.nodes[node_id].get("type", ""),
@@ -1155,6 +1165,19 @@ def export_workflow(
         raise ExportError("this export would not run:\n  - "
                           + "\n  - ".join(blocked) + hint)
 
+    # One name in inputs/ for each file from outside. Two different files with
+    # the same name -- md.xtc from two runs -- used to share a single copy
+    # there, and every step that wanted either of them was handed the first.
+    holders: Dict[str, str] = {}      # name in inputs/ -> the file it holds
+    for entry in external:
+        key = str(entry.source)
+        name, number = entry.source.name, 1
+        while holders.get(name, key) != key:
+            number += 1
+            name = f"{number}_{entry.source.name}"
+        holders[name] = key
+        entry.stored = name
+
     # -- write it out ---------------------------------------------------
     shutil.rmtree(scratch, ignore_errors=True)
     for node_id in wanted:
@@ -1187,7 +1210,7 @@ def export_workflow(
         inputs_dir.mkdir(exist_ok=True)
     copied_bytes = 0
     for entry in external:
-        target = inputs_dir / entry.name
+        target = inputs_dir / (entry.stored or entry.name)
         if target.exists():
             continue
         if not copy_inputs:
@@ -1204,7 +1227,7 @@ def export_workflow(
         (inputs_dir / "MANIFEST.txt").write_text(
             "# Bring these here before running. One per line: name, then where\n"
             "# it was on the machine this was exported from.\n"
-            + "".join(f"{e.name}\t{e.source}\n" for e in external))
+            + "".join(f"{e.stored or e.name}\t{e.source}\n" for e in external))
 
     for item in items:
         target = dest / item.dirname

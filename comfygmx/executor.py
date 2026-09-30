@@ -258,8 +258,29 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
     stage instead of staging it -- the local names a command line refers to
     have to be exactly the ones a real run would produce, and the only way to
     guarantee that is to run the same code.
+
+    Everything a node takes in lands in its one work folder under its own
+    name. Two different files that share a name -- md.xtc from two runs,
+    handed to one trjcat -- used to land on top of each other: the second copy
+    replaced the first, the command named the same file twice, and the node
+    reported success. Now the second one gets a number in front, 2_md.xtc.
+    Only an input's own file is renamed. The files that travel with it (the
+    .itp files beside a topology, a force field folder) keep their names,
+    because whatever uses them looks for them by name.
     """
     record = on_file is not None or on_dir is not None
+    # Name in the work folder -> the file it holds. Made afresh for every
+    # node, so the numbering starts again in each node's folder.
+    taken: Dict[str, str] = {}
+
+    def own_name(identity: str, wanted: str) -> str:
+        """``wanted``, or 2_wanted, 3_wanted ... when a different file has it."""
+        name, number = wanted, 1
+        while taken.get(name, identity) != identity:
+            number += 1
+            name = f"{number}_{wanted}"
+        taken[name] = identity
+        return name
 
     def bring(source: Path, name: Optional[str] = None) -> None:
         target = workdir / (name or source.name)
@@ -271,21 +292,17 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
     def stage(value: Any, as_name: Optional[str] = None) -> Optional[str]:
         """Put one input into the work folder, and say what it is called there.
 
-        ``as_name`` puts the input's own file there under that name rather than
-        its own. Everything a node takes in shares the one folder, so two
-        inputs that happen to have the same name -- ice.xvg from two runs of
-        the same analysis -- would otherwise land on top of each other, and the
-        node would read one file twice. The files that travel with an input
-        (the .itp files beside a topology, a force field folder) keep their
-        names, because whatever uses them looks for them by name.
+        ``as_name`` asks for the input's own file to arrive under that name
+        rather than its own (see :meth:`PlanContext.inp_as`).
         """
         if value is None:
             return None
         if isinstance(value, str):
             source = Path(value)
+            name = own_name(value, as_name or source.name)
             if record or not dry:
-                bring(source, as_name)
-            return as_name or source.name
+                bring(source, name)
+            return name
         if not isinstance(value, dict):
             return None
 
@@ -298,12 +315,21 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
         for directory in value.get("dirs") or []:
             _stage_dir(Path(directory), workdir, dry, on_dir)
 
+        # The input's own file. Before anything has run there is no file yet,
+        # only the name the node upstream will write it under. The preview has
+        # to number it exactly as the run will, or the command it shows is not
+        # the command that runs.
+        own = value.get("path")
+        if not own and kind in ("file", "topology"):
+            own = value.get("name")
         names: List[str] = []
-        if value.get("path"):
-            source = Path(value["path"])
-            names.append(as_name or source.name)
-            if record or not dry:
-                bring(source, as_name)
+        staged_as = None
+        if own:
+            identity = value.get("path") or f"<{value.get('made_by', '')}>/{own}"
+            staged_as = own_name(identity, as_name or Path(own).name)
+            names.append(staged_as)
+            if value.get("path") and (record or not dry):
+                bring(Path(value["path"]), staged_as)
         for extra in value.get("extra") or []:
             source = Path(extra)
             if record or not dry:
@@ -318,13 +344,17 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
                             bring(match)
                         if not names:
                             names.append(match.name)
+        # A file that had to take a number, or was asked for under another
+        # name, is called that, whatever name it was handed on under.
+        if staged_as and staged_as != Path(own).name and (
+                not value.get("name")
+                or Path(value["name"]).name == Path(own).name):
+            return staged_as
         # Only the last part of the name. A node may declare an output that
         # sits in a folder of its own -- "pylipid/sites_summary.csv" -- but
         # staging copies the file itself into the next node's folder and
         # nothing else. Handing on the name with the folder still on it points
         # the next node at a folder that is not there.
-        if as_name and value.get("path"):
-            return as_name
         if value.get("name"):
             plain = Path(value["name"]).name
             if plain not in names:
@@ -422,6 +452,12 @@ def dry_plan(graph: Graph, settings: Settings) -> Dict[str, Dict[str, Any]]:
                 }
             else:
                 outputs[port] = {"kind": "text", "value": value}
+        # Which node writes each file. Before anything has run, that is the
+        # only way to tell two files of the same name apart -- md.xtc from two
+        # different runs -- and staging has to, to give the second a number.
+        for described in outputs.values():
+            if described["kind"] in ("file", "topology", "bundle"):
+                described["made_by"] = node_id
         produced[node_id] = outputs
         entry["outputs"] = outputs
         entry["notes"] = plan.notes
