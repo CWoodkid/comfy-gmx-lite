@@ -1241,6 +1241,13 @@ const Editor = {
         originY + (node.pos ? node.pos[1] : 0),
         node.params || {}, keep);
       if (!made) continue;
+      // A block that arrives switched off stays off, as it does when a saved
+      // workflow is opened. A tutorial can then ship a part that Run leaves
+      // out until somebody switches it on.
+      if (node.off) {
+        made.off = true;
+        this._refreshNodeElement(made);
+      }
       mapping[node.id] = made.id;
       created.push(made.id);
     }

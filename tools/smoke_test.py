@@ -211,7 +211,23 @@ def check_tutorials() -> None:
             params = node.setdefault("params", {})
             if node["type"] == "gmx.forcefield" and not params.get("path"):
                 params["path"] = "/tmp/example.ff"
-        for node_id, entry in dry_plan(Graph(prepared), Settings()).items():
+        # A part shipped switched off is left out of the plan above, so it is
+        # planned a second time with everything switched on: whoever switches
+        # it on must find it wired right.
+        graphs = [prepared]
+        if any(node.get("off") for node in prepared["nodes"]):
+            switched_on = json.loads(json.dumps(prepared))
+            for node in switched_on["nodes"]:
+                node.pop("off", None)
+            graphs.append(switched_on)
+            left_out = set(Graph(prepared).left_out)
+            off = {node["id"] for node in prepared["nodes"] if node.get("off")}
+            check(left_out == off,
+                  f"tutorial {tutorial['id']}: the part shipped switched off takes "
+                  f"other blocks with it: {sorted(left_out - off)}")
+        entries = [item for graph_data in graphs
+                   for item in dry_plan(Graph(graph_data), Settings()).items()]
+        for node_id, entry in entries:
             if not entry.get("error"):
                 continue
             # This suite checks the checkout, not the machine it runs on. A
@@ -373,7 +389,7 @@ def check_plans() -> None:
         workdir = Path("/tmp/comfygmx-smoke")
         ctx = PlanContext(
             node_id="smoke", node_type=spec["type"], params=params, inputs=inputs,
-            workdir=workdir, stage=lambda value: (value or {}).get("name") or "in.dat",
+            workdir=workdir, stage=lambda value, as_name=None: as_name or (value or {}).get("name") or "in.dat",
             settings=settings, dry=True,
         )
         try:
@@ -1491,7 +1507,7 @@ def check_load_structure() -> None:
         ctx = PlanContext(
             node_id="load", node_type="io.structure", params=values, inputs={},
             workdir=Path(folder or "/tmp/comfygmx-smoke"),
-            stage=lambda value: (value or {}).get("name") or "in.dat",
+            stage=lambda value, as_name=None: as_name or (value or {}).get("name") or "in.dat",
             settings=settings, dry=False,
         )
         return cls().plan(ctx)
@@ -3146,7 +3162,10 @@ MEASURED_NOTE_HEIGHTS = [
     # Measured 2026-09-26 in the browser, note card 536 px wide, after the
     # two runs at 300 K and 200 K became one heating run.
     (328, "note_what"), (360, "note_build"), (440, "note_heat"),
-    (519, "note_read"),
+    # Measured 2026-09-30 in the app's own browser pane, after the drop
+    # measure and the salt box came in. There the three above measure 1 px
+    # shorter than they did on 2026-09-26, so those keep their larger numbers.
+    (614, "note_read"), (518, "note_salt"),
 ]
 
 
@@ -3225,6 +3244,221 @@ def check_tutorials_measured() -> None:
     packaged = sum(1 for t in TUTORIALS if t.get("status") == "packaged")
     print(f"tutorial results: {packaged - len(missing)}/{packaged} packaged "
           f"tutorials say what they came out as")
+
+
+def check_salty_ice() -> None:
+    """Salt in the Ice crystal block, the two blocks that set pure water beside
+    salty, and the ice tutorial's switched-off salt box.
+
+    What has to stay true:
+
+      * pure ice is built exactly as before the salt boxes existed, and keeps
+        the cache signature it had, so nothing already run from it runs again
+      * salt goes in as whole pairs, each ion where a molecule's oxygen was, no
+        two ions closer than 0.5 nm, the charges adding up to zero, the
+        hydrogens of the rest untouched -- and GROMACS takes the topology
+      * "Water in the drop" counts water that stays in the drop, not gas that
+        brushes past it for a frame, and it sees a drop across the box's edge
+      * "Compare graphs" reads each run's own file when the two have the same
+        name. The second ice.xvg used to land on top of the first, and the
+        block drew the salty run against itself.
+    """
+    work = Path(tempfile.mkdtemp(prefix="comfygmx-salt-"))
+    try:
+        _salty_ice(work)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _salty_ice(work: Path) -> None:
+    """check_salty_ice, inside a work folder that is removed after."""
+    import math
+    from comfygmx.executor import make_stage
+    from comfygmx.graph import _canonical, _effective_params
+    from comfygmx.nodes.ice_nodes import _COUNT_DROP, _MAKE_ICE
+    from comfygmx.nodes.view_nodes import CompareNode
+    from comfygmx.tutorials import get as tutorial
+
+    # ---- the builder ------------------------------------------------------
+    (work / "make_ice.py").write_text(_MAKE_ICE)
+
+    def build(tag: str, *extra: str):
+        folder = work / tag
+        folder.mkdir()
+        proc = subprocess.run(
+            [sys.executable, str(work / "make_ice.py"), "--cells", "6", "4", "4",
+             "--seed", "1", "--gro", "ice.gro", "--top", "ice.top",
+             "--ndx", "ice.ndx", *extra],
+            cwd=folder, capture_output=True, text=True)
+        return folder, proc
+
+    def atoms(gro: Path):
+        lines = gro.read_text().splitlines()
+        return [(line[5:10].strip(), line[10:15].strip(),
+                 tuple(float(line[20 + 8 * k:28 + 8 * k]) for k in range(3)))
+                for line in lines[2:2 + int(lines[1])]]
+
+    def groups(ndx: Path):
+        found, name = {}, None
+        for line in ndx.read_text().splitlines():
+            if line.startswith("["):
+                name = line.strip("[] ")
+                found[name] = []
+            elif line.strip():
+                found[name] += [int(v) for v in line.split()]
+        return found
+
+    pure, made = build("pure")
+    zero, made_zero = build("zero", "--salt", "0")
+    salty, made_salty = build("salty", "--salt", "26")
+    check(made.returncode == 0 and made_zero.returncode == 0 and made_salty.returncode == 0,
+          "salty ice: the builder failed:\n"
+          + (made.stderr or made_zero.stderr or made_salty.stderr)[-600:])
+    if made.returncode or made_zero.returncode or made_salty.returncode:
+        return
+    for name in ("ice.gro", "ice.top", "ice.ndx"):
+        check((pure / name).read_bytes() == (zero / name).read_bytes(),
+              f"salty ice: --salt 0 does not give the same {name} as no salt at all")
+    check(set(groups(pure / "ice.ndx")) == {"Oxygens"},
+          "salty ice: pure ice's index has more than the Oxygens group")
+
+    before, after = atoms(pure / "ice.gro"), atoms(salty / "ice.gro")
+    ions = [a for a in after if a[0] in ("NA", "CL")]
+    water = [a for a in after if a[0] == "SOL"]
+    check(len(ions) == 52 and sum(a[0] == "NA" for a in ions) == 26
+          and len(water) == 4 * 716,
+          f"salty ice: 26 pairs gave {len(ions)} ions and {len(water) // 4} "
+          "water molecules, not 52 and 716")
+    # Every ion where an oxygen was, and every water that is left exactly as
+    # it was: the salt must not move the hydrogens of the rest.
+    oxygens = {a[2] for a in before if a[1] == "OW"}
+    check(all(a[2] in oxygens for a in ions),
+          "salty ice: an ion is not where a molecule's oxygen was")
+    old = {a[2] for a in before}
+    check(all(a[2] in old for a in water),
+          "THE POINT: putting salt in moved atoms of the water that stayed")
+    closest = min(math.dist(a[2], b[2]) for i, a in enumerate(ions) for b in ions[i + 1:])
+    check(closest >= 0.5 - 0.0015,
+          f"salty ice: two ions start {closest:.3f} nm apart, closer than 0.5 nm")
+    index = groups(salty / "ice.ndx")
+    check(len(index.get("Oxygens", [])) == 716 and len(index.get("Ions", [])) == 52
+          and len(index.get("Oxygens_and_ions", [])) == 768,
+          f"salty ice: the index groups are {[(k, len(v)) for k, v in index.items()]}")
+    top = (salty / "ice.top").read_text()
+    molecules = top.split("[ molecules ]")[-1].split()
+    counts = {molecules[i]: int(molecules[i + 1])
+              for i in range(0, len(molecules) - 1)
+              if molecules[i] in ("SOL", "NA", "CL")}
+    check(counts == {"SOL": 716, "NA": 26, "CL": 26},
+          f"salty ice: the topology lists {counts}")
+    too_much = subprocess.run(
+        [sys.executable, str(work / "make_ice.py"), "--cells", "6", "4", "4",
+         "--salt", "400", "--gro", "x.gro", "--top", "x.top", "--ndx", "x.ndx"],
+        cwd=work, capture_output=True, text=True)
+    check(too_much.returncode != 0 and "room for only" in too_much.stderr,
+          "salty ice: asking for more salt than fits does not say so")
+
+    gmx = shutil.which("gmx")
+    if gmx:
+        env = dict(os.environ, LC_ALL="C")
+        (salty / "min.mdp").write_text(
+            "integrator = steep\nnsteps = 10\ncutoff-scheme = Verlet\n"
+            "coulombtype = PME\nrcoulomb = 1.0\nrvdw = 1.0\n")
+        boxed = subprocess.run([gmx, "editconf", "-f", "ice.gro", "-o", "cube.gro",
+                                "-bt", "cubic", "-box", "5.5", "-c"],
+                               cwd=salty, env=env, capture_output=True, text=True)
+        pre = subprocess.run([gmx, "grompp", "-f", "min.mdp", "-c", "cube.gro",
+                              "-p", "ice.top", "-o", "em.tpr"],
+                             cwd=salty, env=env, capture_output=True, text=True)
+        check(boxed.returncode == 0 and pre.returncode == 0,
+              "salty ice: GROMACS does not take the salty topology:\n"
+              + (boxed.stderr or pre.stderr)[-800:])
+        check("non-zero total charge" not in pre.stderr,
+              "salty ice: the salty system is not neutral")
+
+    # The pure block's cache signature: the salt boxes start empty, and empty
+    # boxes are left out of it, so it is the signature it had before.
+    plain = {"type": "build.ice",
+             "params": {"cells_x": 6, "cells_y": 4, "cells_z": 4, "seed": 1}}
+    sent = {"type": "build.ice", "params": dict(plain["params"], salt="", salt_seed="")}
+    signed = _canonical(_effective_params(plain))
+    check("salt" not in signed and "salt_seed" not in signed
+          and signed == _canonical(_effective_params(sent)),
+          "THE POINT: pure ice's signature now includes the salt boxes, so every "
+          "run made from a block of ice before they existed would run again")
+
+    # ---- Water in the drop ------------------------------------------------
+    # A drop of 27 molecules on a grid 0.28 nm apart, lying across the box's
+    # edge in x, with a sodium and a chloride stuck to it; five gas molecules
+    # far away. In the middle frame one gas molecule touches the drop.
+    def frame(t, touching):
+        rows = [("SOL", "OW", (x, y, z)) for x in (3.72, 0.0, 0.28)
+                for y in (1.0, 1.28, 1.56) for z in (1.0, 1.28, 1.56)]
+        gas = [(2.0, 3.0, z) for z in (0.2, 1.0, 1.8, 2.6, 3.4)]
+        if touching:
+            gas[0] = (0.56, 1.0, 1.0)
+        rows += [("SOL", "OW", p) for p in gas]
+        rows += [("NA", "NA", (0.0, 1.0, 1.84)), ("CL", "CL", (0.0, 1.28, 1.84))]
+        lines = [f"drop test t= {t:.5f} step= 0\n", f"{len(rows):5d}\n"]
+        for i, (res, name, p) in enumerate(rows, 1):
+            lines.append("%5d%-5s%5s%5d%8.3f%8.3f%8.3f\n" % (i, res, name, i, *p))
+        lines.append("   4.00000   4.00000   4.00000\n")
+        return "".join(lines)
+
+    (work / "count_drop.py").write_text(_COUNT_DROP)
+    (work / "frames.gro").write_text(frame(0, False) + frame(0.5, True) + frame(1, False))
+    counted = subprocess.run([sys.executable, "count_drop.py", "frames.gro", "drop.xvg"],
+                             cwd=work, capture_output=True, text=True)
+    check(counted.returncode == 0,
+          "water in the drop: the counter failed:\n" + counted.stderr[-600:])
+    if counted.returncode == 0:
+        text = (work / "drop.xvg").read_text()
+        shares = [float(line.split()[1]) for line in text.splitlines()
+                  if line.strip() and line[0] not in "#@"]
+        check(shares == [84.38, 84.38, 84.38],
+              "THE POINT: water in the drop counts gas that touched the drop for "
+              f"one frame, or misses the drop across the box's edge ({shares}; "
+              "27 of the 32 water molecules, 84.38 %, in every frame)")
+        check("(32 molecules)" in text and '@ s0 legend "in the drop"' in text,
+              "water in the drop: the file does not say how many molecules, or "
+              "has no legend")
+
+    # ---- Compare graphs ---------------------------------------------------
+    run_a, run_b, folder = work / "run_a", work / "run_b", work / "compare"
+    for path in (run_a, run_b, folder):
+        path.mkdir()
+    head = '@    title "{0}"\n@    xaxis  label "Time (ps)"\n@    yaxis  label "{1}"\n'
+    (run_a / "ice.xvg").write_text(head.format("pure", "Molecules in ice") + "".join(
+        f"{x} {x}\n" for x in range(11)))
+    (run_b / "ice.xvg").write_text(head.format("salty", "Molecules in ice") + "".join(
+        f"{x} {2 * x}\n" for x in range(0, 13, 2)))
+    inputs = {port: {"kind": "file", "path": str(run / "ice.xvg"), "name": "ice.xvg"}
+              for port, run in (("first", run_a), ("second", run_b))}
+    params = dict(CompareNode.defaults(), name_first="pure water", name_second="with salt")
+    ctx = PlanContext(node_id="cmp", node_type="view.compare", params=params,
+                      inputs=inputs, workdir=folder,
+                      stage=make_stage(folder, dry=False), settings=None, dry=False)
+    plan = CompareNode().plan(ctx)
+    for name, body in plan.files.items():
+        (folder / name).write_text(body)
+    argv = [str(v) for v in plan.steps[0].argv]
+    drew = subprocess.run([sys.executable, *argv[1:]], cwd=folder,
+                          capture_output=True, text=True)
+    check(drew.returncode == 0, "compare graphs: the script failed:\n" + drew.stderr[-600:])
+    if drew.returncode == 0:
+        out = (folder / "compare.xvg").read_text()
+        rows = [[float(v) for v in line.split()] for line in out.splitlines()
+                if line.strip() and line[0] not in "#@"]
+        check(len(rows) == 11 and rows[3] == [3.0, 3.0, 6.0],
+              "THE POINT: compare graphs drew one run against itself, or read the "
+              f"second graph wrong between its points (at 3 ps: {rows[3] if rows else None}; "
+              "the pure run has 3 there and the salty one, saved every 2 ps, 6)")
+        check('@ s0 legend "pure water"' in out and '@ s1 legend "with salt"' in out,
+              "compare graphs: the key does not carry the names given")
+    print("salty ice: pure ice built and signed as before; 26 pairs in the "
+          "oxygens' places, 0.5 nm apart, neutral"
+          + (", taken by GROMACS" if gmx else " (GROMACS not on the path)")
+          + "; gas brushing the drop not counted; two ice.xvg compared as two")
 
 
 def check_box_maths() -> None:
@@ -3333,6 +3567,7 @@ CHECKS = (
     check_doc_counts,
     check_note_heights,
     check_tutorials_measured,
+    check_salty_ice,
 )
 
 

@@ -438,4 +438,193 @@ class PreviewTrajectoryNode(Node):
         return plan
 
 
-NODES = [PreviewStructureNode, PreviewPlotNode, PreviewTrajectoryNode]
+_COMPARE = r'''#!/usr/bin/env python3
+"""Put the same line from two or three graph files into one graph.
+
+The first file sets the points along the bottom axis. The line from each other
+file is read off at those points, joining its own points with straight lines,
+so runs saved at different intervals still line up. Only the stretch that
+every file covers is kept, so no line runs off into nothing. Needs nothing but
+Python.
+
+usage: compare.py out.xvg [--column N] [--title T] NAME FILE NAME FILE [NAME FILE]
+"""
+
+import argparse
+import bisect
+import sys
+
+
+def quoted(line):
+    parts = line.split('"')
+    return parts[1] if len(parts) >= 3 else ""
+
+
+def read(path, column):
+    """The title, the two axis labels and the points of one graph file."""
+    title = xlabel = ylabel = ""
+    points = []
+    with open(path, errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("@"):
+                low = line.lower()
+                if " title " in low:
+                    title = quoted(line)
+                elif "xaxis" in low and "label" in low:
+                    xlabel = quoted(line)
+                elif "yaxis" in low and "label" in low:
+                    ylabel = quoted(line)
+                continue
+            try:
+                values = [float(v) for v in line.split()]
+            except ValueError:
+                continue
+            if len(values) > column:
+                points.append((values[0], values[column]))
+    points.sort()
+    return title, xlabel, ylabel, [p[0] for p in points], [p[1] for p in points]
+
+
+def height(xs, ys, x):
+    """The line's height at x, joining its points with straight lines."""
+    i = bisect.bisect_left(xs, x)
+    if i < len(xs) and xs[i] == x:
+        return ys[i]
+    lo, hi = i - 1, i
+    share = (x - xs[lo]) / (xs[hi] - xs[lo])
+    return ys[lo] + share * (ys[hi] - ys[lo])
+
+
+def clean(text):
+    return text.replace('"', "'")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Put the same line from several "
+                                             "graph files into one graph.")
+    ap.add_argument("out")
+    ap.add_argument("pairs", nargs="+", metavar="NAME FILE")
+    ap.add_argument("--column", type=int, default=1,
+                    help="which line of each file: 1 is the first")
+    ap.add_argument("--title", default="")
+    args = ap.parse_args(argv)
+    if len(args.pairs) % 2 or len(args.pairs) < 4:
+        sys.exit("give a name and a file for each graph, and at least two graphs")
+
+    graphs = []
+    for name, path in zip(args.pairs[0::2], args.pairs[1::2]):
+        title, xlabel, ylabel, xs, ys = read(path, args.column)
+        if len(xs) < 2:
+            sys.exit(f"{path} has fewer than two points in line {args.column}: is "
+                     f"it a graph, and does it have that many lines?")
+        graphs.append((name, path, title, xlabel, ylabel, xs, ys))
+        print(f"{name}: {path}, {len(xs)} points, from {xs[0]:g} to {xs[-1]:g}")
+
+    low = max(g[5][0] for g in graphs)
+    high = min(g[5][-1] for g in graphs)
+    if low > high:
+        sys.exit("the graphs do not overlap along the bottom axis, so there is "
+                 "nothing to compare")
+    for label, which in (("bottom axes", 3), ("side axes", 4)):
+        names = sorted({g[which] for g in graphs if g[which]})
+        if len(names) > 1:
+            print(f"note: the {label} are labelled differently ("
+                  + ", ".join(f"'{n}'" for n in names)
+                  + "): are these the same measurement? The first one's label is used")
+
+    first = graphs[0]
+    xs = [x for x in first[5] if low <= x <= high]
+    with open(args.out, "w") as fh:
+        fh.write("# written by Comfy-gmx's 'Compare graphs' block\n")
+        fh.write("# columns: " + ", ".join([first[3] or "x"] + [g[0] for g in graphs]) + "\n")
+        fh.write(f'@    title "{clean(args.title or first[2])}"\n')
+        fh.write(f'@    xaxis  label "{clean(first[3])}"\n')
+        fh.write(f'@    yaxis  label "{clean(first[4])}"\n')
+        fh.write("@TYPE xy\n")
+        for k, g in enumerate(graphs):
+            fh.write(f'@ s{k} legend "{clean(g[0])}"\n')
+        for x in xs:
+            fh.write(f"{x:12.4f}" + "".join(f" {height(g[5], g[6], x):12.4f}"
+                                           for g in graphs) + "\n")
+    if low > min(g[5][0] for g in graphs) or high < max(g[5][-1] for g in graphs):
+        print(f"kept the stretch every graph covers: {low:g} to {high:g}")
+    print(f"{len(graphs)} graphs in one, {len(xs)} points each, in {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
+
+class CompareNode(Node):
+    type = "view.compare"
+    title = "Compare graphs"
+    category = CATEGORY
+    color = "#3f6d7d"
+    tool = "python"
+    preview_kind = "plot"
+    preview_port = "xvg"
+    description = (
+        "Draws two or three graphs as one, so they can be compared line "
+        "against line: the same measurement from two runs, say. Wire the "
+        "graphs in, give each a name for the key, and it draws them together "
+        "inside the block.\n\n"
+        "The first graph sets the points along the bottom axis, and the others "
+        "are read off at the same points, so runs saved at different intervals "
+        "still line up. Only the stretch that every graph covers is drawn. "
+        "From a file that holds several lines, it takes the first; 'Which "
+        "line of each graph' picks another."
+    )
+    inputs = (
+        Port("first", "xvg", "the first graph"),
+        Port("second", "xvg", "the second graph"),
+        Port("third", "xvg", "a third graph", optional=True),
+    )
+    outputs = (Port("xvg", "xvg", "the graphs together"),)
+    params = (
+        Param("name_first", "str", "Name of the first", "", placeholder="first",
+              help="What the first graph's line is called in the key."),
+        Param("name_second", "str", "Name of the second", "", placeholder="second"),
+        Param("name_third", "str", "Name of the third", "", placeholder="third",
+              advanced=True),
+        Param("title", "str", "Title", "", placeholder="the first graph's title"),
+        Param("column", "int", "Which line of each graph", 1, min=1, max=100,
+              advanced=True,
+              help="A graph file can hold several lines -- gmx energy writes one "
+                   "for each thing it was asked for. 1 is the first. The same "
+                   "line is taken from every file."),
+        Param("output", "str", "Output name", "compare.xvg", advanced=True),
+    )
+
+    def plan(self, ctx: PlanContext) -> Plan:
+        plan = Plan()
+        out = ctx.pstr("output") or "compare.xvg"
+        argv = ["python", "compare.py", out]
+        for port in ("first", "second", "third"):
+            value = ctx.raw(port)
+            if value is None:
+                if port == "third":
+                    continue
+                raise NodeError(f"input '{port}' is not connected")
+            # Each graph under a name of its own. The same measurement from two
+            # runs usually has the same file name -- ice.xvg and ice.xvg -- and
+            # taken in under that name the second would land on the first, and
+            # the block would draw one run against itself.
+            own = value if isinstance(value, str) else (
+                value.get("name") or value.get("path") or "graph.xvg")
+            name = ctx.inp_as(port, f"{port}_{Path(str(own)).name}")
+            argv += [ctx.pstr("name_" + port) or port, name]
+        argv += ["--column", max(1, ctx.pint("column", 1))]
+        if ctx.pstr("title"):
+            argv += ["--title", ctx.pstr("title")]
+        plan.files["compare.py"] = _COMPARE
+        plan.step(argv, tool="python", label="put the graphs together")
+        plan.outputs["xvg"] = out
+        return plan
+
+
+NODES = [PreviewStructureNode, PreviewPlotNode, PreviewTrajectoryNode, CompareNode]

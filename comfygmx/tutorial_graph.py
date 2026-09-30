@@ -113,8 +113,9 @@ def wall(node_id: str, port: str, side: str, label: str = "") -> Dict[str, str]:
 #: move it -- and a height that is too small is the one that hurts, because it
 #: is what lets two nodes overlap.  Too large only leaves a gap.
 NODE_H = {
+    "analysis.drop_water": 233,
     "analysis.ice_count": 235,
-    "build.ice": 284,
+    "build.ice": 320,
     "gmx.clustsize": 290,
     "gmx.density": 350,
     "gmx.dssp": 471,
@@ -149,6 +150,7 @@ NODE_H = {
     "util.edit_text": 297,
     "util.mdp": 678,
     "util.note": 166,
+    "view.compare": 510,
     "view.plot": 386,
     "view.structure": 386,
     "view.trajectory": 616,
@@ -230,6 +232,7 @@ NODE_W = {
     # A note is drawn as a wide card (.note-card in style.css): two columns of
     # blocks wide, so a long note is a paragraph rather than a tower.
     "util.note": 536,
+    "view.compare": 300,
     "view.plot": 300,
     "view.structure": 300,
     "view.trajectory": 300,

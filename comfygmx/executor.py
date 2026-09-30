@@ -250,7 +250,7 @@ def _materialise(plan: Plan, workdir: Path) -> Dict[str, Any]:
 
 
 def make_stage(workdir: Path, dry: bool, on_file=None,
-               on_dir=None) -> Callable[[Any], Optional[str]]:
+               on_dir=None) -> Callable[..., Optional[str]]:
     """Build the ``stage`` callable handed to :class:`PlanContext`.
 
     ``on_file``/``on_dir`` replace the copy with something else, keeping the
@@ -261,20 +261,31 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
     """
     record = on_file is not None or on_dir is not None
 
-    def bring(source: Path) -> None:
+    def bring(source: Path, name: Optional[str] = None) -> None:
+        target = workdir / (name or source.name)
         if on_file is not None:
-            on_file(source, workdir / source.name)
+            on_file(source, target)
         elif source.exists():
-            _link_or_copy(source, workdir / source.name)
+            _link_or_copy(source, target)
 
-    def stage(value: Any) -> Optional[str]:
+    def stage(value: Any, as_name: Optional[str] = None) -> Optional[str]:
+        """Put one input into the work folder, and say what it is called there.
+
+        ``as_name`` puts the input's own file there under that name rather than
+        its own. Everything a node takes in shares the one folder, so two
+        inputs that happen to have the same name -- ice.xvg from two runs of
+        the same analysis -- would otherwise land on top of each other, and the
+        node would read one file twice. The files that travel with an input
+        (the .itp files beside a topology, a force field folder) keep their
+        names, because whatever uses them looks for them by name.
+        """
         if value is None:
             return None
         if isinstance(value, str):
             source = Path(value)
             if record or not dry:
-                bring(source)
-            return source.name
+                bring(source, as_name)
+            return as_name or source.name
         if not isinstance(value, dict):
             return None
 
@@ -290,9 +301,9 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
         names: List[str] = []
         if value.get("path"):
             source = Path(value["path"])
-            names.append(source.name)
+            names.append(as_name or source.name)
             if record or not dry:
-                bring(source)
+                bring(source, as_name)
         for extra in value.get("extra") or []:
             source = Path(extra)
             if record or not dry:
@@ -312,6 +323,8 @@ def make_stage(workdir: Path, dry: bool, on_file=None,
         # staging copies the file itself into the next node's folder and
         # nothing else. Handing on the name with the folder still on it points
         # the next node at a folder that is not there.
+        if as_name and value.get("path"):
+            return as_name
         if value.get("name"):
             plain = Path(value["name"]).name
             if plain not in names:

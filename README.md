@@ -19,16 +19,17 @@ does and why, instead of treating it as a black box.
 
 It is the teaching edition of Comfy-gmx, a larger research tool. It keeps
 what its two tutorials need, plus a few everyday GROMACS tools, so a
-first-time user sees 25 blocks rather than hundreds.
+first-time user sees 27 blocks rather than hundreds.
 
 ## Capabilities
 
-- Simulations are graphs of blocks joined by wires. The 25 blocks cover
+- Simulations are graphs of blocks joined by wires. The 27 blocks cover
   loading and downloading files, preparing a structure, building a system
   (box, water, ions, added molecules, an ice crystal), preparing and running
   GROMACS, processing trajectories, analysis (energies, RMSD, radius of
-  gyration, secondary structure, hydrogen bonds, density, ice counting) and
-  previews.
+  gyration, secondary structure, hydrogen bonds, density, ice counting, the
+  water left in a drop) and previews, including one that sets two or three
+  graphs side by side.
 - Every block and every setting carries a plain-language explanation. Each
   tutorial also explains its steps in notes on the canvas.
 - **Check** lists missing connections and unusable settings before anything
@@ -65,7 +66,7 @@ first-time user sees 25 blocks rather than hundreds.
 
 | tutorial | what happens | time on mybinder.org |
 | --- | --- | --- |
-| **An ice cube melting** | a small ice cube is heated from 200 K to 1000 K in one run: it melts into a drop, and the drop then boils away into a gas | about 3 minutes |
+| **An ice cube melting** | a small ice cube is heated from 200 K to 1000 K in one run: it melts into a drop, and the drop then boils away into a gas. An extra part, switched off at first, does the same with salt in the ice | about 3 minutes, and as long again for the salt |
 | **Lysozyme in Water** | the classic first GROMACS tutorial: a protein in a box of water, from download to analysis | about 9 minutes |
 
 The times run from pressing **Run** until the last block finishes. They were
@@ -138,7 +139,7 @@ On Windows, use WSL (Linux inside Windows), or Docker with the files in
 
 ## What is included
 
-The editor has 25 blocks, two tutorials and seven chunks. Compared with the
+The editor has 27 blocks, two tutorials and seven chunks. Compared with the
 full Comfy-gmx, this edition leaves out coarse-grained (Martini) simulations,
 membrane builders, ligands, and installers for programs other than GROMACS.
 

@@ -126,6 +126,11 @@ const graphSource = fs.readFileSync(
 check(/created\.off = !!node\.off;/.test(graphSource),
       'opening a workflow does not read the switch back, so a switched-off block '
       + 'comes back on -- and so does every undo, which reopens the graph');
+// A tutorial or a chunk arrives through addChunk, not fromJSON. The ice
+// tutorial ships its salt box switched off, and it came in switched on.
+check(/addChunk\([\s\S]{0,900}if \(node\.off\) \{\s*made\.off = true;/.test(graphSource),
+      'a tutorial or chunk that arrives with blocks switched off has them switched '
+      + 'on, so Run runs the part it was meant to leave out');
 Editor.toggleOff(['c']);
 
 console.log('a chunk means everything you can see in it');

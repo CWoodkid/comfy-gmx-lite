@@ -465,6 +465,20 @@ class PlanContext:
             raise NodeError(f"input '{port}' is not connected")
         return name
 
+    def inp_as(self, port: str, name: str) -> Optional[str]:
+        """Like :meth:`inp`, but the file arrives under ``name``.
+
+        Every input lands in the one work folder under its own name, so a node
+        that takes several files of the same kind -- two graphs to compare,
+        both called ice.xvg because they came from two runs of the same
+        analysis -- would find the second on top of the first. Such a node
+        names each one itself.
+        """
+        value = self.inputs.get(port)
+        if value is None:
+            return None
+        return self._stage(value, as_name=name)
+
     def staged_dirs(self, port: str) -> List[str]:
         """Directory names that came in on ``port`` and must go out again.
 

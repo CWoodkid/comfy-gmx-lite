@@ -1,13 +1,14 @@
-"""Ice: a crystal to start from, and a way to see how much of it is left.
+"""Ice: a crystal to start from, and ways to see how much of it is left.
 
-Two blocks for the ice-melting tutorial, and for anything else made of ice.
+Three blocks for the ice-melting tutorial, and for anything else made of ice.
 "Ice crystal" builds a block of ordinary ice (ice Ih, the kind in a freezer)
-out of TIP4P/Ice water, with a topology to match. "Count the ice" goes
-through a trajectory and counts, frame by frame, how many molecules are
-still arranged as in a crystal.
+out of TIP4P/Ice water, with a topology to match, and with salt in it if
+asked. "Count the ice" goes through a trajectory and counts, frame by frame,
+how many molecules are still arranged as in a crystal. "Water in the drop"
+measures, frame by frame, how much of the water has not yet boiled off.
 
-Both do their work with small Python scripts that travel inside the block.
-The ice builder needs nothing but Python; the counter needs numpy.
+All three do their work with small Python scripts that travel inside the
+block. The ice builder needs nothing but Python; the other two need numpy.
 """
 
 from __future__ import annotations
@@ -28,6 +29,11 @@ Writes three files:
 * a topology (.top): what a TIP4P/Ice molecule is, and how many there are;
 * an index (.ndx): the group "Oxygens", one atom per molecule, for looking at
   the crystal without the hydrogens in the way.
+
+With --salt, that many water molecules become sodium ions and as many again
+chloride ions, each ion where the molecule's oxygen was, no two ions closer
+than 0.5 nm. The ions come after the water in both files, and the index gains
+the groups "Ions" and "Oxygens_and_ions".
 
 Where the oxygens go is fixed by the crystal. Where the hydrogens go is not:
 each oxygen has four neighbours and points its two hydrogens at two of them,
@@ -60,6 +66,11 @@ SIGMA = 0.31668                      # nm
 EPSILON = 106.1 * 0.0083144626       # 106.1 K times the gas constant, kJ/mol
 Q_H = 0.5897                         # e
 Q_M = -2 * Q_H
+
+# The salt: no two ions closer than this when they are put in, so none starts
+# out touching another. Neighbouring oxygens in ice are 0.276 nm apart.
+ION_GAP = 0.5                        # nm
+WATER_KG_PER_MOL = 0.018015
 
 
 def cell_oxygens():
@@ -233,14 +244,40 @@ def unit(v):
     return tuple(c / length for c in v)
 
 
-def write(prefix_gro, prefix_top, prefix_ndx, oxygens, box, o, seed):
+def pick_salt(oxygens, pairs, rng):
+    """Which molecules become ions: 2 x pairs of them, no two closer than
+    ION_GAP. Returns (sodium, chloride), each a sorted list of molecules."""
+    order = list(range(len(oxygens)))
+    rng.shuffle(order)
+    chosen = []
+    for m in order:
+        if len(chosen) == 2 * pairs:
+            break
+        p = oxygens[m]
+        if all(sum((p[k] - oxygens[c][k]) ** 2 for k in range(3)) >= ION_GAP ** 2
+               for c in chosen):
+            chosen.append(m)
+    if len(chosen) < 2 * pairs:
+        raise SystemExit(f"there is room for only {len(chosen) // 2} pairs of ions "
+                         f"{ION_GAP} nm apart in this crystal: use less salt, or "
+                         f"more cells")
+    return sorted(chosen[0::2]), sorted(chosen[1::2])
+
+
+def write(prefix_gro, prefix_top, prefix_ndx, oxygens, box, o, seed,
+          sodium=(), chloride=(), salt_seed=1):
     half = math.radians(ANGLE_HOH) / 2.0
+    swapped = set(sodium) | set(chloride)
     lines = []
     atom = 0
+    residue = 0
     gives = [[] for _ in oxygens]
     for e in range(len(o.bonds)):
         gives[o.giver(e)].append(o.vector(e))
     for m, p in enumerate(oxygens):
+        if m in swapped:
+            continue
+        residue += 1
         u1, u2 = (unit(v) for v in gives[m])
         bis = unit(tuple(a + b for a, b in zip(u1, u2)))
         per = unit(tuple(a - b for a, b in zip(u1, u2)))
@@ -250,22 +287,55 @@ def write(prefix_gro, prefix_top, prefix_ndx, oxygens, box, o, seed):
         for name, xyz in (("OW", p), ("HW1", h1), ("HW2", h2), ("MW", msite)):
             atom += 1
             lines.append("%5d%-5s%5s%5d%8.3f%8.3f%8.3f\n" % (
-                (m + 1) % 100000, "SOL", name, atom % 100000, xyz[0], xyz[1], xyz[2]))
-    n = len(oxygens)
+                residue % 100000, "SOL", name, atom % 100000, xyz[0], xyz[1], xyz[2]))
+    n = residue
+    # Each ion goes where the oxygen of the molecule it replaces was.
+    for name, sites in (("NA", sodium), ("CL", chloride)):
+        for m in sites:
+            residue += 1
+            atom += 1
+            p = oxygens[m]
+            lines.append("%5d%-5s%5s%5d%8.3f%8.3f%8.3f\n" % (
+                residue % 100000, name, name, atom % 100000, p[0], p[1], p[2]))
+    pairs = len(sodium)
+    title = f"Ice Ih, {n} TIP4P/Ice molecules, hydrogens from seed {seed}"
+    if pairs:
+        title += (f", {pairs} Na+ and {pairs} Cl- in place of {2 * pairs} more, "
+                  f"salt from seed {salt_seed}")
     with open(prefix_gro, "w") as fh:
-        fh.write(f"Ice Ih, {n} TIP4P/Ice molecules, hydrogens from seed {seed}\n")
+        fh.write(title + "\n")
         fh.write(f"{atom:5d}\n")
         fh.writelines(lines)
         fh.write("%10.5f%10.5f%10.5f\n" % box)
+    text = TOPOLOGY.format(sigma=SIGMA, epsilon=EPSILON, q_h=Q_H, q_m=Q_M,
+                           r_oh=R_OH, r_hh=2 * R_OH * math.sin(half),
+                           a=D_OM / (2 * R_OH * math.cos(half)), n=n)
+    if pairs:
+        text = with_salt(text, pairs)
     with open(prefix_top, "w") as fh:
-        fh.write(TOPOLOGY.format(sigma=SIGMA, epsilon=EPSILON, q_h=Q_H, q_m=Q_M,
-                                 r_oh=R_OH, r_hh=2 * R_OH * math.sin(half),
-                                 a=D_OM / (2 * R_OH * math.cos(half)), n=n))
+        fh.write(text)
     with open(prefix_ndx, "w") as fh:
-        fh.write("[ Oxygens ]\n")
-        numbers = [str(4 * m + 1) for m in range(n)]
-        for k in range(0, n, 15):
-            fh.write(" ".join(numbers[k:k + 15]) + "\n")
+        groups = [("Oxygens", [4 * m + 1 for m in range(n)])]
+        if pairs:
+            ions = list(range(4 * n + 1, 4 * n + 2 * pairs + 1))
+            groups += [("Ions", ions), ("Oxygens_and_ions", groups[0][1] + ions)]
+        for name, atoms in groups:
+            fh.write(f"[ {name} ]\n")
+            numbers = [str(a) for a in atoms]
+            for k in range(0, len(numbers), 15):
+                fh.write(" ".join(numbers[k:k + 15]) + "\n")
+
+
+def with_salt(text, pairs):
+    """The water's topology, with the two ions added to it."""
+    types = "  MW_ice  0       0.0      0.0     D      0.0         0.0\n"
+    system = "[ system ]\nIce Ih, TIP4P/Ice\n"
+    if text.count(types) != 1 or text.count(system) != 1:
+        raise SystemExit("the water's topology has changed shape; the salt cannot "
+                         "be added to it")
+    text = text.replace(types, types + SALT_TYPES)
+    text = text.replace(system, SALT_MOLECULES + "[ system ]\nIce Ih, TIP4P/Ice, with salt\n")
+    return text + f"  NA    {pairs}\n  CL    {pairs}\n"
 
 
 TOPOLOGY = """\
@@ -326,6 +396,37 @@ Ice Ih, TIP4P/Ice
   SOL   {n}
 """
 
+SALT_TYPES = """\
+; Salt: a sodium ion and a chloride ion, one point each, carrying the charge
+; of a whole electron, + and -. Their sizes are Joung and Cheatham's for
+; TIP4P-Ew water, a close cousin of TIP4P/Ice, as GROMACS ships them in
+; amber14sb.ff: "Determination of alkali and halide monovalent ion parameters
+; for use in explicitly solvated biomolecular simulations", J. Phys. Chem. B
+; 112, 9020-9041 (2008), doi:10.1021/jp8001614. The combination rule above
+; works out how each ion and a water oxygen feel each other's size.
+  NA_ion  11      22.99    0.0     A      0.218448365688  0.704742500000
+  CL_ion  17      35.45    0.0     A      0.491776092413  0.048791716000
+"""
+
+SALT_MOLECULES = """\
+[ moleculetype ]
+; name  nrexcl
+  NA    1
+
+[ atoms ]
+; nr  type    resnr  residue  atom  cgnr  charge    mass
+  1   NA_ion  1      NA       NA    1      1.0      22.99
+
+[ moleculetype ]
+; name  nrexcl
+  CL    1
+
+[ atoms ]
+; nr  type    resnr  residue  atom  cgnr  charge    mass
+  1   CL_ion  1      CL       CL    1     -1.0      35.45
+
+"""
+
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
@@ -335,20 +436,37 @@ def main(argv=None):
     ap.add_argument("--gro", default="ice.gro")
     ap.add_argument("--top", default="ice.top")
     ap.add_argument("--ndx", default="ice.ndx")
+    ap.add_argument("--salt", type=int, default=0,
+                    help="pairs of sodium and chloride ions, in place of water molecules")
+    ap.add_argument("--salt-seed", type=int, default=1,
+                    help="which molecules become ions")
     args = ap.parse_args(argv)
     if min(args.cells) < 2:
         raise SystemExit("use at least 2 cells in each direction")
+    if args.salt < 0:
+        raise SystemExit("the salt is a number of pairs of ions: 0 or more")
     rng = random.Random(args.seed)
     oxygens, box = build_oxygens(*args.cells)
     bonds = neighbour_bonds(oxygens, box)
     o = disorder(len(oxygens), bonds, box, rng, shuffles=20 * len(oxygens))
-    write(args.gro, args.top, args.ndx, oxygens, box, o, args.seed)
+    sodium, chloride = [], []
+    if args.salt:
+        # A random stream of its own, so the hydrogens stay where they were.
+        sodium, chloride = pick_salt(oxygens, args.salt, random.Random(args.salt_seed))
+    write(args.gro, args.top, args.ndx, oxygens, box, o, args.seed,
+          sodium, chloride, args.salt_seed)
     dip = o.dipole()
     print(f"{len(oxygens)} water molecules in ice Ih, {args.cells[0]} x {args.cells[1]} x "
           f"{args.cells[2]} cells, {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
     print(f"every oxygen gives two hydrogens and takes two; the bonds' overall "
           f"direction adds up to ({dip[0]:.3f}, {dip[1]:.3f}, {dip[2]:.3f}) nm, so the "
           f"crystal has no overall dipole")
+    if args.salt:
+        water = len(oxygens) - 2 * args.salt
+        print(f"{args.salt} sodium and {args.salt} chloride ions in place of "
+              f"{2 * args.salt} of the molecules: {water} water molecules are left, and "
+              f"the salt comes to {args.salt / (water * WATER_KG_PER_MOL):.1f} mol per kg "
+              f"of water (seawater has about 0.6)")
     return 0
 
 
@@ -483,6 +601,133 @@ if __name__ == "__main__":
     sys.exit(main())
 '''
 
+_COUNT_DROP = r'''#!/usr/bin/env python3
+"""Measure, frame by frame, how much of the water is still in the drop.
+
+Two molecules touch when their oxygens -- or an oxygen and an ion, or two
+ions -- are closer than 0.35 nm, about the distance to a molecule's nearest
+neighbours in liquid water. The drop is the biggest group of molecules that
+touch, directly or through others. Everything else is gas.
+
+A hot gas in a small box is crowded, so a gas molecule is often within
+0.35 nm of the drop for a moment as it flies past. A water molecule counts as
+in the drop only when it is in the biggest group in the frame before, this
+frame and the frame after. Ions are part of the drop but are not counted: the
+line is the share of the water that is still there.
+
+usage: count_drop.py frames.gro out.xvg [--cutoff 0.35] [--water OW]
+"""
+
+import argparse
+import sys
+
+import numpy as np
+
+
+def frames(path):
+    """(time in ps, atom names, positions, box) for every frame of a .gro file."""
+    with open(path) as fh:
+        while True:
+            title = fh.readline()
+            if not title:
+                return
+            n = int(fh.readline())
+            names = []
+            xyz = np.empty((n, 3))
+            for i in range(n):
+                line = fh.readline()
+                names.append(line[10:15].strip())
+                xyz[i] = (float(line[20:28]), float(line[28:36]), float(line[36:44]))
+            box = np.array([float(v) for v in fh.readline().split()[:3]])
+            time = float(title.split("t=")[1].split()[0]) if "t=" in title else 0.0
+            yield time, names, xyz, box
+
+
+def biggest_group(xyz, box, cutoff):
+    """True for each molecule in the biggest group of molecules that touch."""
+    n = len(xyz)
+    ii, jj = [], []
+    for start in range(0, n, 256):
+        d = xyz[None, :, :] - xyz[start:start + 256, None, :]
+        d -= box * np.round(d / box)
+        a, b = np.nonzero((d ** 2).sum(-1) < cutoff ** 2)
+        a = a + start
+        keep = a < b
+        ii.append(a[keep])
+        jj.append(b[keep])
+    ii = np.concatenate(ii)
+    jj = np.concatenate(jj)
+    # Every molecule takes the lowest number among the molecules it touches,
+    # over and over, until nothing changes: then every molecule in a group
+    # carries the number of the group's first member.
+    label = np.arange(n)
+    while True:
+        low = np.minimum(label[ii], label[jj])
+        new = label.copy()
+        np.minimum.at(new, ii, low)
+        np.minimum.at(new, jj, low)
+        new = new[new]
+        if np.array_equal(new, label):
+            break
+        label = new
+    return label == np.bincount(label, minlength=n).argmax()
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Measure how much of the water is "
+                                             "still in the drop.")
+    ap.add_argument("frames")
+    ap.add_argument("out")
+    ap.add_argument("--cutoff", type=float, default=0.35)
+    ap.add_argument("--water", default="OW",
+                    help="the atom name of the water oxygens: only these are counted")
+    args = ap.parse_args(argv)
+
+    times, inside, water = [], [], None
+    for time, names, xyz, box in frames(args.frames):
+        if water is None:
+            water = np.array([name == args.water for name in names])
+        times.append(time)
+        inside.append(biggest_group(xyz, box, args.cutoff) & water)
+    if not times:
+        sys.exit("no frames in " + args.frames)
+    total = int(water.sum())
+    if not total:
+        sys.exit(f"no atom called {args.water} in {args.frames}: which atom is "
+                 f"the water's oxygen?")
+    inside = np.array(inside)
+    held = inside.copy()
+    held[1:] &= inside[:-1]
+    held[:-1] &= inside[1:]
+    share = 100.0 * held.sum(1) / total
+
+    with open(args.out, "w") as fh:
+        fh.write("# written by Comfy-gmx's 'Water in the drop' block\n")
+        fh.write(f"# columns: time (ps), % of the {total} water molecules still in the drop\n")
+        fh.write(f'@    title "How much of the water ({total} molecules) is still in the drop"\n')
+        fh.write('@    xaxis  label "Time (ps)"\n')
+        fh.write('@    yaxis  label "Water still in the drop (%)"\n')
+        fh.write("@TYPE xy\n")
+        fh.write('@ s0 legend "in the drop"\n')
+        for time, value in zip(times, share):
+            fh.write(f"{time:10.3f} {value:7.2f}\n")
+
+    ions = len(water) - total
+    print(f"{len(times)} frames, {total} water molecules"
+          + (f" and {ions} ions" if ions else ""))
+    print(f"in the drop at the start: {share[0]:.0f} %; at the end "
+          f"({times[-1]:.1f} ps): {share[-1]:.0f} %")
+    for mark in (50, 10):
+        below = np.nonzero(share < mark)[0]
+        if share[0] >= mark and len(below):
+            print(f"down to {mark} % after {times[below[0]]:.1f} ps")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
 
 class IceCrystalNode(Node):
     type = "build.ice"
@@ -500,9 +745,14 @@ class IceCrystalNode(Node):
         "every oxygen holds two hydrogens and points them at two of its four "
         "neighbours, and every pair of neighbours shares exactly one. The "
         "crystal has no overall electric dipole, as real ice has none.\n\n"
+        "Salt, if you ask for it, goes in by swapping water molecules for "
+        "sodium and chloride ions, spread through the crystal. Real ice pushes "
+        "salt out as it freezes, so think of it as salty water frozen too fast "
+        "for the salt to get out.\n\n"
         "Out come the crystal, a topology that says what a TIP4P/Ice molecule "
-        "is, and an index file with one group, 'Oxygens': one atom per "
-        "molecule, which is the clearest way to look at the crystal."
+        "is, and an index file with the group 'Oxygens': one atom per water "
+        "molecule, which is the clearest way to look at the crystal. With "
+        "salt, also 'Ions' and 'Oxygens_and_ions'."
     )
     docs = "https://doi.org/10.1063/1.1931662"
     outputs = (
@@ -522,6 +772,26 @@ class IceCrystalNode(Node):
         Param("seed", "int", "Seed for the hydrogens", 1, min=1,
               help="Which random arrangement of hydrogens. Any number; the "
                    "same number gives the same crystal."),
+        # The two salt boxes start empty rather than at 0 and 1. An empty box
+        # is left out when the program decides whether a block has changed, so
+        # a block of pure ice built before these boxes existed still counts as
+        # the same block, and what was run from it is not run again.
+        Param("salt", "int", "Salt: pairs of Na+ and Cl-", "", min=0, max=500,
+              placeholder="0: pure ice",
+              help="How many water molecules to swap for a sodium ion (Na+), "
+                   "and how many more for a chloride ion (Cl-). Empty or 0 is "
+                   "pure ice. "
+                   "Each ion goes where a molecule's oxygen was, and no two "
+                   "ions start closer than 0.5 nm.\n\n"
+                   "In a crystal of 768 molecules, 13 pairs is about 1 mole of "
+                   "salt per kilogram of water and 26 pairs about 2; seawater "
+                   "has about 0.6, and water can dissolve at most about 6. The "
+                   "block says what it came to."),
+        Param("salt_seed", "int", "Seed for the salt", "", min=1, advanced=True,
+              placeholder="1",
+              help="Which molecules become ions. Any number; empty is 1. The "
+                   "same number gives the same places, and the hydrogens do "
+                   "not change with it."),
         Param("output", "str", "Output name", "ice.gro", advanced=True),
         Param("topology_name", "str", "Topology name", "ice.top", advanced=True),
         Param("index_name", "str", "Index name", "ice.ndx", advanced=True),
@@ -533,14 +803,20 @@ class IceCrystalNode(Node):
         if min(cells) < 2:
             raise NodeError("use at least 2 cells in each direction: with fewer, "
                             "a molecule would be its own neighbour across the box")
+        salt = ctx.pint("salt", 0)
+        if salt < 0:
+            raise NodeError("the salt is a number of pairs of ions: 0 or more")
         out = ctx.pstr("output") or "ice.gro"
         top = ctx.pstr("topology_name") or "ice.top"
         ndx = ctx.pstr("index_name") or "ice.ndx"
         plan.files["make_ice.py"] = _MAKE_ICE
-        plan.step(["python", "make_ice.py", "--cells", *cells,
-                   "--seed", ctx.pint("seed", 1),
-                   "--gro", out, "--top", top, "--ndx", ndx],
-                  tool="python", label="build the ice crystal")
+        argv = ["python", "make_ice.py", "--cells", *cells,
+                "--seed", ctx.pint("seed", 1),
+                "--gro", out, "--top", top, "--ndx", ndx]
+        # Only with salt, so a block of pure ice runs the command it always did.
+        if salt:
+            argv += ["--salt", salt, "--salt-seed", ctx.pint("salt_seed", 1)]
+        plan.step(argv, tool="python", label="build the ice crystal")
         plan.outputs["structure"] = out
         plan.outputs["topology"] = {"top": top, "glob": []}
         plan.outputs["index"] = ndx
@@ -603,4 +879,68 @@ class IceCountNode(Node):
         return plan
 
 
-NODES = [IceCrystalNode, IceCountNode]
+class DropWaterNode(Node):
+    type = "analysis.drop_water"
+    title = "Water in the drop"
+    category = ANALYSIS
+    color = ANALYSIS_COLOR
+    tool = "gmx"
+    description = (
+        "Goes through a trajectory and measures, frame by frame, how much of "
+        "the water is still in the drop: the share of the water molecules that "
+        "have not yet flown off as gas. A falling line is water boiling away.\n\n"
+        "The drop is the biggest group of molecules that touch -- closer than "
+        "0.35 nm, directly or through others. In a hot gas, molecules fly past "
+        "the drop all the time, so a molecule counts only when it was in the "
+        "drop in the frame before and the frame after as well. Ions, if there "
+        "are any, belong to the drop but are not counted: the line is the "
+        "share of the water."
+    )
+    inputs = (
+        Port("traj", "traj", "trajectory"),
+        Port("tpr", "tpr", "tpr"),
+    )
+    outputs = (Port("xvg", "xvg", "share of the water in the drop over time"),)
+    params = (
+        Param("sel", "str", "The molecules", "name OW NA CL",
+              help="A GROMACS selection with one atom per molecule: the water "
+                   "oxygens, and any ions, which count as part of the drop. "
+                   "'name OW NA CL' takes the oxygens of most water models and "
+                   "the sodium and chloride ions of the Ice crystal block; "
+                   "names that are not there are simply not found."),
+        Param("skip", "int", "Use every Nth frame", 1, min=1, max=10000,
+              help="The frame before and the frame after are then further "
+                   "apart in time, so a molecule has to stay longer to count."),
+        Param("water", "str", "The water's oxygen", "OW", advanced=True,
+              help="The atom name of the water oxygens: only these are counted."),
+        Param("cutoff", "float", "Touching distance (nm)", 0.35, min=0.2, max=0.6,
+              advanced=True,
+              help="Molecules closer than this touch. 0.35 nm is about the "
+                   "distance to a molecule's nearest neighbours in liquid water."),
+        Param("output", "str", "Output name", "drop.xvg", advanced=True),
+    )
+
+    def plan(self, ctx: PlanContext) -> Plan:
+        plan = Plan()
+        tpr = ctx.require("tpr")
+        traj = ctx.require("traj")
+        out = ctx.pstr("output") or "drop.xvg"
+        sel = ctx.pstr("sel") or "name OW NA CL"
+        water = ctx.pstr("water") or "OW"
+        plan.step(["gmx", "select", "-s", tpr, "-select", sel, "-on", "drop.ndx"],
+                  tool="gmx", label="find the water oxygens and the ions")
+        argv = ["gmx", "trjconv", "-s", tpr, "-f", traj, "-n", "drop.ndx",
+                "-o", "drop_frames.gro"]
+        if ctx.pint("skip", 1) > 1:
+            argv += ["-skip", ctx.pint("skip", 1)]
+        plan.step(argv, tool="gmx", label="take them out of every frame",
+                  stdin="0\n")
+        plan.files["count_drop.py"] = _COUNT_DROP
+        plan.step(["python", "count_drop.py", "drop_frames.gro", out,
+                   "--cutoff", ctx.pfloat("cutoff", 0.35), "--water", water],
+                  tool="python", label="measure the drop")
+        plan.outputs["xvg"] = out
+        return plan
+
+
+NODES = [IceCrystalNode, IceCountNode, DropWaterNode]

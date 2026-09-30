@@ -955,6 +955,8 @@ textarea.code {
   margin-top: 3px; font-size: 10px; color: var(--text-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* One entry of the key under a curve with several lines, in its line's colour. */
+.preview-key { margin-right: 8px; }
 .node-resize {
   position: absolute; right: 0; bottom: 0; width: 14px; height: 14px;
   cursor: nwse-resize; opacity: .45;

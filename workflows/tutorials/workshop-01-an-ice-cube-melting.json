@@ -227,6 +227,26 @@
       "params": {}
     },
     {
+      "id": "drop",
+      "type": "analysis.drop_water",
+      "pos": [
+        2250,
+        2705
+      ],
+      "params": {
+        "output": "drop.xvg"
+      }
+    },
+    {
+      "id": "drop_plot",
+      "type": "view.plot",
+      "pos": [
+        2550,
+        2705
+      ],
+      "params": {}
+    },
+    {
       "id": "watch",
       "type": "view.trajectory",
       "pos": [
@@ -246,11 +266,197 @@
       "type": "util.note",
       "pos": [
         2250,
+        -255
+      ],
+      "params": {
+        "text": "3. WHAT THE PICTURES SAY\n\nTEMPERATURE: the thermometer. It follows the thermostat: a gentle\nslope for 100 ps, then a steep one. Use it to read off how hot it\nwas at any moment in the other graphs.\n\nCOUNT THE ICE: how many molecules still sit in the honeycomb, frame\nby frame. It starts well below 768, because a molecule on the\nsurface has too few neighbours to pass the test, and drops within\nthe first picosecond: once the molecules shiver, some fail the\nstrict test even though the crystal is still there. Its fall to\nzero is the melting.\n\nSIZE: the radius of gyration, roughly how far the molecules are from\nthe middle, on average. It shrinks a little as the cube melts: a\nball is more compact than a cube, and liquid water packs its\nmolecules closer together than ice does, which is why ice floats.\nThen it shoots up as the drop boils away, and levels off once the\ngas fills the box evenly.\n\nENERGY: how tightly the molecules hold on to each other, the\npotential energy. The more negative, the tighter. It climbs the whole\nway, because the heat goes into pulling the molecules apart; fastest\nwhile the drop boils away, and hardly at all once it is all gas,\nwhen the molecules have almost nothing left to let go of.\n\nWATER IN THE DROP: the share of the water still in the drop. A\nmolecule counts when it touches the drop, closer than 0.35 nm, in\nthis frame and in the frames just before and after, so gas flying\npast is not counted. It stays near 100 % until the drop starts to\nboil, and falls to zero as the drop boils away.\n\nTHE MOVIE: one dot per molecule, its oxygen. Press play; drag to\nturn it."
+      }
+    },
+    {
+      "id": "note_salt",
+      "type": "util.note",
+      "pos": [
+        3600,
         -159
       ],
       "params": {
-        "text": "3. WHAT THE PICTURES SAY\n\nTEMPERATURE: the thermometer. It follows the thermostat: a gentle\nslope for 100 ps, then a steep one. Use it to read off how hot it\nwas at any moment in the other graphs.\n\nCOUNT THE ICE: how many molecules still sit in the honeycomb, frame\nby frame. It starts well below 768, because a molecule on the\nsurface has too few neighbours to pass the test, and drops within\nthe first picosecond: once the molecules shiver, some fail the\nstrict test even though the crystal is still there. Its fall to\nzero is the melting.\n\nSIZE: the radius of gyration, roughly how far the molecules are from\nthe middle, on average. It shrinks a little as the cube melts: a\nball is more compact than a cube, and liquid water packs its\nmolecules closer together than ice does, which is why ice floats.\nThen it shoots up as the drop boils away, and levels off once the\ngas fills the box evenly.\n\nENERGY: how tightly the molecules hold on to each other, the\npotential energy. The more negative, the tighter. It climbs the whole\nway, because the heat goes into pulling the molecules apart; fastest\nwhile the drop boils away, and hardly at all once it is all gas,\nwhen the molecules have almost nothing left to let go of.\n\nTHE MOVIE: one dot per molecule, its oxygen. Press play; drag to\nturn it."
+        "text": "4. EXTRA: DOES SALT CHANGE IT?\nThe box underneath is switched off, so Run leaves it out.\n\nSalt in water holds on to the water molecules around it. So salty\nwater boils at a higher temperature than pure water, and freezes\nat a lower one: that is why roads are salted in winter.\n\nThe box underneath does it all again with salt in the ice: 26 water\nmolecules swapped for sodium ions (Na+, purple in the movie) and 26\nfor chloride ions (Cl-, green). That is 2 moles of salt per kilogram of\nwater, over three times as salty as the sea. Everything else is the\nsame.\n\nTo switch it on, right-click the box's title bar and choose 'Switch\nthis chunk back on', then press Run. Only the new box runs: the\npure cube's results are kept. It takes as long as the first run.\n\nThe two graphs on its right put pure and salty side by side:\n- ICE: the salty crystal starts with fewer molecules in ice, since\n  every ion breaks the honeycomb around it, and it melts sooner;\n- WATER IN THE DROP: the salty drop holds on to its water for\n  longer, and some of it never leaves: it stays stuck to the ions.\n\nThe size is not real. In a kitchen, this much salt lowers the\nmelting point by about 7 degrees and raises the boiling point by\nabout 2. Here both move by tens of degrees: the heat comes very\nfast, and a drop this small gets saltier and saltier as its water\nleaves. The direction is right; the size is not."
       }
+    },
+    {
+      "id": "salt_ice",
+      "type": "build.ice",
+      "pos": [
+        3600,
+        521
+      ],
+      "params": {
+        "cells_x": 6,
+        "cells_y": 4,
+        "cells_z": 4,
+        "seed": 1,
+        "salt": 26
+      },
+      "off": true
+    },
+    {
+      "id": "salt_box",
+      "type": "gmx.editconf",
+      "pos": [
+        3900,
+        521
+      ],
+      "params": {
+        "box_type": "cubic",
+        "box": "5.5 5.5 5.5",
+        "center": true,
+        "output": "cube.gro"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_em_mdp",
+      "type": "util.mdp",
+      "pos": [
+        3600,
+        1191
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; Minimisation: let every molecule settle into place.\n;\n; A crystal built from a recipe is never quite right -- a hydrogen a little\n; too close to a neighbour here, a molecule a little twisted there. This walks\n; every molecule downhill in energy until nothing is pushing hard any more.\n; No time passes, and nothing moves afterwards: the cube is standing\n; perfectly still, which is what 0 K, absolute zero, means.\nintegrator      = steep\nemtol           = 100       ; stop when no force is bigger than this\nnsteps          = 5000      ; or after this many tries\n\ncutoff-scheme   = Verlet\ncoulombtype     = PME       ; every charge feels every other charge\nrcoulomb        = 1.0       ; nm\nvdwtype         = cut-off   ; molecules further apart than rvdw ignore each other's size\nrvdw            = 1.0       ; nm\npbc             = xyz       ; the box repeats in every direction\n",
+        "filename": "minimise.mdp"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_em_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        3900,
+        1191
+      ],
+      "params": {
+        "output": "em.tpr"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_em",
+      "type": "gmx.mdrun",
+      "pos": [
+        4200,
+        1191
+      ],
+      "params": {
+        "deffnm": "em"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_heat_mdp",
+      "type": "util.mdp",
+      "pos": [
+        4500,
+        521
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; The ice cube heated in one run, from 200 K to 1000 K.\n;\n; 200 K is minus 73 degrees C, colder than any freezer. 1000 K is over 700\n; degrees C. The thermostat's target climbs as the run goes: slowly to 400 K\n; over the first 100 ps, so the ice has time to melt and the drop time to\n; settle, then fast to 1000 K over the next 100 ps, where the drop boils away.\n; To heat it differently, change the numbers on the annealing lines, and\n; nsteps to match the last time on them.\nintegrator           = md\ndt                   = 0.002     ; one step is 2 femtoseconds (0.002 ps)\nnsteps               = 100000    ; 100,000 steps: 200 picoseconds\n\nnstxout-compressed   = 250       ; save a picture every 250 steps (0.5 ps)\nnstenergy            = 500       ; and the energies, every 1 ps\nnstlog               = 5000\n\ncutoff-scheme        = Verlet\ncoulombtype          = PME\nrcoulomb             = 1.0\nvdwtype              = cut-off\nrvdw                 = 1.0\npbc                  = xyz\n\n; The thermostat: it keeps the temperature at its target, by speeding the\n; molecules up or slowing them down a little at every step.\ntcoupl               = v-rescale\ntc-grps              = System\ntau_t                = 0.1       ; how quickly it corrects, in ps\nref_t                = 200       ; the target at the start\n\n; Annealing: the target moves, in straight lines between these points.\n; 200 K at 0 ps, 400 K at 100 ps, 1000 K at 200 ps.\nannealing            = single\nannealing-npoints    = 3\nannealing-time       = 0 100 200\nannealing-temp       = 200 400 1000\n\n; Give every molecule a speed to start with, picked at random the way\n; speeds are spread at 200 K.\ngen_vel              = yes\ngen_temp             = 200\ngen_seed             = 2026\n\n; No pressure control: around the cube there is nothing but empty space, and\n; that is where the gas goes.\npcoupl               = no\n\n; Take away any drift of the whole lot, so it does not wander off. Only the\n; drift: molecules that boil off fly out through one side of the box and come\n; back in through the opposite one, since the box repeats in every direction,\n; and stopping any spin as well goes wrong once they do.\ncomm-mode            = linear\n",
+        "filename": "heat.mdp"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_heat_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        4800,
+        521
+      ],
+      "params": {
+        "output": "heat.tpr"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_heat",
+      "type": "gmx.mdrun",
+      "pos": [
+        5100,
+        521
+      ],
+      "params": {
+        "deffnm": "heat"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_count",
+      "type": "analysis.ice_count",
+      "pos": [
+        5424,
+        521
+      ],
+      "params": {
+        "output": "ice.xvg"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_drop",
+      "type": "analysis.drop_water",
+      "pos": [
+        5424,
+        1191
+      ],
+      "params": {
+        "output": "drop.xvg"
+      },
+      "off": true
+    },
+    {
+      "id": "cmp_ice",
+      "type": "view.compare",
+      "pos": [
+        5724,
+        521
+      ],
+      "params": {
+        "name_first": "pure water",
+        "name_second": "with salt",
+        "title": "Ice: pure water against salty"
+      },
+      "off": true
+    },
+    {
+      "id": "cmp_drop",
+      "type": "view.compare",
+      "pos": [
+        5724,
+        1191
+      ],
+      "params": {
+        "name_first": "pure water",
+        "name_second": "with salt",
+        "title": "Water still in the drop: pure against salty"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_watch",
+      "type": "view.trajectory",
+      "pos": [
+        5100,
+        1191
+      ],
+      "params": {
+        "mode": "every Nth",
+        "skip": 2,
+        "sel": "Oxygens_and_ions",
+        "pbc": "mol",
+        "center": true
+      },
+      "off": true
     }
   ],
   "links": [
@@ -383,6 +589,24 @@
     {
       "from_node": "heat",
       "from_port": "traj",
+      "to_node": "drop",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "heat_pp",
+      "from_port": "tpr",
+      "to_node": "drop",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "drop",
+      "from_port": "xvg",
+      "to_node": "drop_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "heat",
+      "from_port": "traj",
       "to_node": "watch",
       "to_port": "traj"
     },
@@ -396,6 +620,126 @@
       "from_node": "ice",
       "from_port": "index",
       "to_node": "watch",
+      "to_port": "index"
+    },
+    {
+      "from_node": "salt_ice",
+      "from_port": "structure",
+      "to_node": "salt_box",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "salt_em_mdp",
+      "from_port": "mdp",
+      "to_node": "salt_em_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "salt_box",
+      "from_port": "structure",
+      "to_node": "salt_em_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "salt_ice",
+      "from_port": "topology",
+      "to_node": "salt_em_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "salt_em_pp",
+      "from_port": "tpr",
+      "to_node": "salt_em",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_heat_mdp",
+      "from_port": "mdp",
+      "to_node": "salt_heat_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "salt_em",
+      "from_port": "structure",
+      "to_node": "salt_heat_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "salt_ice",
+      "from_port": "topology",
+      "to_node": "salt_heat_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "salt_heat_pp",
+      "from_port": "tpr",
+      "to_node": "salt_heat",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_heat",
+      "from_port": "traj",
+      "to_node": "salt_count",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "salt_heat_pp",
+      "from_port": "tpr",
+      "to_node": "salt_count",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_heat",
+      "from_port": "traj",
+      "to_node": "salt_drop",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "salt_heat_pp",
+      "from_port": "tpr",
+      "to_node": "salt_drop",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "count",
+      "from_port": "xvg",
+      "to_node": "cmp_ice",
+      "to_port": "first"
+    },
+    {
+      "from_node": "salt_count",
+      "from_port": "xvg",
+      "to_node": "cmp_ice",
+      "to_port": "second"
+    },
+    {
+      "from_node": "drop",
+      "from_port": "xvg",
+      "to_node": "cmp_drop",
+      "to_port": "first"
+    },
+    {
+      "from_node": "salt_drop",
+      "from_port": "xvg",
+      "to_node": "cmp_drop",
+      "to_port": "second"
+    },
+    {
+      "from_node": "salt_heat",
+      "from_port": "traj",
+      "to_node": "salt_watch",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "salt_heat_pp",
+      "from_port": "tpr",
+      "to_node": "salt_watch",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_ice",
+      "from_port": "index",
+      "to_node": "salt_watch",
       "to_port": "index"
     }
   ],
@@ -445,6 +789,8 @@
         "size_plot",
         "energy",
         "energy_plot",
+        "drop",
+        "drop_plot",
         "watch",
         "note_heat"
       ],
@@ -464,6 +810,51 @@
           "port": "structure",
           "side": "west",
           "label": "settled cube"
+        },
+        {
+          "node": "drop",
+          "port": "xvg",
+          "side": "east",
+          "label": "pure: drop"
+        },
+        {
+          "node": "count",
+          "port": "xvg",
+          "side": "east",
+          "label": "pure: ice"
+        }
+      ]
+    },
+    {
+      "title": "3. Extra: the same with salt",
+      "color": "#b06634",
+      "nodes": [
+        "salt_ice",
+        "salt_box",
+        "salt_em_mdp",
+        "salt_em_pp",
+        "salt_em",
+        "salt_heat_mdp",
+        "salt_heat_pp",
+        "salt_heat",
+        "salt_count",
+        "salt_drop",
+        "cmp_ice",
+        "cmp_drop",
+        "salt_watch"
+      ],
+      "patch": [
+        {
+          "node": "count",
+          "port": "xvg",
+          "side": "west",
+          "label": "pure: ice"
+        },
+        {
+          "node": "drop",
+          "port": "xvg",
+          "side": "west",
+          "label": "pure: drop"
         }
       ]
     }

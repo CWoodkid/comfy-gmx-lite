@@ -3,10 +3,14 @@
 Not a translation of a published course, unlike Lysozyme in Water. A small cube
 of ice floats in empty space and is heated in one run, from colder than any
 freezer to far hotter than any kettle. On the way it melts into a round drop,
-and the drop boils away into a gas that fills the box. Four measurements say
+and the drop boils away into a gas that fills the box. Five measurements say
 the same thing in numbers: the temperature, how many molecules are still part
-of the ice, how big the lump is, and how tightly the molecules still hold on
-to each other. A movie shows it.
+of the ice, how big the lump is, how tightly the molecules still hold on to
+each other, and how much of the water is still in the drop. A movie shows it.
+
+An extra box does it all again with salt in the ice and sets the two side by
+side. It is switched off, so Run leaves it out until a teacher switches it on:
+the class sees the pure cube first.
 
 The whole of it runs in a few minutes on one processor, which is the point:
 it was made for a class, where there are fifteen minutes and one processor
@@ -116,6 +120,13 @@ comm-mode            = linear
 """
 
 
+def _off(node: Dict[str, Any]) -> Dict[str, Any]:
+    """The block switched off, as if somebody had pressed Ctrl+M on it: Run
+    leaves it out, along with everything that depends on it."""
+    node["off"] = True
+    return node
+
+
 _ICE_NODES: List[Dict[str, Any]] = [
     _note("note_what", 0, 0,
           "AN ICE CUBE, HEATED UNTIL IT BOILS AWAY\n"
@@ -211,6 +222,8 @@ _ICE_NODES: List[Dict[str, Any]] = [
     _n("size_plot", "view.plot", 8.5, 3),
     _n("energy", "gmx.energy", 7.5, 4, terms="Potential\n", output="energy.xvg"),
     _n("energy_plot", "view.plot", 8.5, 4),
+    _n("drop", "analysis.drop_water", 7.5, 5, output="drop.xvg"),
+    _n("drop_plot", "view.plot", 8.5, 5),
     _n("watch", "view.trajectory", 9.5, 1, mode="every Nth", skip=2,
        sel="Oxygens", pbc="mol", center=True),
 
@@ -243,8 +256,72 @@ _ICE_NODES: List[Dict[str, Any]] = [
           "while the drop boils away, and hardly at all once it is all gas,\n"
           "when the molecules have almost nothing left to let go of.\n"
           "\n"
+          "WATER IN THE DROP: the share of the water still in the drop. A\n"
+          "molecule counts when it touches the drop, closer than 0.35 nm, in\n"
+          "this frame and in the frames just before and after, so gas flying\n"
+          "past is not counted. It stays near 100 % until the drop starts to\n"
+          "boil, and falls to zero as the drop boils away.\n"
+          "\n"
           "THE MOVIE: one dot per molecule, its oxygen. Press play; drag to\n"
           "turn it."),
+
+    # ---- 5. the same with salt, switched off until it is wanted ---------------
+    # A class sees the pure cube first. The salty cube is a box of its own to
+    # the right, switched off, so Run leaves it out until somebody switches it
+    # on. It builds, settles and heats its own cube with copies of the two
+    # run-parameter blocks, so no wire has to cross the heating box; only the
+    # pure cube's two measurements come across, for the comparison graphs.
+    # Its note stands above it and is not switched off, so it stays readable.
+    _note("note_salt", 12, 0,
+          "4. EXTRA: DOES SALT CHANGE IT?\n"
+          "The box underneath is switched off, so Run leaves it out.\n"
+          "\n"
+          "Salt in water holds on to the water molecules around it. So salty\n"
+          "water boils at a higher temperature than pure water, and freezes\n"
+          "at a lower one: that is why roads are salted in winter.\n"
+          "\n"
+          "The box underneath does it all again with salt in the ice: 26 water\n"
+          "molecules swapped for sodium ions (Na+, purple in the movie) and 26\n"
+          "for chloride ions (Cl-, green). That is 2 moles of salt per kilogram of\n"
+          "water, over three times as salty as the sea. Everything else is the\n"
+          "same.\n"
+          "\n"
+          "To switch it on, right-click the box's title bar and choose 'Switch\n"
+          "this chunk back on', then press Run. Only the new box runs: the\n"
+          "pure cube's results are kept. It takes as long as the first run.\n"
+          "\n"
+          "The two graphs on its right put pure and salty side by side:\n"
+          "- ICE: the salty crystal starts with fewer molecules in ice, since\n"
+          "  every ion breaks the honeycomb around it, and it melts sooner;\n"
+          "- WATER IN THE DROP: the salty drop holds on to its water for\n"
+          "  longer, and some of it never leaves: it stays stuck to the ions.\n"
+          "\n"
+          "The size is not real. In a kitchen, this much salt lowers the\n"
+          "melting point by about 7 degrees and raises the boiling point by\n"
+          "about 2. Here both move by tens of degrees: the heat comes very\n"
+          "fast, and a drop this small gets saltier and saltier as its water\n"
+          "leaves. The direction is right; the size is not."),
+    _off(_n("salt_ice", "build.ice", 12, 1, cells_x=6, cells_y=4, cells_z=4,
+            seed=1, salt=26)),
+    _off(_n("salt_box", "gmx.editconf", 13, 1, box_type="cubic",
+            box="5.5 5.5 5.5", center=True, output="cube.gro")),
+    _off(_n("salt_em_mdp", "util.mdp", 12, 2, mode="raw", raw=_MIN_MDP,
+            filename="minimise.mdp")),
+    _off(_n("salt_em_pp", "gmx.grompp", 13, 2, output="em.tpr")),
+    _off(_n("salt_em", "gmx.mdrun", 14, 2, deffnm="em")),
+    _off(_n("salt_heat_mdp", "util.mdp", 15, 1, mode="raw", raw=_HEAT_MDP,
+            filename="heat.mdp")),
+    _off(_n("salt_heat_pp", "gmx.grompp", 16, 1, output="heat.tpr")),
+    _off(_n("salt_heat", "gmx.mdrun", 17, 1, deffnm="heat")),
+    _off(_n("salt_count", "analysis.ice_count", 18, 1, output="ice.xvg")),
+    _off(_n("salt_drop", "analysis.drop_water", 18, 2, output="drop.xvg")),
+    _off(_n("cmp_ice", "view.compare", 19, 1, name_first="pure water",
+            name_second="with salt", title="Ice: pure water against salty")),
+    _off(_n("cmp_drop", "view.compare", 19, 2, name_first="pure water",
+            name_second="with salt",
+            title="Water still in the drop: pure against salty")),
+    _off(_n("salt_watch", "view.trajectory", 17, 2, mode="every Nth", skip=2,
+            sel="Oxygens_and_ions", pbc="mol", center=True)),
 ]
 
 _ICE_LINKS: List[Dict[str, str]] = [
@@ -271,9 +348,33 @@ _ICE_LINKS: List[Dict[str, str]] = [
     _l("size", "xvg", "size_plot", "xvg"),
     _l("heat", "edr", "energy", "edr"),
     _l("energy", "xvg", "energy_plot", "xvg"),
+    _l("heat", "traj", "drop", "traj"),
+    _l("heat_pp", "tpr", "drop", "tpr"),
+    _l("drop", "xvg", "drop_plot", "xvg"),
     _l("heat", "traj", "watch", "traj"),
     _l("heat_pp", "tpr", "watch", "tpr"),
     _l("ice", "index", "watch", "index"),
+
+    _l("salt_ice", "structure", "salt_box", "structure"),
+    _l("salt_em_mdp", "mdp", "salt_em_pp", "mdp"),
+    _l("salt_box", "structure", "salt_em_pp", "structure"),
+    _l("salt_ice", "topology", "salt_em_pp", "topology"),
+    _l("salt_em_pp", "tpr", "salt_em", "tpr"),
+    _l("salt_heat_mdp", "mdp", "salt_heat_pp", "mdp"),
+    _l("salt_em", "structure", "salt_heat_pp", "structure"),
+    _l("salt_ice", "topology", "salt_heat_pp", "topology"),
+    _l("salt_heat_pp", "tpr", "salt_heat", "tpr"),
+    _l("salt_heat", "traj", "salt_count", "traj"),
+    _l("salt_heat_pp", "tpr", "salt_count", "tpr"),
+    _l("salt_heat", "traj", "salt_drop", "traj"),
+    _l("salt_heat_pp", "tpr", "salt_drop", "tpr"),
+    _l("count", "xvg", "cmp_ice", "first"),
+    _l("salt_count", "xvg", "cmp_ice", "second"),
+    _l("drop", "xvg", "cmp_drop", "first"),
+    _l("salt_drop", "xvg", "cmp_drop", "second"),
+    _l("salt_heat", "traj", "salt_watch", "traj"),
+    _l("salt_heat_pp", "tpr", "salt_watch", "tpr"),
+    _l("salt_ice", "index", "salt_watch", "index"),
 ]
 
 _ICE_GROUPS = [
@@ -290,11 +391,20 @@ _ICE_GROUPS = [
                   _wall("ice", "topology", "east")]),
     _group("2. Heat it: 200 K to 1000 K", COLOR["production"],
            "heat_mdp", "heat_pp", "heat", "temp", "temp_plot", "count",
-           "count_plot", "size", "size_plot", "energy", "energy_plot", "watch",
-           "note_heat",
+           "count_plot", "size", "size_plot", "energy", "energy_plot", "drop",
+           "drop_plot", "watch", "note_heat",
            walls=[_wall("ice", "topology", "west"),
                   _wall("ice", "index", "west"),
-                  _wall("em", "structure", "west", "settled cube")]),
+                  _wall("em", "structure", "west", "settled cube"),
+                  # Bottom up, the reverse of the salt box's left edge.
+                  _wall("drop", "xvg", "east", "pure: drop"),
+                  _wall("count", "xvg", "east", "pure: ice")]),
+    _group("3. Extra: the same with salt", COLOR["analysis"],
+           "salt_ice", "salt_box", "salt_em_mdp", "salt_em_pp", "salt_em",
+           "salt_heat_mdp", "salt_heat_pp", "salt_heat", "salt_count",
+           "salt_drop", "cmp_ice", "cmp_drop", "salt_watch",
+           walls=[_wall("count", "xvg", "west", "pure: ice"),
+                  _wall("drop", "xvg", "west", "pure: drop")]),
 ]
 
 _ICE_STEPS = [
@@ -312,6 +422,15 @@ _ICE_STEPS = [
      "summary": "200 ps in one run, the temperature climbing all the way. The "
                 "ice melts into a round drop, and the drop boils away into a "
                 "gas that fills the box."},
+    {"title": "4. Extra: the same with salt", "page": "",
+     "nodes": ["salt_ice", "salt_box", "salt_em_mdp", "salt_em_pp", "salt_em",
+               "salt_heat_mdp", "salt_heat_pp", "salt_heat", "salt_count",
+               "salt_drop", "cmp_ice", "cmp_drop", "salt_watch"],
+     "summary": "Switched off until you switch it on: right-click its box's "
+                "title bar. The same cube with 26 pairs of sodium and chloride "
+                "ions in it, heated the same way, and two graphs that put pure "
+                "and salty side by side. The salty ice melts sooner, and the "
+                "salty drop holds on to its water for longer."},
 ]
 
 TUTORIALS: List[Dict[str, Any]] = [
@@ -326,8 +445,11 @@ TUTORIALS: List[Dict[str, Any]] = [
                    "from 200 K, colder than any freezer, to 1000 K: it melts "
                    "into a round drop, and the drop boils away into a gas that "
                    "fills the box. Follow the temperature, count the ice "
-                   "molecule by molecule, measure the size of the lump and "
-                   "how tightly its molecules hold on, and watch it happen.",
+                   "molecule by molecule, measure the size of the lump, how "
+                   "tightly its molecules hold on and how much water is left "
+                   "in the drop, and watch it happen. An extra box, switched "
+                   "off until you want it, does it all again with salt in the "
+                   "ice and sets the two side by side.",
         "requires": [
             "GROMACS",
             "Python with numpy, for counting the ice",
@@ -335,7 +457,8 @@ TUTORIALS: List[Dict[str, Any]] = [
         ],
         "runtime": "about 2 and a half minutes on one processor, most of it "
                    "the 200 ps run. Measured in the online copy, limited to "
-                   "one processor",
+                   "one processor. The extra salt box, switched on, takes "
+                   "about as long again",
         "measured": "Run here from start to finish in the online copy, on one "
                     "processor, in 2 minutes 24 seconds.\n"
                     "\n"
@@ -357,15 +480,33 @@ TUTORIALS: List[Dict[str, Any]] = [
                     "the box.\n"
                     "\n"
                     "Energy: the potential energy went from -45,930 to -6,800 "
-                    "kJ/mol.",
+                    "kJ/mol.\n"
+                    "\n"
+                    "The drop measure and the salt box came later, and were run "
+                    "on a workstation with 4 processors. The temperatures from "
+                    "here on are the thermostat's target at that moment. Water "
+                    "in the drop: over 90 % until 125 ps (550 K), half at "
+                    "147 ps (682 K), 10 % at 156 ps (736 K), none from 180 ps "
+                    "on. On one processor the drop measure took 13 seconds.\n"
+                    "\n"
+                    "With salt (26 pairs, 2 mol per kg of water): 163 of the 716 "
+                    "water molecules pass the ice test at the start, 21 after "
+                    "1 ps, and the ice was all but gone at 20.5 ps (241 K), "
+                    "against 61 ps (322 K) for the pure cube. Water in the "
+                    "drop: over 90 % until 128 ps (568 K), half at 150.5 ps "
+                    "(703 K), 10 % at 179.5 ps (877 K), and 3.6 % still there "
+                    "at the end, stuck to the ions. Heated on one processor, "
+                    "the salty cube took 118 seconds, the same as the pure one.",
         "notes": "Written for this version: there is no published tutorial "
                  "behind it, so the notes on the canvas say everything it "
                  "has to say.",
         "steps": _ICE_STEPS,
-        # Two columns, each stacked on its own; the first box and the run
-        # then stand level with each other.
-        "graph": {"nodes": _level_with(_relayout(_ICE_NODES, bands=(4,)),
-                                       "heat_mdp", "ice", 4),
+        # Three columns, each stacked on its own; then the first box, the run
+        # and the salty cube stand level with each other.
+        "graph": {"nodes": _level_with(
+                      _level_with(_relayout(_ICE_NODES, bands=(4, 11.5)),
+                                  "heat_mdp", "ice", 4),
+                      "salt_ice", "heat_mdp", 11.5),
                   "links": _ICE_LINKS, "groups": _ICE_GROUPS},
     },
 ]

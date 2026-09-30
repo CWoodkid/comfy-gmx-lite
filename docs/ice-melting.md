@@ -24,7 +24,7 @@ way the class sees ice, liquid and gas, one after the other:
 - **Boiling.** Molecules fly off the drop, a few at first, then in a rush.
 - **Gas** for the last 30 or 40 ps. The molecules fill the whole box.
 
-Five results make it visible:
+Six results make it visible:
 
 | block | what it draws | what the class should see |
 | --- | --- | --- |
@@ -32,6 +32,7 @@ Five results make it visible:
 | **Count the ice** | how many molecules still sit in the crystal pattern, frame by frame | a slow fall from about 30 ps, then to zero by about 70 ps |
 | **Radius of gyration** | roughly how far the molecules are from the middle, on average | shrinks a little as the cube becomes a drop, shoots up as the drop boils away, and levels off when the gas fills the box |
 | **Energy terms** (Potential) | how tightly the molecules hold on to each other | climbs the whole way, fastest while the drop boils away |
+| **Water in the drop** | the share of the water still in the liquid drop, frame by frame | near 100 % until the drop starts to boil, then down to nothing |
 | **Preview trajectory** | a movie, one dot per molecule | a cube, then a ball, then a cloud |
 
 This is what I got when I ran it in the online copy on one processor of my own
@@ -55,6 +56,11 @@ The last molecule counted as ice went at 68.5 ps. The drop was smallest,
 1.38 nm, at 73 ps. The thermometer reads a little above or below the target
 from moment to moment, because the thermostat corrects it gently rather than
 all at once.
+
+I added *Water in the drop* later, and ran it on a workstation with 4
+processors. The drop held over 90 % of its water until 125 ps, was half gone at
+147 ps, and was empty from 180 ps on. The thermostat's target at those moments
+was 550 K, 682 K and 880 K. On one processor the block takes 13 seconds.
 
 On another computer the numbers will differ a little. Two machines round their
 arithmetic in slightly different ways, those tiny differences grow over a run,
@@ -157,6 +163,113 @@ drops: once the molecules start to shiver, some of them fail the strict test
 even though the crystal is still there. What matters is what happens after
 that.
 
+## Extra: the same with salt
+
+A colleague asked whether this simulation can show salt raising the boiling
+point of water. It can show which way salt pushes, and why. It cannot show by
+how much. The box **3. Extra: the same with salt**, to the right of the run,
+does it. It starts switched off, so **Run** leaves it out: the class sees the
+pure cube first, and the salty one when you are ready.
+
+**Switching it on.** Right-click the box's title bar and choose **Switch this
+chunk back on** (or hold Ctrl and Alt and click the title bar). Then press
+**Run**. Only the new box runs, because everything the pure cube produced is
+reused. It takes about as long as the first run: on one processor the salty
+cube heated in 118 seconds, the same as the pure one. The same menu switches
+it off again.
+
+**What is in it.** The same cube, with 26 of its 768 water molecules swapped
+for sodium ions (Na+) and 26 for chloride ions (Cl−). That is 2 moles of salt
+per kilogram of water, more than three times as salty as the sea (about 0.6).
+The box settles the cube and heats it exactly as boxes 1 and 2 do, with copies
+of the same two *Run parameters (.mdp)* blocks. If you change the heating in
+box 2, change the copy in box 3 too, or the comparison is not fair. Two
+*Compare graphs* blocks set the pure and the salty cube side by side: the ice
+count, and the water still in the drop. Its movie shows the ions too, sodium
+in purple and chloride in green.
+
+**What the class should see.** This is my run on a workstation. The
+temperatures are the thermostat's target at that moment.
+
+| | pure water | with salt |
+| --- | --- | --- |
+| pass the ice test at the start | 441 of 768 | 163 of 716 |
+| after 1 ps | 285 | 21 |
+| ice all but gone (2 % of the start left) | 61 ps (322 K) | 20.5 ps (241 K) |
+| water in the drop: over 90 % until | 125 ps (550 K) | 128 ps (568 K) |
+| half gone | 147 ps (682 K) | 150.5 ps (703 K) |
+| 10 % left | 156 ps (736 K) | 179.5 ps (877 K) |
+| at the end, 1000 K | none | 3.6 %, stuck to the ions |
+
+- **The salty ice melts sooner.** Every ion breaks the honeycomb around it, so
+  fewer molecules pass the ice test from the start, and the rest give way at a
+  lower temperature.
+- **The salty drop holds on to its water for longer.** It starts to lose water
+  at nearly the same moment, and it is half gone only a few picoseconds later;
+  how many changes from run to run. The difference is at the end: the last
+  tenth of the water stays about 23 ps (140 degrees) longer, and a few per cent
+  never leave at all.
+
+**The science.** Salt in water falls apart into ions, and each ion holds on to
+the water molecules around it. A molecule held by an ion is less free to fly
+off, so salty water has to be hotter before it boils. The ions also get in the
+way of the molecules locking into the pattern of ice, so salty water has to be
+colder before it freezes. That is why roads are salted in winter, and why the
+sea freezes at about −2 °C. The size of the effect depends on how many
+particles are dissolved, not on what they are. For water, every mole of
+dissolved particles in a kilogram raises the boiling point by about 0.51
+degrees and lowers the freezing point by about 1.86. Salt gives two particles,
+a sodium and a chloride, so at 2 moles per kilogram the boiling point goes up
+by about 2 degrees and the freezing point down by about 7.
+
+**Why the simulation overdoes it.** Here both shifts are tens of degrees. There
+are three reasons, and they are worth telling the class.
+
+- The heating is very fast. As with the pure cube, everything happens later
+  than it would in a kitchen, and a difference between the two cubes is
+  stretched out with it.
+- The drop is tiny, and it gets saltier as it boils. By the time half the water
+  has gone, the salt is twice as concentrated, and the last few dozen water
+  molecules are all held by ions. A pan of salt water only gets there when it
+  has nearly boiled dry.
+- The salty crystal is not one that nature makes. Real ice pushes salt out as it
+  freezes: sea ice is far less salty than the sea, with the salt left in small
+  pockets of brine. A crystal with
+  ions spread all through it is salty water frozen far too fast for the salt to
+  get out, and it is weaker for it.
+
+So the class sees the right direction for the right reason, but not the right
+size. I would say so when I show it.
+
+**How the salt is put in.** *Ice crystal* has a box *Salt: pairs of Na+ and
+Cl-*. It swaps that many water molecules for sodium ions and as many again for
+chloride ions, each ion where the molecule's oxygen was, and no two ions closer
+than 0.5 nm. *Seed for the salt*, under advanced, chooses which molecules; the
+hydrogens of the rest stay as they were. The block reports how much salt that
+came to, in moles per kilogram of water. Left empty, the box gives the pure
+crystal, exactly as before. The ions are the ones Joung and Cheatham made for
+TIP4P-Ew water, a close relative of TIP4P/Ice, as GROMACS 2026.3 ships them in
+its amber14sb.ff force field.
+
+**How the drop is measured.** *Water in the drop* looks for the biggest group
+of molecules that touch, closer than 0.35 nm (about the distance to a
+molecule's nearest neighbours in liquid water), directly or through others.
+That is the drop. It counts the water molecules in it, frame by frame, as a
+share of all the water. The ions belong to the drop but are not counted. The
+gas in this small box is crowded, and gas molecules brush past the drop all
+the time, so a molecule counts only when it is in the drop in the frame
+before and the frame after as well.
+
+**Things to try with salt.**
+
+- **Less salt.** Set the salt to 13 pairs, about 1 mole per kilogram. Is the
+  difference still there?
+- **More salt.** 40 pairs is about 3 moles per kilogram. Does the salty drop
+  leave more water behind?
+- **How much is chance?** Change *Seed for the salt*, or `gen_seed` in the heating
+  run's *Run parameters (.mdp)* (in both boxes, to keep them alike), and run
+  again. Which parts of the difference come back every time?
+
 ## Things to try
 
 - **Heat it more slowly.** In the *Run parameters (.mdp)* block of the run (in
@@ -184,6 +297,10 @@ that.
 - Abascal, J. L. F., Sanz, E., García Fernández, R. and Vega, C. (2005). A
   potential model for the study of ices and amorphous water: TIP4P/Ice. *J.
   Chem. Phys.* 122, 234511. [doi:10.1063/1.1931662](https://doi.org/10.1063/1.1931662)
+- Joung, I. S. and Cheatham, T. E. (2008). Determination of alkali and halide
+  monovalent ion parameters for use in explicitly solvated biomolecular
+  simulations. *J. Phys. Chem. B* 112, 9020-9041.
+  [doi:10.1021/jp8001614](https://doi.org/10.1021/jp8001614)
 - Nguyen, A. H. and Molinero, V. (2015). Identification of clathrate hydrates,
   hexagonal ice, cubic ice, and liquid water in simulations: the CHILL+
   algorithm. *J. Phys. Chem. B* 119, 9369-9376.

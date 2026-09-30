@@ -604,7 +604,7 @@ const NodePreview = {
     canvas.addEventListener('mousedown', (event) => event.stopPropagation());
 
     if (node.previewData) {
-      caption.textContent = this.describeFlat(kind, node.previewData);
+      this.captionFlat(caption, kind, node.previewData);
     } else if (node.previewError) {
       caption.textContent = node.previewError;
     } else {
@@ -614,6 +614,27 @@ const NodePreview = {
     }
     requestAnimationFrame(() => this.paint(node));
     return host;
+  },
+
+  /* The line under a curve. With more than one line on the canvas it names
+     each in its own colour: two curves with no key are two curves nobody can
+     tell apart, and pointing at the canvas to find out is no help to a class
+     watching the teacher's screen. */
+  captionFlat(caption, kind, data) {
+    const series = (kind === 'plot' && data && !data.error && data.series) || [];
+    if (series.length < 2) {
+      caption.textContent = this.describeFlat(kind, data);
+      return;
+    }
+    caption.textContent = '';
+    series.forEach((s, i) => {
+      caption.appendChild(UI.el('span', {
+        class: 'preview-key',
+        style: `color: ${SERIES_COLORS[i % SERIES_COLORS.length]}`,
+      }, [`\u25A0 ${s.label}`]));
+    });
+    const shown = data.stride > 1 ? ` (every ${data.stride}th)` : '';
+    caption.appendChild(document.createTextNode(`${data.n_rows || 0} rows${shown}`));
   },
 
   describeFlat(kind, data) {
@@ -847,7 +868,7 @@ const NodePreview = {
       node.previewError = '';
       const current = this.views.get(node.id);
       if (current && (kind === 'plot' || kind === 'dssp')) {
-        current.caption.textContent = this.describeFlat(kind, data);
+        this.captionFlat(current.caption, kind, data);
         current.caption.title = source;
         this.paint(node);
       } else if (current) {
