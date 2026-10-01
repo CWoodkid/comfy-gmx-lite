@@ -270,6 +270,106 @@ before and the frame after as well.
   run's *Run parameters (.mdp)* (in both boxes, to keep them alike), and run
   again. Which parts of the difference come back every time?
 
+## Extra: cool it down again
+
+Does the gas freeze back into ice when it is cooled again? Two more boxes
+answer that: **4. Extra: cool it down again**, under the pure run, and **5.
+Extra: cool the salty one down too**, under the salty cube. Both start
+switched off, like the salt box. Their note stands to their left.
+
+**Switching them on.** Right-click each box's title bar and choose **Switch
+this chunk back on**, then press **Run**. Only the new boxes run, because the
+heating runs are reused. Box 4 needs nothing but the heating above it. Box 5
+needs the salt box switched on and run as well, and its two graphs, which set
+pure and salty side by side, need box 4 too. Each cooling run takes as long
+as a heating run: on one processor, 119 seconds for the pure gas and 117 for
+the salty one.
+
+**What is in them.** Each box starts from the last frame of the heating run
+above it: the gas at 1000 K, with every molecule where it was and moving as
+fast as it was. So nothing jumps: the pure gas ended the heating at 990 K and
+started the cooling at 990 K. The *Run parameters (.mdp)* block cools it along
+the heating schedule backwards: fast from 1000 K to 400 K over the first
+100 ps, then slowly to 200 K over the second 100 ps. The ice count, the water
+in the drop and a movie follow it, as in the heating. Box 5 has a copy of box
+4's *Run parameters (.mdp)*. If you change one, change the other too.
+
+The two movies have *Periodic boundary* set to **lump**. The drop forms
+wherever the gas happens to gather, often across the edge of the box, and
+the box repeats in every direction, so the usual setting draws it cut in
+two, half at each side of the box. **lump** moves every frame so the drop
+sits in the middle, in one piece. The heating movies do not need it: the
+cube starts in the middle, and its drop stays there.
+
+**What the class should see.** This is my run on a workstation. The
+temperatures are the thermostat's target at that moment.
+
+| | pure water | with salt |
+| --- | --- | --- |
+| water in the drop at the start, 1000 K | none | 8 %, the water that never left the ions |
+| back in the drop: 10 % | 62.5 ps (625 K) | 35.5 ps (787 K) |
+| half | 74.5 ps (553 K) | 70 ps (580 K) |
+| 90 % | 83 ps (502 K) | 84 ps (496 K) |
+| all of it | from 147.5 ps (305 K) on | from 173.5 ps (253 K) on |
+| most molecules passing the ice test in one frame | 2 (5 in another run) | 1 |
+
+- **The gas turns back into a drop.** As the molecules slow down, the ones
+  that meet stick together again, and the drop gathers them up. It comes back
+  at a lower temperature than it left: in the same run, the pure drop was half
+  gone at 670 K on the way up, and half back at 553 K on the way down. Both
+  lag behind a thermostat that moves this fast, as the melting did.
+- **A ball, or a column through the box.** The water does not always end as a
+  round drop. It can also settle into a thick column that runs out through one
+  side of the box and back in through the opposite side, joined to itself: the
+  box repeats in every direction, so the column has no ends. A liquid pulls
+  itself into the shape with the least surface, and for 768 molecules in this
+  box the two shapes come out almost equal: about 39 nm² for a ball 3.5 nm
+  across, and about 40 nm² for the column. So either can form. In my two runs
+  the pure water made a column once and a ball once, and so did the salty
+  water. The movie shows a column as a band that touches two opposite faces of
+  the box. It is one body of water, and the drop graph counts it as one.
+- **The ice does not come back.** Now and then a few molecules pass the ice
+  test by chance, as happens in any cold water. The pure cube had 439 at the
+  start of the heating, and nothing like that returns, not even at 200 K.
+- **Salt makes little difference here.** The salty drop starts from the water
+  that never left its ions. In one of my runs it gathered the rest back a
+  little sooner than the pure drop did, and in another a little later, so that
+  part is chance.
+
+**Why the ice does not come back.** Melting and freezing are not mirror images.
+A crystal can start to melt anywhere on its surface, and this one comes apart
+in picoseconds. Freezing has to start from a seed: a cluster of molecules that
+happen to line up into the pattern of ice together, big enough to grow rather
+than fall apart again. Small clusters like that form and fall apart all the
+time. One big enough to grow is rare, and the less the water is cooled below
+its freezing point, the bigger it has to be. So pure water can be cooled well
+below 0 °C and stay liquid. This is supercooling, and it happens in nature:
+the tiny droplets in clouds stay liquid down to about −38 °C. In a glass of
+water, freezing starts from something a seed can grow on, such as dust or a
+scratch in the glass. The drop in the simulation has nothing like that, and
+200 ps is far too short for a seed to form on its own.
+
+**What I tried before building it.** I cooled a drop to 230 K (−43 °C) and held
+it there for 900 ps, over four times as long as the cooling run. No more than
+5 molecules passed the ice test at any moment, pure or salty. I also started
+from frames where the cube had not finished melting, and cooled them at once
+to 230 K or to 200 K. The ice that was left did not grow back. At 230 K it
+kept melting, from 195 molecules to 57 in a nanosecond. At 200 K it went down
+from 256 to around 190 in 250 ps and stayed near that for the rest of the
+500 ps run. A crystal this small melts at a lower temperature than a big one,
+because so much of it is surface. With salt, the 37 molecules of ice that were
+left melted away at both temperatures.
+
+**Things to try with the cooling.**
+
+- **Watch the drop gather.** Play the movie in box 4 between about 60 and
+  85 ps, when most of the water comes back into the drop.
+- **Cool it more slowly.** In box 4's *Run parameters (.mdp)*, set
+  `annealing-time` to `0 100 1000`, `annealing-temp` to `1000 230 230` and
+  `nsteps` to `500000`: down to 230 K in 100 ps, then held there for 900 ps.
+  That is the run I tried. It takes five times as long, about ten minutes on
+  one processor. Does any ice come back?
+
 ## Things to try
 
 - **Heat it more slowly.** In the *Run parameters (.mdp)* block of the run (in

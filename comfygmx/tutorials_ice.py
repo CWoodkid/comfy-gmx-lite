@@ -12,6 +12,11 @@ An extra box does it all again with salt in the ice and sets the two side by
 side. It is switched off, so Run leaves it out until a teacher switches it on:
 the class sees the pure cube first.
 
+Two more boxes, also switched off, take the hot gas at the end of each run,
+pure and salty, and cool it back down the same way. The gas gathers into a
+drop again, but the ice does not come back: freezing has to start from a
+seed, and none forms in the time a class has.
+
 The whole of it runs in a few minutes on one processor, which is the point:
 it was made for a class, where there are fifteen minutes and one processor
 each.
@@ -23,8 +28,10 @@ from typing import Any, Dict, List
 
 from .chunks import COLOR
 from .tutorial_graph import (
+    GROUP_PAD, GROUP_TITLE_H,
     group as _group, level_with as _level_with, link as _l, node as _n,
-    note as _note, relayout as _relayout, wall as _wall,
+    note as _note, relayout as _relayout, space_boxes as _space_boxes,
+    wall as _wall,
 )
 
 #: Where the teacher's notes for this tutorial live.
@@ -116,6 +123,55 @@ pcoupl               = no
 ; drift: molecules that boil off fly out through one side of the box and come
 ; back in through the opposite one, since the box repeats in every direction,
 ; and stopping any spin as well goes wrong once they do.
+comm-mode            = linear
+"""
+
+# The cooling schedule is the heating one run backwards. It was tried on the
+# pure and the salty gas before it was written down: the gas is back in one
+# drop by about 400 K, and the ice count stays at zero all the way down, apart
+# from a few molecules now and then that pass the test by chance. A drop
+# cooled to 230 K and held there for 900 ps did no better, so a slower
+# schedule would show nothing more in the time a class has.
+_COOL_MDP = """; The hot gas cooled in one run, from 1000 K back down to 200 K.
+;
+; The heating run backwards: fast from 1000 K to 400 K over the first 100 ps,
+; while the gas gathers back into a drop, then slowly to 200 K over the next
+; 100 ps. It starts from the last picture of the heating run, and every
+; molecule keeps the speed it had there, so the temperature carries on from
+; where the heating left it.
+integrator           = md
+dt                   = 0.002     ; one step is 2 femtoseconds (0.002 ps)
+nsteps               = 100000    ; 100,000 steps: 200 picoseconds
+
+nstxout-compressed   = 250       ; save a picture every 250 steps (0.5 ps)
+nstenergy            = 500       ; and the energies, every 1 ps
+nstlog               = 5000
+
+cutoff-scheme        = Verlet
+coulombtype          = PME
+rcoulomb             = 1.0
+vdwtype              = cut-off
+rvdw                 = 1.0
+pbc                  = xyz
+
+; The same thermostat as in the heating run.
+tcoupl               = v-rescale
+tc-grps              = System
+tau_t                = 0.1       ; how quickly it corrects, in ps
+ref_t                = 1000      ; the target at the start
+
+; Annealing: the target moves, in straight lines between these points.
+; 1000 K at 0 ps, 400 K at 100 ps, 200 K at 200 ps.
+annealing            = single
+annealing-npoints    = 3
+annealing-time       = 0 100 200
+annealing-temp       = 1000 400 200
+
+; No new speeds: every molecule keeps the one it had at the end of the
+; heating. The structure file carries it, along with where the molecule was.
+gen_vel              = no
+
+pcoupl               = no
 comm-mode            = linear
 """
 
@@ -322,6 +378,79 @@ _ICE_NODES: List[Dict[str, Any]] = [
             title="Water still in the drop: pure against salty")),
     _off(_n("salt_watch", "view.trajectory", 17, 2, mode="every Nth", skip=2,
             sel="Oxygens_and_ions", pbc="mol", center=True)),
+
+    # ---- 6. cool them down again, switched off until it is wanted ------------
+    # Two boxes, one under each heating run, so each takes its hot gas from
+    # the box right above it: pure under pure, salty under salty. One box for
+    # both would have needed wires cutting straight across the heating box.
+    # Each copies the blocks of the run above it column for column. The note
+    # stands to the left, level with them, where no wire has to pass.
+    _note("note_cool", 0, 6,
+          "5. EXTRA: COOL IT DOWN AGAIN\n"
+          "The two boxes to the right are switched off, so Run leaves them out.\n"
+          "\n"
+          "They take the hot gas at the end of each heating run, pure and salty,\n"
+          "and cool it the way it was heated, backwards: fast from 1000 K to\n"
+          "400 K over the first 100 picoseconds, then slowly to 200 K over the\n"
+          "next 100. Every molecule starts from where it was at the end of the\n"
+          "heating, moving just as fast.\n"
+          "\n"
+          "What happens, pure or salty:\n"
+          "- the gas gathers back into one body of water: slowed down, the\n"
+          "  molecules stick together again when they meet, and by about 400 K\n"
+          "  nearly all of them are back. It may be a round drop, or a thick\n"
+          "  column that leaves the box through one side and comes back in\n"
+          "  through the other, joined to itself: in a box this small the two\n"
+          "  shapes have almost the same surface, so either can form;\n"
+          "- the ice does not come back. Now and then a few molecules pass the\n"
+          "  ice test by chance, as they do in any cold water, but the cube had\n"
+          "  439 at the start, and nothing like that returns, not even at 200 K,\n"
+          "  73 degrees below freezing.\n"
+          "\n"
+          "Why not? A crystal melts from its surface, and falls apart in\n"
+          "picoseconds. Freezing has to start from a seed: a cluster of\n"
+          "molecules that happen to line up into the honeycomb together, big\n"
+          "enough to last, before the rest can join it. Until one forms, water\n"
+          "stays liquid far below 0 degrees C. This is called supercooling, and\n"
+          "it is real: the tiny droplets in clouds stay liquid down to about\n"
+          "-38 degrees C. Tried before this was written, a drop cooled to 230 K\n"
+          "and held there for 900 ps, over four times as long as this run,\n"
+          "still did not freeze.\n"
+          "\n"
+          "To switch them on, right-click each box's title bar and choose\n"
+          "'Switch this chunk back on', then press Run. Only the new boxes run:\n"
+          "the heating runs' results are kept. The pure box needs only the\n"
+          "heating above it. The salty box needs the salt box above it switched\n"
+          "on too, and its two graphs put pure and salty side by side."),
+    _off(_n("cool_mdp", "util.mdp", 4.5, 6, mode="raw", raw=_COOL_MDP,
+            filename="cool.mdp")),
+    _off(_n("cool_pp", "gmx.grompp", 5.5, 6, output="cool.tpr")),
+    _off(_n("cool", "gmx.mdrun", 6.5, 6, deffnm="cool")),
+    _off(_n("cool_count", "analysis.ice_count", 7.5, 6, output="ice.xvg")),
+    _off(_n("cool_count_plot", "view.plot", 8.5, 6)),
+    _off(_n("cool_drop", "analysis.drop_water", 7.5, 7, output="drop.xvg")),
+    _off(_n("cool_drop_plot", "view.plot", 8.5, 7)),
+    # The drop forms wherever the gas happens to gather, often across the
+    # box edge, and "mol" would draw it cut in two; "lump" keeps it whole
+    # in the middle. The heating movies need no such help: the cube starts
+    # in the middle and its drop stays there.
+    _off(_n("cool_watch", "view.trajectory", 9.5, 6, mode="every Nth", skip=2,
+            sel="Oxygens", pbc="lump", center=True)),
+
+    _off(_n("salt_cool_mdp", "util.mdp", 15, 3, mode="raw", raw=_COOL_MDP,
+            filename="cool.mdp")),
+    _off(_n("salt_cool_pp", "gmx.grompp", 16, 3, output="cool.tpr")),
+    _off(_n("salt_cool", "gmx.mdrun", 17, 3, deffnm="cool")),
+    _off(_n("salt_cool_count", "analysis.ice_count", 18, 3, output="ice.xvg")),
+    _off(_n("salt_cool_drop", "analysis.drop_water", 18, 4, output="drop.xvg")),
+    _off(_n("cmp_cool_ice", "view.compare", 19, 3, name_first="pure water",
+            name_second="with salt",
+            title="Ice while cooling: pure water against salty")),
+    _off(_n("cmp_cool_drop", "view.compare", 19, 4, name_first="pure water",
+            name_second="with salt",
+            title="Water back in the drop while cooling: pure against salty")),
+    _off(_n("salt_cool_watch", "view.trajectory", 17, 4, mode="every Nth",
+            skip=2, sel="Oxygens_and_ions", pbc="lump", center=True)),
 ]
 
 _ICE_LINKS: List[Dict[str, str]] = [
@@ -375,7 +504,41 @@ _ICE_LINKS: List[Dict[str, str]] = [
     _l("salt_heat", "traj", "salt_watch", "traj"),
     _l("salt_heat_pp", "tpr", "salt_watch", "tpr"),
     _l("salt_ice", "index", "salt_watch", "index"),
+
+    _l("cool_mdp", "mdp", "cool_pp", "mdp"),
+    _l("heat", "structure", "cool_pp", "structure"),
+    _l("ice", "topology", "cool_pp", "topology"),
+    _l("cool_pp", "tpr", "cool", "tpr"),
+    _l("cool", "traj", "cool_count", "traj"),
+    _l("cool_pp", "tpr", "cool_count", "tpr"),
+    _l("cool_count", "xvg", "cool_count_plot", "xvg"),
+    _l("cool", "traj", "cool_drop", "traj"),
+    _l("cool_pp", "tpr", "cool_drop", "tpr"),
+    _l("cool_drop", "xvg", "cool_drop_plot", "xvg"),
+    _l("cool", "traj", "cool_watch", "traj"),
+    _l("cool_pp", "tpr", "cool_watch", "tpr"),
+    _l("ice", "index", "cool_watch", "index"),
+
+    _l("salt_cool_mdp", "mdp", "salt_cool_pp", "mdp"),
+    _l("salt_heat", "structure", "salt_cool_pp", "structure"),
+    _l("salt_ice", "topology", "salt_cool_pp", "topology"),
+    _l("salt_cool_pp", "tpr", "salt_cool", "tpr"),
+    _l("salt_cool", "traj", "salt_cool_count", "traj"),
+    _l("salt_cool_pp", "tpr", "salt_cool_count", "tpr"),
+    _l("salt_cool", "traj", "salt_cool_drop", "traj"),
+    _l("salt_cool_pp", "tpr", "salt_cool_drop", "tpr"),
+    _l("cool_count", "xvg", "cmp_cool_ice", "first"),
+    _l("salt_cool_count", "xvg", "cmp_cool_ice", "second"),
+    _l("cool_drop", "xvg", "cmp_cool_drop", "first"),
+    _l("salt_cool_drop", "xvg", "cmp_cool_drop", "second"),
+    _l("salt_cool", "traj", "salt_cool_watch", "traj"),
+    _l("salt_cool_pp", "tpr", "salt_cool_watch", "tpr"),
+    _l("salt_ice", "index", "salt_cool_watch", "index"),
 ]
+
+_HEAT_BOX = "2. Heat it: 200 K to 1000 K"
+_COOL_BOX = "4. Extra: cool it down again"
+_SALT_COOL_BOX = "5. Extra: cool the salty one down too"
 
 _ICE_GROUPS = [
     # Building the cube and letting it settle share one box. As two boxes, one
@@ -389,14 +552,17 @@ _ICE_GROUPS = [
            walls=[_wall("em", "structure", "east", "settled cube"),
                   _wall("ice", "index", "east"),
                   _wall("ice", "topology", "east")]),
-    _group("2. Heat it: 200 K to 1000 K", COLOR["production"],
+    _group(_HEAT_BOX, COLOR["production"],
            "heat_mdp", "heat_pp", "heat", "temp", "temp_plot", "count",
            "count_plot", "size", "size_plot", "energy", "energy_plot", "drop",
            "drop_plot", "watch", "note_heat",
            walls=[_wall("ice", "topology", "west"),
                   _wall("ice", "index", "west"),
                   _wall("em", "structure", "west", "settled cube"),
-                  # Bottom up, the reverse of the salt box's left edge.
+                  # Bottom up. Lowest, nearest the corner it turns round on
+                  # its way to the cooling box underneath, the hot gas; then
+                  # the reverse of the salt box's left edge.
+                  _wall("heat", "structure", "east", "pure: hot gas"),
                   _wall("drop", "xvg", "east", "pure: drop"),
                   _wall("count", "xvg", "east", "pure: ice")]),
     _group("3. Extra: the same with salt", COLOR["analysis"],
@@ -404,7 +570,30 @@ _ICE_GROUPS = [
            "salt_heat_mdp", "salt_heat_pp", "salt_heat", "salt_count",
            "salt_drop", "cmp_ice", "cmp_drop", "salt_watch",
            walls=[_wall("count", "xvg", "west", "pure: ice"),
-                  _wall("drop", "xvg", "west", "pure: drop")]),
+                  _wall("drop", "xvg", "west", "pure: drop"),
+                  # Bottom up, the reverse of the salty cooling box's left
+                  # edge, so the three turn the corner without crossing.
+                  _wall("salt_ice", "index", "east", "salty: index"),
+                  _wall("salt_ice", "topology", "east", "salty: topology"),
+                  _wall("salt_heat", "structure", "east", "salty: hot gas")]),
+    _group(_COOL_BOX, COLOR["production"],
+           "cool_mdp", "cool_pp", "cool", "cool_count", "cool_count_plot",
+           "cool_drop", "cool_drop_plot", "cool_watch",
+           walls=[_wall("heat", "structure", "west", "pure: hot gas"),
+                  _wall("ice", "topology", "west"),
+                  _wall("ice", "index", "west"),
+                  # Bottom up, the reverse of the salty cooling box's left
+                  # edge below the salty files.
+                  _wall("cool_drop", "xvg", "east", "pure: drop"),
+                  _wall("cool_count", "xvg", "east", "pure: ice")]),
+    _group(_SALT_COOL_BOX, COLOR["analysis"],
+           "salt_cool_mdp", "salt_cool_pp", "salt_cool", "salt_cool_count",
+           "salt_cool_drop", "cmp_cool_ice", "cmp_cool_drop", "salt_cool_watch",
+           walls=[_wall("salt_heat", "structure", "west", "salty: hot gas"),
+                  _wall("salt_ice", "topology", "west", "salty: topology"),
+                  _wall("salt_ice", "index", "west", "salty: index"),
+                  _wall("cool_count", "xvg", "west", "pure: ice"),
+                  _wall("cool_drop", "xvg", "west", "pure: drop")]),
 ]
 
 _ICE_STEPS = [
@@ -431,7 +620,43 @@ _ICE_STEPS = [
                 "ions in it, heated the same way, and two graphs that put pure "
                 "and salty side by side. The salty ice melts sooner, and the "
                 "salty drop holds on to its water for longer."},
+    {"title": "5. Extra: cool them down again", "page": "",
+     "nodes": ["cool_mdp", "cool_pp", "cool", "cool_count", "cool_drop",
+               "cool_watch", "salt_cool_mdp", "salt_cool_pp", "salt_cool",
+               "salt_cool_count", "salt_cool_drop", "cmp_cool_ice",
+               "cmp_cool_drop", "salt_cool_watch"],
+     "summary": "Two boxes, switched off until you switch them on: right-click "
+                "each box's title bar. The hot gas at the end of each heating "
+                "run, pure and salty, cooled back to 200 K the way it was "
+                "heated. The gas gathers back into a drop, or a column through "
+                "the box edge, but the ice does not come back: freezing has to "
+                "start from a seed, and in 200 picoseconds none forms."},
 ]
+
+
+def _ice_layout(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Where everything stands on the page.
+
+    Three columns, each stacked on its own; then the first box, the run and
+    the salty cube stand level with each other. The pure cooling box goes
+    under the pure run, far enough below it for the hot gas to swing round
+    the corner between them, and the salty cooling box stands level with
+    it, under the salty cube. The note for the two stands level with them
+    in the first column, which is empty that far down.
+    """
+    _relayout(nodes, bands=(4, 11.5))
+    _level_with(nodes, "heat_mdp", "ice", 4)
+    _level_with(nodes, "salt_ice", "heat_mdp", 11.5)
+    _space_boxes(nodes, _ICE_GROUPS, [_HEAT_BOX, _COOL_BOX], 360)
+    by_id = {n["id"]: n for n in nodes}
+    top = by_id["cool_mdp"]["pos"][1]
+    salty = next(g for g in _ICE_GROUPS if g["title"] == _SALT_COOL_BOX)
+    shift = top - by_id["salt_cool_mdp"]["pos"][1]
+    for node_id in salty["nodes"]:
+        by_id[node_id]["pos"][1] += shift
+    by_id["note_cool"]["pos"][1] = top - GROUP_PAD - GROUP_TITLE_H
+    return nodes
+
 
 TUTORIALS: List[Dict[str, Any]] = [
     {
@@ -449,7 +674,9 @@ TUTORIALS: List[Dict[str, Any]] = [
                    "tightly its molecules hold on and how much water is left "
                    "in the drop, and watch it happen. An extra box, switched "
                    "off until you want it, does it all again with salt in the "
-                   "ice and sets the two side by side.",
+                   "ice and sets the two side by side. Two more, also switched "
+                   "off, cool the pure and the salty gas back down: it gathers "
+                   "into a drop again, but the ice does not come back.",
         "requires": [
             "GROMACS",
             "Python with numpy, for counting the ice",
@@ -458,7 +685,8 @@ TUTORIALS: List[Dict[str, Any]] = [
         "runtime": "about 2 and a half minutes on one processor, most of it "
                    "the 200 ps run. Measured in the online copy, limited to "
                    "one processor. The extra salt box, switched on, takes "
-                   "about as long again",
+                   "about as long again, and so does each of the two cooling "
+                   "boxes",
         "measured": "Run here from start to finish in the online copy, on one "
                     "processor, in 2 minutes 24 seconds.\n"
                     "\n"
@@ -496,17 +724,30 @@ TUTORIALS: List[Dict[str, Any]] = [
                     "drop: over 90 % until 128 ps (568 K), half at 150.5 ps "
                     "(703 K), 10 % at 179.5 ps (877 K), and 3.6 % still there "
                     "at the end, stuck to the ions. Heated on one processor, "
-                    "the salty cube took 118 seconds, the same as the pure one.",
+                    "the salty cube took 118 seconds, the same as the pure one.\n"
+                    "\n"
+                    "The cooling boxes came last, on the same workstation. The "
+                    "pure gas started cooling at 990 K, where the heating had "
+                    "left it, and both runs followed the thermostat down: about "
+                    "715 K at 50 ps, 395 K at 100 ps and 200 K at the end. Water "
+                    "back in the drop, pure: 10 % at 62.5 ps (625 K), half at "
+                    "74.5 ps (553 K), 90 % at 83 ps (502 K), all of it from "
+                    "147.5 ps (305 K) on; on the way up, in the same run, half "
+                    "had gone at 670 K. Salty: 8 % at the start, the water that "
+                    "never left the ions; half at 70 ps (580 K), 90 % at 84 ps "
+                    "(496 K), all of it from 173.5 ps (253 K) on. The pure water "
+                    "gathered into a column through the box edge, joined to "
+                    "itself, and the salty water into a round drop; in a second "
+                    "run, from the page, it was the other way round. No frame had "
+                    "more than 2 molecules passing the ice test, pure or salty "
+                    "(5 in the second run). "
+                    "On one processor each cooling run took 2 minutes, 119 "
+                    "seconds pure and 117 salty.",
         "notes": "Written for this version: there is no published tutorial "
                  "behind it, so the notes on the canvas say everything it "
                  "has to say.",
         "steps": _ICE_STEPS,
-        # Three columns, each stacked on its own; then the first box, the run
-        # and the salty cube stand level with each other.
-        "graph": {"nodes": _level_with(
-                      _level_with(_relayout(_ICE_NODES, bands=(4, 11.5)),
-                                  "heat_mdp", "ice", 4),
-                      "salt_ice", "heat_mdp", 11.5),
+        "graph": {"nodes": _ice_layout(_ICE_NODES),
                   "links": _ICE_LINKS, "groups": _ICE_GROUPS},
     },
 ]

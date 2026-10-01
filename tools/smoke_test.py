@@ -1124,6 +1124,89 @@ def check_trajectory_groups() -> None:
           "file merged with the system's own groups")
 
 
+def check_whole_lump() -> None:
+    """Preview trajectory's 'lump': one lump kept whole in the middle of the box.
+
+    The ice tutorial's cooled gas gathers into a drop wherever it happens to,
+    and a drop across the box edge was drawn cut in two although it is one
+    drop. trjconv's own -pbc cluster fixes that but took four minutes for 201
+    frames of 768 molecules. So 'lump' has trjconv keep the molecules whole,
+    and a script the block carries moves each frame so the lump sits in the
+    middle. Checked: the command it plans, and the script on a ball cut by two
+    box edges, a molecule across an edge, and a slanted box it must leave
+    alone. The default command is checked unchanged in check_trajectory_groups.
+    """
+    import random
+    import subprocess
+    import tempfile
+    from comfygmx.graph import Graph
+    from comfygmx.executor import dry_plan
+    from comfygmx.nodes.view_nodes import _WHOLE_LUMP
+
+    nodes = [{"id": "f", "type": "io.file", "params": {"path": "/tmp/md.xtc"}},
+             {"id": "t", "type": "io.file", "params": {"path": "/tmp/md.tpr"}},
+             {"id": "v", "type": "view.trajectory",
+              "params": {"sel": "Oxygens", "pbc": "lump"}}]
+    links = [{"from_node": "f", "from_port": "file", "to_node": "v", "to_port": "traj"},
+             {"from_node": "t", "from_port": "file", "to_node": "v", "to_port": "tpr"}]
+    entry = dry_plan(Graph({"nodes": nodes, "links": links}), Settings())["v"]
+    plan = entry.get("_plan")
+    if plan is None:
+        check(False, f"lump: the block did not plan: {entry.get('error')}")
+        return
+    first, last = plan.steps[0].argv[0], [str(a) for a in plan.steps[-1].argv]
+    check("-pbc mol " in first and "lump" not in first,
+          f"lump: trjconv is not asked to keep the molecules whole: {first}")
+    check(last == ["python", "whole_lump.py", "frames.pdb"]
+          and "whole_lump.py" in plan.files,
+          f"lump: the step that moves the lump to the middle is missing: {last}")
+
+    box = 55.0
+    atom = "ATOM  %5d  %-3s %-4s%5d    %8.3f%8.3f%8.3f  1.00  0.00\n"
+    random.seed(1)
+    ball = []
+    while len(ball) < 300:     # a ball 30 A across, centred at x = 2, z = 53
+        p = [random.uniform(-15, 15) for _ in range(3)]
+        if sum(v * v for v in p) <= 225:
+            ball.append([(2 + p[0]) % box, 27.5 + p[1], (53 + p[2]) % box])
+
+    def frame(angle):
+        lines = ["CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f P 1           1\n"
+                 % (box, box, box, 90, 90, angle), "MODEL        1\n"]
+        lines += [atom % (i, "OW", "SOL", i, *p) for i, p in enumerate(ball, 1)]
+        lines += [atom % (301, "OW", "MOL", 301, 54.5, 27.5, 27.5),
+                  atom % (302, "HW1", "MOL", 301, 55.5, 27.5, 27.5)]
+        return lines + ["TER\n", "ENDMDL\n"]
+
+    with tempfile.TemporaryDirectory() as work:
+        (Path(work) / "whole_lump.py").write_text(_WHOLE_LUMP)
+        pdb = Path(work) / "frames.pdb"
+        read = {}
+        for name, angle in (("square", 90.0), ("slanted", 60.0)):
+            pdb.write_text("".join(frame(angle)))
+            done = subprocess.run([sys.executable, "whole_lump.py", "frames.pdb"],
+                                  cwd=work, capture_output=True, text=True)
+            check(done.returncode == 0, f"lump: the script failed: {done.stderr}")
+            read[name] = [(line[17:20], [float(line[30 + 8 * k:38 + 8 * k])
+                                         for k in range(3)])
+                          for line in pdb.read_text().splitlines()
+                          if line.startswith("ATOM")]
+    kept = [p for name, p in read["square"] if name == "SOL"]
+    span = [max(p[k] for p in kept) - min(p[k] for p in kept) for k in range(3)]
+    middle = [sum(p[k] for p in kept) / len(kept) for k in range(3)]
+    check(max(span) < 31 and all(abs(m - 27.5) < 1 for m in middle),
+          f"lump: a ball cut by the box edge did not come out whole in the "
+          f"middle: spans {span}, middle {middle}")
+    molecule = [p for name, p in read["square"] if name == "MOL"]
+    check(abs(molecule[1][0] - molecule[0][0] - 1.0) < 0.01,
+          f"lump: a molecule across the box edge was cut in two: {molecule}")
+    unmoved = [p for name, p in read["slanted"] if name == "SOL"]
+    check(all(abs(a - b) < 0.001 for p, q in zip(unmoved, ball) for a, b in zip(p, q)),
+          "lump: a slanted box was changed, though the script cannot handle one")
+    print("whole lump: trjconv keeps molecules whole, then a ball cut by two box "
+          "edges comes out whole in the middle; a slanted box is left alone")
+
+
 def check_canvas_panning() -> None:
     """Can you move the canvas about on a laptop trackpad?
 
@@ -3279,7 +3362,7 @@ def check_doc_counts() -> None:
     print(f"doc counts: {len(want)} packaged tutorials checked against the docs")
 
 
-#: Five notes from the ice tutorial, with the height each one actually
+#: Six notes from the ice tutorial, with the height each one actually
 #: rendered at in the browser. Kept as a fixture because the layout of every
 #: packaged tutorial is spaced by the estimate, and an estimate that drifts
 #: 40 px low puts a note through the node underneath it.
@@ -3291,6 +3374,8 @@ MEASURED_NOTE_HEIGHTS = [
     # measure and the salt box came in. There the three above measure 1 px
     # shorter than they did on 2026-09-26, so those keep their larger numbers.
     (614, "note_read"), (518, "note_salt"),
+    # Measured 2026-09-30 in the same pane, after the cooling boxes came in.
+    (646, "note_cool"),
 ]
 
 
@@ -3684,6 +3769,7 @@ CHECKS = (
     check_shell_tabs,
     check_trajectory_carries_its_run_file,
     check_trajectory_groups,
+    check_whole_lump,
     check_file_tidying,
     check_chain_letters_survive,
     check_following_a_run,

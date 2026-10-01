@@ -8,7 +8,7 @@ it runs.
 | # | Tutorial | Blocks | Where it comes from |
 |---|---|---|---|
 | 1 | [Lysozyme in Water](http://www.mdtutorials.com/gmx/lysozyme/) | 50 | the first of Justin A. Lemkul's GROMACS tutorials |
-| 1 | [An ice cube melting](ice-melting.md) | 38, of which 13 start switched off | I wrote it for this version |
+| 1 | [An ice cube melting](ice-melting.md) | 55, of which 29 start switched off | I wrote it for this version |
 
 Lysozyme in Water is a *translation* of a published tutorial's commands into
 blocks, with that tutorial's own settings files. The explanations on its site
@@ -53,8 +53,10 @@ two days on one processor.
 
 I wrote this one to fit: one run of 200 ps that heats the cube from 200 K to
 1000 K, so it melts and then boils away. An extra box, switched off until you
-want it, does the same with salt in the ice and sets the two side by side. Its
-teacher's notes are in [ice-melting.md](ice-melting.md).
+want it, does the same with salt in the ice and sets the two side by side. Two
+more, also switched off, cool the pure and the salty gas back down: it
+gathers into a drop again, but the ice does not come back. Its teacher's
+notes are in [ice-melting.md](ice-melting.md).
 
 ## If you use Lysozyme in Water, cite it
 

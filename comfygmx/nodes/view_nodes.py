@@ -210,9 +210,15 @@ class PreviewTrajectoryNode(Node):
                    "with a form…' lists every group this system has, with how "
                    "many atoms each holds, and lets you tick several."),
         Param("pbc", "choice", "Periodic boundary", "mol",
-              choices=["mol", "atom", "whole", "nojump", "none"],
+              choices=["mol", "atom", "whole", "nojump", "none", "lump"],
               help="'mol' keeps molecules in one piece, which is what makes a "
-                   "protein stop exploding across the box edge."),
+                   "protein stop exploding across the box edge. 'lump' is for "
+                   "one lump in a box of gas or water -- a drop, a micelle: it "
+                   "keeps molecules in one piece too, and then moves every "
+                   "frame so that the lump sits in the middle of the box, so "
+                   "the box edge never draws it cut in two. 'Centre the "
+                   "selection' cannot do that on its own: the ordinary middle "
+                   "of a lump cut in two lies in the gap between the parts."),
         Param("center", "bool", "Centre the selection", True,
               help="Puts the selection in the middle of the box, so it does not "
                    "walk out of view over the run."),
@@ -318,8 +324,12 @@ class PreviewTrajectoryNode(Node):
         # here was Ubuntu's /usr/bin/gmx 2021.4 reading a 2025.4 tpr -- and
         # what that produces is "listRanges does not have a first element with
         # value 0", which says nothing about versions at all.
+        # 'lump' is not trjconv's: trjconv keeps the molecules whole, and a
+        # step of this block's own moves the lump to the middle afterwards.
+        pbc = ctx.pstr("pbc", "mol") or "mol"
+        lump = pbc == "lump"
         argv = ["trjconv", "-s", tpr, "-f", traj, "-o", out,
-                "-pbc", ctx.pstr("pbc", "mol") or "mol"]
+                "-pbc", "mol" if lump else pbc]
         # One group, or several with commas between them. trjconv writes one
         # group, so several are joined into one first (see _pick).
         chosen = self._groups(ctx.pstr("sel", "Protein") or "Protein") or ["Protein"]
@@ -434,8 +444,122 @@ class PreviewTrajectoryNode(Node):
                     tool="gmx", label=f"every {_ordinal(skip)} frame of {sel}")
             plan.notes.append(f"every {_ordinal(skip)} frame of '{sel}', written as "
                               f"models in {out}")
+        if lump:
+            plan.files["whole_lump.py"] = _WHOLE_LUMP
+            plan.step(["python", "whole_lump.py", out], tool="python",
+                      label="the lump moved to the middle of the box")
+            plan.notes.append("every frame moved so that the lump sits in the "
+                              "middle of the box, in one piece")
         plan.outputs["frames"] = out
         return plan
+
+
+_WHOLE_LUMP = r'''#!/usr/bin/env python3
+"""Move every frame of a PDB of several models so one lump sits in the middle.
+
+A drop in a box of gas, or a micelle in water, is one lump. The box repeats in
+every direction, so a lump that happens to sit across an edge of the box is
+drawn cut in two: part of it at one side of the box, the rest at the opposite
+side. It is still one lump, and centring on its middle does not help, because
+the ordinary middle of a lump cut in two lies in the gap between the parts.
+
+So the middle is found the way the box repeats. Along each edge of the box,
+every atom is given an angle: nothing at one end of the edge, a full turn at
+the other end, where it would come back in. The average of those angles
+points at where the atoms crowd together, whichever side of the edge they are
+drawn on. Every frame is then moved so that point is in the middle of the
+box, and each molecule that ends up outside is put back in through the
+opposite side, whole. A rectangular box only: a slanted one is left as it
+was. Needs nothing but Python.
+
+usage: whole_lump.py frames.pdb      (the file is rewritten in place)
+"""
+
+import math
+import os
+import sys
+
+
+def crowded(values, length):
+    """Where along one edge of the box the atoms crowd together."""
+    turn = 2.0 * math.pi / length
+    s = sum(math.sin(v * turn) for v in values)
+    c = sum(math.cos(v * turn) for v in values)
+    if abs(s) < 1e-9 and abs(c) < 1e-9:
+        return length / 2.0          # spread out evenly: nothing to move
+    return (math.atan2(s, c) / turn) % length
+
+
+def recentre(model, box):
+    """One frame's lines, with every atom moved so the lump is in the middle."""
+    atoms = [i for i, line in enumerate(model)
+             if line.startswith(("ATOM", "HETATM"))]
+    if not atoms or not box:
+        return model
+    xyz = [[float(model[i][30 + 8 * k:38 + 8 * k]) for k in range(3)]
+           for i in atoms]
+    shift = [box[k] / 2.0 - crowded([p[k] for p in xyz], box[k])
+             for k in range(3)]
+    out = list(model)
+    key, wrap = None, [0.0, 0.0, 0.0]
+    for n, i in enumerate(atoms):
+        line = model[i]
+        p = [xyz[n][k] + shift[k] for k in range(3)]
+        # A molecule is the run of lines with the same residue; its first atom
+        # decides which way the whole of it goes back into the box.
+        if line[17:27] != key:
+            key = line[17:27]
+            wrap = [math.floor(p[k] / box[k]) * box[k] for k in range(3)]
+        p = [p[k] - wrap[k] for k in range(3)]
+        out[i] = line[:30] + "%8.3f%8.3f%8.3f" % tuple(p) + line[54:]
+    return out
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__.strip().splitlines()[-1])
+    path = sys.argv[1]
+    with open(path) as fh:
+        lines = fh.read().splitlines(keepends=True)
+    out, model, box = [], None, None
+    frames, slanted = 0, False
+    for line in lines:
+        if line.startswith("CRYST1"):
+            edges = [float(line[6 + 9 * k:15 + 9 * k]) for k in range(3)]
+            angles = [float(line[33 + 7 * k:40 + 7 * k]) for k in range(3)]
+            slanted = slanted or any(abs(a - 90.0) > 0.01 for a in angles)
+            box = None if any(abs(a - 90.0) > 0.01 for a in angles) else edges
+            # GROMACS writes it before each frame's MODEL line; kept in its
+            # place wherever it is.
+            (model if model is not None else out).append(line)
+        elif line.startswith("MODEL"):
+            model = [line]
+        elif line.startswith("ENDMDL") and model is not None:
+            out.extend(recentre(model + [line], box))
+            frames += 1
+            model = None
+        elif model is not None:
+            model.append(line)
+        else:
+            out.append(line)
+    if model is not None:            # the last frame had no ENDMDL
+        out.extend(recentre(model, box))
+        frames += 1
+    if not frames:                   # one frame, written without MODEL lines
+        out = recentre(out, box)
+        frames = 1
+    with open(path + ".tmp", "w") as fh:
+        fh.writelines(out)
+    os.replace(path + ".tmp", path)
+    if slanted:
+        print("the box is not rectangular: frames in a slanted box were left "
+              "as they were")
+    print(f"{frames} frames: the lump moved to the middle of the box in each")
+
+
+if __name__ == "__main__":
+    main()
+'''
 
 
 _COMPARE = r'''#!/usr/bin/env python3

@@ -9,17 +9,20 @@ machine may well be slower. GROMACS was 2026.3 from conda-forge.
 The downloads (the protein and the force field) were already in the image, as
 they are online, so they took no time.
 
-The ice tutorial has grown since it was timed, from 22 blocks to 38. It now
+The ice tutorial has grown since it was timed, from 22 blocks to 55. It now
 also measures how much water is left in the drop, which took 13 seconds on one
-processor of my workstation. The other 14 new blocks are an extra box, and its
+processor of my workstation. 14 of the new blocks are an extra box, and its
 note, that do it all again with salt in the ice. That box starts switched off,
-so **Run**
-leaves it out. Switched on, it heats a second cube, which took 118 seconds on
-one processor of my workstation, the same as the pure cube there.
+so **Run** leaves it out. Switched on, it heats a second cube, which took 118
+seconds on one processor of my workstation, the same as the pure cube there.
+The last 17 are two more boxes, and their note, that cool the pure and the
+salty gas back down. They start switched off too. Switched on, each cooling
+run took 2 minutes on one processor of my workstation: 119 seconds for the
+pure gas and 117 for the salty one.
 
 | # | Tutorial | Blocks | From Run to the last block | of which, simulating |
 |---|---|---|---|---|
-| 1 | An ice cube melting | 22 then, 38 now | 2 min 26 s | 2 min 6 s |
+| 1 | An ice cube melting | 22 then, 55 now | 2 min 26 s | 2 min 6 s |
 | 1 | Lysozyme in Water | 50 | 7 min 41 s | 6 min 47 s |
 
 ## On mybinder.org
@@ -29,7 +32,7 @@ sites, with nobody touching the page:
 
 | Tutorial | Blocks | 2i2c site | of which, simulating | GESIS site | of which, simulating |
 |---|---|---|---|---|---|
-| An ice cube melting | 22 then, 38 now | 2 min 50 s | 2 min 29 s | 2 min 49 s | 2 min 28 s |
+| An ice cube melting | 22 then, 55 now | 2 min 50 s | 2 min 29 s | 2 min 49 s | 2 min 28 s |
 | Lysozyme in Water | 50 | 8 min 36 s | 7 min 37 s | 8 min 50 s | 7 min 46 s |
 
 That is between 12 and 16 per cent slower than the online copy on my

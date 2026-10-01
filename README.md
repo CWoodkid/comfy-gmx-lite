@@ -66,12 +66,13 @@ first-time user sees 27 blocks rather than hundreds.
 
 | tutorial | what happens | time on mybinder.org |
 | --- | --- | --- |
-| **An ice cube melting** | a small ice cube is heated from 200 K to 1000 K in one run: it melts into a drop, and the drop then boils away into a gas. An extra part, switched off at first, does the same with salt in the ice | about 3 minutes, and as long again for the salt |
+| **An ice cube melting** | a small ice cube is heated from 200 K to 1000 K in one run: it melts into a drop, and the drop then boils away into a gas. Extra parts, switched off at first, do the same with salt in the ice, and cool the pure and the salty gas back down: each gathers into a drop again, but the ice does not come back | about 3 minutes, and about as long again for each of the three extra boxes |
 | **Lysozyme in Water** | the classic first GROMACS tutorial: a protein in a box of water, from download to analysis | about 9 minutes |
 
 The times run from pressing **Run** until the last block finishes. They were
 measured on mybinder.org in September 2026, where each copy had one
-processor.
+processor. The extra boxes of the ice tutorial were timed on one processor
+of a workstation instead.
 
 ## Running online
 

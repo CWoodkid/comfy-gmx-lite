@@ -457,6 +457,221 @@
         "center": true
       },
       "off": true
+    },
+    {
+      "id": "note_cool",
+      "type": "util.note",
+      "pos": [
+        0,
+        3467
+      ],
+      "params": {
+        "text": "5. EXTRA: COOL IT DOWN AGAIN\nThe two boxes to the right are switched off, so Run leaves them out.\n\nThey take the hot gas at the end of each heating run, pure and salty,\nand cool it the way it was heated, backwards: fast from 1000 K to\n400 K over the first 100 picoseconds, then slowly to 200 K over the\nnext 100. Every molecule starts from where it was at the end of the\nheating, moving just as fast.\n\nWhat happens, pure or salty:\n- the gas gathers back into one body of water: slowed down, the\n  molecules stick together again when they meet, and by about 400 K\n  nearly all of them are back. It may be a round drop, or a thick\n  column that leaves the box through one side and comes back in\n  through the other, joined to itself: in a box this small the two\n  shapes have almost the same surface, so either can form;\n- the ice does not come back. Now and then a few molecules pass the\n  ice test by chance, as they do in any cold water, but the cube had\n  439 at the start, and nothing like that returns, not even at 200 K,\n  73 degrees below freezing.\n\nWhy not? A crystal melts from its surface, and falls apart in\npicoseconds. Freezing has to start from a seed: a cluster of\nmolecules that happen to line up into the honeycomb together, big\nenough to last, before the rest can join it. Until one forms, water\nstays liquid far below 0 degrees C. This is called supercooling, and\nit is real: the tiny droplets in clouds stay liquid down to about\n-38 degrees C. Tried before this was written, a drop cooled to 230 K\nand held there for 900 ps, over four times as long as this run,\nstill did not freeze.\n\nTo switch them on, right-click each box's title bar and choose\n'Switch this chunk back on', then press Run. Only the new boxes run:\nthe heating runs' results are kept. The pure box needs only the\nheating above it. The salty box needs the salt box above it switched\non too, and its two graphs put pure and salty side by side."
+      }
+    },
+    {
+      "id": "cool_mdp",
+      "type": "util.mdp",
+      "pos": [
+        1350,
+        3509
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; The hot gas cooled in one run, from 1000 K back down to 200 K.\n;\n; The heating run backwards: fast from 1000 K to 400 K over the first 100 ps,\n; while the gas gathers back into a drop, then slowly to 200 K over the next\n; 100 ps. It starts from the last picture of the heating run, and every\n; molecule keeps the speed it had there, so the temperature carries on from\n; where the heating left it.\nintegrator           = md\ndt                   = 0.002     ; one step is 2 femtoseconds (0.002 ps)\nnsteps               = 100000    ; 100,000 steps: 200 picoseconds\n\nnstxout-compressed   = 250       ; save a picture every 250 steps (0.5 ps)\nnstenergy            = 500       ; and the energies, every 1 ps\nnstlog               = 5000\n\ncutoff-scheme        = Verlet\ncoulombtype          = PME\nrcoulomb             = 1.0\nvdwtype              = cut-off\nrvdw                 = 1.0\npbc                  = xyz\n\n; The same thermostat as in the heating run.\ntcoupl               = v-rescale\ntc-grps              = System\ntau_t                = 0.1       ; how quickly it corrects, in ps\nref_t                = 1000      ; the target at the start\n\n; Annealing: the target moves, in straight lines between these points.\n; 1000 K at 0 ps, 400 K at 100 ps, 200 K at 200 ps.\nannealing            = single\nannealing-npoints    = 3\nannealing-time       = 0 100 200\nannealing-temp       = 1000 400 200\n\n; No new speeds: every molecule keeps the one it had at the end of the\n; heating. The structure file carries it, along with where the molecule was.\ngen_vel              = no\n\npcoupl               = no\ncomm-mode            = linear\n",
+        "filename": "cool.mdp"
+      },
+      "off": true
+    },
+    {
+      "id": "cool_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        1650,
+        3509
+      ],
+      "params": {
+        "output": "cool.tpr"
+      },
+      "off": true
+    },
+    {
+      "id": "cool",
+      "type": "gmx.mdrun",
+      "pos": [
+        1950,
+        3509
+      ],
+      "params": {
+        "deffnm": "cool"
+      },
+      "off": true
+    },
+    {
+      "id": "cool_count",
+      "type": "analysis.ice_count",
+      "pos": [
+        2250,
+        3509
+      ],
+      "params": {
+        "output": "ice.xvg"
+      },
+      "off": true
+    },
+    {
+      "id": "cool_count_plot",
+      "type": "view.plot",
+      "pos": [
+        2550,
+        3509
+      ],
+      "params": {},
+      "off": true
+    },
+    {
+      "id": "cool_drop",
+      "type": "analysis.drop_water",
+      "pos": [
+        2250,
+        4055
+      ],
+      "params": {
+        "output": "drop.xvg"
+      },
+      "off": true
+    },
+    {
+      "id": "cool_drop_plot",
+      "type": "view.plot",
+      "pos": [
+        2550,
+        4055
+      ],
+      "params": {},
+      "off": true
+    },
+    {
+      "id": "cool_watch",
+      "type": "view.trajectory",
+      "pos": [
+        2874,
+        3509
+      ],
+      "params": {
+        "mode": "every Nth",
+        "skip": 2,
+        "sel": "Oxygens",
+        "pbc": "lump",
+        "center": true
+      },
+      "off": true
+    },
+    {
+      "id": "salt_cool_mdp",
+      "type": "util.mdp",
+      "pos": [
+        4500,
+        3509
+      ],
+      "params": {
+        "mode": "raw",
+        "raw": "; The hot gas cooled in one run, from 1000 K back down to 200 K.\n;\n; The heating run backwards: fast from 1000 K to 400 K over the first 100 ps,\n; while the gas gathers back into a drop, then slowly to 200 K over the next\n; 100 ps. It starts from the last picture of the heating run, and every\n; molecule keeps the speed it had there, so the temperature carries on from\n; where the heating left it.\nintegrator           = md\ndt                   = 0.002     ; one step is 2 femtoseconds (0.002 ps)\nnsteps               = 100000    ; 100,000 steps: 200 picoseconds\n\nnstxout-compressed   = 250       ; save a picture every 250 steps (0.5 ps)\nnstenergy            = 500       ; and the energies, every 1 ps\nnstlog               = 5000\n\ncutoff-scheme        = Verlet\ncoulombtype          = PME\nrcoulomb             = 1.0\nvdwtype              = cut-off\nrvdw                 = 1.0\npbc                  = xyz\n\n; The same thermostat as in the heating run.\ntcoupl               = v-rescale\ntc-grps              = System\ntau_t                = 0.1       ; how quickly it corrects, in ps\nref_t                = 1000      ; the target at the start\n\n; Annealing: the target moves, in straight lines between these points.\n; 1000 K at 0 ps, 400 K at 100 ps, 200 K at 200 ps.\nannealing            = single\nannealing-npoints    = 3\nannealing-time       = 0 100 200\nannealing-temp       = 1000 400 200\n\n; No new speeds: every molecule keeps the one it had at the end of the\n; heating. The structure file carries it, along with where the molecule was.\ngen_vel              = no\n\npcoupl               = no\ncomm-mode            = linear\n",
+        "filename": "cool.mdp"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_cool_pp",
+      "type": "gmx.grompp",
+      "pos": [
+        4800,
+        3509
+      ],
+      "params": {
+        "output": "cool.tpr"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_cool",
+      "type": "gmx.mdrun",
+      "pos": [
+        5100,
+        3509
+      ],
+      "params": {
+        "deffnm": "cool"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_cool_count",
+      "type": "analysis.ice_count",
+      "pos": [
+        5424,
+        3509
+      ],
+      "params": {
+        "output": "ice.xvg"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_cool_drop",
+      "type": "analysis.drop_water",
+      "pos": [
+        5424,
+        4179
+      ],
+      "params": {
+        "output": "drop.xvg"
+      },
+      "off": true
+    },
+    {
+      "id": "cmp_cool_ice",
+      "type": "view.compare",
+      "pos": [
+        5724,
+        3509
+      ],
+      "params": {
+        "name_first": "pure water",
+        "name_second": "with salt",
+        "title": "Ice while cooling: pure water against salty"
+      },
+      "off": true
+    },
+    {
+      "id": "cmp_cool_drop",
+      "type": "view.compare",
+      "pos": [
+        5724,
+        4179
+      ],
+      "params": {
+        "name_first": "pure water",
+        "name_second": "with salt",
+        "title": "Water back in the drop while cooling: pure against salty"
+      },
+      "off": true
+    },
+    {
+      "id": "salt_cool_watch",
+      "type": "view.trajectory",
+      "pos": [
+        5100,
+        4179
+      ],
+      "params": {
+        "mode": "every Nth",
+        "skip": 2,
+        "sel": "Oxygens_and_ions",
+        "pbc": "lump",
+        "center": true
+      },
+      "off": true
     }
   ],
   "links": [
@@ -741,6 +956,174 @@
       "from_port": "index",
       "to_node": "salt_watch",
       "to_port": "index"
+    },
+    {
+      "from_node": "cool_mdp",
+      "from_port": "mdp",
+      "to_node": "cool_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "heat",
+      "from_port": "structure",
+      "to_node": "cool_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "topology",
+      "to_node": "cool_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "cool_pp",
+      "from_port": "tpr",
+      "to_node": "cool",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "cool",
+      "from_port": "traj",
+      "to_node": "cool_count",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "cool_pp",
+      "from_port": "tpr",
+      "to_node": "cool_count",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "cool_count",
+      "from_port": "xvg",
+      "to_node": "cool_count_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "cool",
+      "from_port": "traj",
+      "to_node": "cool_drop",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "cool_pp",
+      "from_port": "tpr",
+      "to_node": "cool_drop",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "cool_drop",
+      "from_port": "xvg",
+      "to_node": "cool_drop_plot",
+      "to_port": "xvg"
+    },
+    {
+      "from_node": "cool",
+      "from_port": "traj",
+      "to_node": "cool_watch",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "cool_pp",
+      "from_port": "tpr",
+      "to_node": "cool_watch",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "ice",
+      "from_port": "index",
+      "to_node": "cool_watch",
+      "to_port": "index"
+    },
+    {
+      "from_node": "salt_cool_mdp",
+      "from_port": "mdp",
+      "to_node": "salt_cool_pp",
+      "to_port": "mdp"
+    },
+    {
+      "from_node": "salt_heat",
+      "from_port": "structure",
+      "to_node": "salt_cool_pp",
+      "to_port": "structure"
+    },
+    {
+      "from_node": "salt_ice",
+      "from_port": "topology",
+      "to_node": "salt_cool_pp",
+      "to_port": "topology"
+    },
+    {
+      "from_node": "salt_cool_pp",
+      "from_port": "tpr",
+      "to_node": "salt_cool",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_cool",
+      "from_port": "traj",
+      "to_node": "salt_cool_count",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "salt_cool_pp",
+      "from_port": "tpr",
+      "to_node": "salt_cool_count",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_cool",
+      "from_port": "traj",
+      "to_node": "salt_cool_drop",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "salt_cool_pp",
+      "from_port": "tpr",
+      "to_node": "salt_cool_drop",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "cool_count",
+      "from_port": "xvg",
+      "to_node": "cmp_cool_ice",
+      "to_port": "first"
+    },
+    {
+      "from_node": "salt_cool_count",
+      "from_port": "xvg",
+      "to_node": "cmp_cool_ice",
+      "to_port": "second"
+    },
+    {
+      "from_node": "cool_drop",
+      "from_port": "xvg",
+      "to_node": "cmp_cool_drop",
+      "to_port": "first"
+    },
+    {
+      "from_node": "salt_cool_drop",
+      "from_port": "xvg",
+      "to_node": "cmp_cool_drop",
+      "to_port": "second"
+    },
+    {
+      "from_node": "salt_cool",
+      "from_port": "traj",
+      "to_node": "salt_cool_watch",
+      "to_port": "traj"
+    },
+    {
+      "from_node": "salt_cool_pp",
+      "from_port": "tpr",
+      "to_node": "salt_cool_watch",
+      "to_port": "tpr"
+    },
+    {
+      "from_node": "salt_ice",
+      "from_port": "index",
+      "to_node": "salt_cool_watch",
+      "to_port": "index"
     }
   ],
   "groups": [
@@ -812,6 +1195,12 @@
           "label": "settled cube"
         },
         {
+          "node": "heat",
+          "port": "structure",
+          "side": "east",
+          "label": "pure: hot gas"
+        },
+        {
           "node": "drop",
           "port": "xvg",
           "side": "east",
@@ -852,6 +1241,114 @@
         },
         {
           "node": "drop",
+          "port": "xvg",
+          "side": "west",
+          "label": "pure: drop"
+        },
+        {
+          "node": "salt_ice",
+          "port": "index",
+          "side": "east",
+          "label": "salty: index"
+        },
+        {
+          "node": "salt_ice",
+          "port": "topology",
+          "side": "east",
+          "label": "salty: topology"
+        },
+        {
+          "node": "salt_heat",
+          "port": "structure",
+          "side": "east",
+          "label": "salty: hot gas"
+        }
+      ]
+    },
+    {
+      "title": "4. Extra: cool it down again",
+      "color": "#a1309b",
+      "nodes": [
+        "cool_mdp",
+        "cool_pp",
+        "cool",
+        "cool_count",
+        "cool_count_plot",
+        "cool_drop",
+        "cool_drop_plot",
+        "cool_watch"
+      ],
+      "patch": [
+        {
+          "node": "heat",
+          "port": "structure",
+          "side": "west",
+          "label": "pure: hot gas"
+        },
+        {
+          "node": "ice",
+          "port": "topology",
+          "side": "west"
+        },
+        {
+          "node": "ice",
+          "port": "index",
+          "side": "west"
+        },
+        {
+          "node": "cool_drop",
+          "port": "xvg",
+          "side": "east",
+          "label": "pure: drop"
+        },
+        {
+          "node": "cool_count",
+          "port": "xvg",
+          "side": "east",
+          "label": "pure: ice"
+        }
+      ]
+    },
+    {
+      "title": "5. Extra: cool the salty one down too",
+      "color": "#b06634",
+      "nodes": [
+        "salt_cool_mdp",
+        "salt_cool_pp",
+        "salt_cool",
+        "salt_cool_count",
+        "salt_cool_drop",
+        "cmp_cool_ice",
+        "cmp_cool_drop",
+        "salt_cool_watch"
+      ],
+      "patch": [
+        {
+          "node": "salt_heat",
+          "port": "structure",
+          "side": "west",
+          "label": "salty: hot gas"
+        },
+        {
+          "node": "salt_ice",
+          "port": "topology",
+          "side": "west",
+          "label": "salty: topology"
+        },
+        {
+          "node": "salt_ice",
+          "port": "index",
+          "side": "west",
+          "label": "salty: index"
+        },
+        {
+          "node": "cool_count",
+          "port": "xvg",
+          "side": "west",
+          "label": "pure: ice"
+        },
+        {
+          "node": "cool_drop",
           "port": "xvg",
           "side": "west",
           "label": "pure: drop"
