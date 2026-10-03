@@ -28,7 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from . import __version__, bootstrap, facts, flaghints, groups, shell
+from . import __version__, bootstrap, facts, flaghints, groups, resources, shell
 from .chunks import chunk_list, delete_chunk, save_chunk
 from .config import WEB_DIR, Settings
 from .environments import (CATALOG, Toolbox, _version_number, available_versions,
@@ -1188,6 +1188,9 @@ def h_run(self: Handler) -> None:
         session=body.get("session", "") or "",
         # "just these nodes", as opposed to "these and everything they need"
         isolate=bool(body.get("isolate")),
+        # The answer to "another simulation holds the graphics card", when
+        # the page asked it just before this (see h_resources_check).
+        gpu_busy=str(body.get("gpu_busy") or ""),
     )
     reused = [node_id for node_id, state in run.nodes.items()
               if self.app.executor.cached_result(state.signature)
@@ -1195,6 +1198,59 @@ def h_run(self: Handler) -> None:
     self._json({"run": run.id, "order": run.order, "workdir": str(run.workdir),
                 "reused": reused,
                 "will_run": [n for n in run.order if n not in set(reused)]})
+
+
+def h_resources_check(self: Handler) -> None:
+    """Just before Run: should the page ask about the graphics card?
+
+    Only when the answer matters. Fitting simulations to what is free is
+    switched on, Settings says "ask", this run will start at least one
+    simulation whose graphics card nobody set on the block or in Settings,
+    and every card this program may use is held by another simulation (or
+    is very busy). Anything else needs no question: a free card is simply
+    used, and no card means the processor anyway. Taking the look costs two
+    short calls to nvidia-smi, and nothing at all without one.
+    """
+    body = self._body()
+    prefs = self.app.settings.get("resources")
+    prefs = prefs if isinstance(prefs, dict) else {}
+    if prefs.get("auto", True) is False or str(prefs.get("gpu_busy") or "ask") != "ask":
+        self._json({"ask": False})
+        return
+    try:
+        graph = Graph(body.get("graph") or {})
+    except GraphError:
+        self._json({"ask": False})
+        return
+    forecast = self.app.executor.forecast(
+        graph, force=set(body.get("force") or []), only=body.get("only") or None,
+        isolate=bool(body.get("isolate")))
+    # Every block that will really run, not only Run MD: whichever block's
+    # plan starts a gmx mdrun -- a sweep starts one per value -- is fitted
+    # when it runs, so it is asked about here too.
+    starting = [entry["node"] for entry in forecast.get("nodes") or []
+                if not entry.get("cached")]
+    if not starting:
+        self._json({"ask": False})
+        return
+    plans = dry_plan(graph, self.app.settings)
+    undecided = []
+    for node_id in starting:
+        plan = (plans.get(node_id) or {}).get("_plan")
+        steps = [s for s in (plan.steps if plan else [])
+                 if not s.shell and s.tool == "gmx" and resources.is_mdrun(s.argv)]
+        if any(not resources.explicit(s.argv)["gpu"] for s in steps):
+            undecided.append(node_id)
+    if not undecided:
+        self._json({"ask": False})
+        return
+    cards = resources.look_at_graphics_cards({os.getpid()})
+    question = resources.gpu_question(cards, os.environ.get("CUDA_VISIBLE_DEVICES"))
+    if not question:
+        self._json({"ask": False})
+        return
+    question.update({"ask": True, "nodes": undecided})
+    self._json(question)
 
 
 def h_export(self: Handler) -> None:
@@ -2226,6 +2282,7 @@ ROUTES: List[Tuple[re.Pattern, Tuple[str, ...], Callable]] = [
     (re.compile(r"^/api/graph/preview$"), ("POST",), h_preview),
     (re.compile(r"^/api/graph/tools$"), ("POST",), h_graph_tools),
     (re.compile(r"^/api/run$"), ("POST",), h_run),
+    (re.compile(r"^/api/resources/check$"), ("POST",), h_resources_check),
     (re.compile(r"^/api/export$"), ("POST",), h_export),
     (re.compile(r"^/api/runs$"), ("GET",), h_runs),
     # Before the /api/runs/<id> patterns below: "folders" is a valid run id as

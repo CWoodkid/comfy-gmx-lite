@@ -276,7 +276,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     executor = Executor(settings)
     run = executor.start(graph, only=_node_names(args.only),
                          force=_node_names(args.force), label=args.label or "",
-                         output_dir=args.output_dir or "")
+                         output_dir=args.output_dir or "",
+                         gpu_busy=getattr(args, "gpu_busy", "") or "")
     print(f"run {run.id} -> {run.workdir}")
 
     seen = 0
@@ -488,6 +489,12 @@ def main(argv=None) -> int:
     p_run.add_argument("--output-dir", default="", dest="output_dir",
                        help="where to create the run directory "
                             "(default: the configured output folder)")
+    p_run.add_argument("--gpu-busy", default="", dest="gpu_busy",
+                       choices=["processor", "share"],
+                       help="when another simulation is using the graphics card: "
+                            "run on the processor only, or share the card. "
+                            "Default: what Settings says, and the processor "
+                            "only where Settings says to ask")
     p_run.set_defaults(func=cmd_run)
 
     p_validate = sub.add_parser(

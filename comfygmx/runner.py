@@ -62,7 +62,7 @@ def render_step(step: Step, command: str) -> Dict[str, str]:
         # configured gmx_mpi still reaches a piped command.
         rendered = (step.argv[0] if step.argv else "").replace("{cmd}", command)
     else:
-        argv = substitute_tool(step, command)
+        argv = list(step.wrap) + substitute_tool(step, command)
         rendered = " ".join(shlex.quote(str(a)) for a in argv)
     return {"label": step.label, "command": rendered, "stdin": step.stdin or ""}
 

@@ -396,7 +396,7 @@ Runs the simulation. This is the step that takes the time -- minutes for an ener
 | Parameter | Type | Default | Notes |
 |---|---|---|---|
 | Output prefix (-deffnm) | str | `md` |  |
-| OpenMP threads (-ntomp) | int | `0` | 0 lets GROMACS pick. Set it when other jobs share the machine. |
+| OpenMP threads (-ntomp) | int | `0` | 0: Comfy-gmx gives the simulation the cores nothing else is using (Settings → This computer), and GROMACS picks when the computer is free. A number here is used as it is. |
 | MPI ranks (-ntmpi) | int | `0` |  |
 | GPU ids (-gpu_id) | str |  |  |
 | Non-bonded on | choice (auto, cpu, gpu) | `auto` | advanced. |

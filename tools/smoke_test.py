@@ -1207,6 +1207,760 @@ def check_whole_lump() -> None:
           "edges comes out whole in the middle; a slanted box is left alone")
 
 
+#: A stand-in for gmx, for check_fit_to_computer: it writes down the command it
+#: was given, its CUDA_VISIBLE_DEVICES and the cores it may run on, then makes
+#: the files a simulation would, so the block finishes as a real one would.
+_FAKE_GMX = r"""#!/usr/bin/env bash
+if [ "$1" != "mdrun" ]; then
+  # Asked for its version (an export does), or anything else: answer the way
+  # a GROMACS would, and write nothing where it was asked from.
+  echo "GROMACS version:    2026.3-stand-in"
+  exit 0
+fi
+{
+  printf 'argv:'; printf ' %s' "$@"; printf '\n'
+  echo "cuda:${CUDA_VISIBLE_DEVICES-unset}"
+  echo "cores:$(sed -n 's/^Cpus_allowed_list:[[:space:]]*//p' /proc/$$/status 2>/dev/null)"
+  echo "start:$(date +%s.%N)"
+} > fake_gmx_record.txt
+sleep "${FAKE_GMX_SLEEP:-0}"
+echo "end:$(date +%s.%N)" >> fake_gmx_record.txt
+deffnm=md; prev=
+for word in "$@"; do [ "$prev" = "-deffnm" ] && deffnm=$word; prev=$word; done
+for ext in gro xtc edr log cpt; do : > "$deffnm.$ext"; done
+"""
+
+
+def check_fit_to_computer() -> None:
+    """A simulation gets only what the computer has free (resources.py).
+
+    Left to itself, GROMACS takes every core and the graphics card, also the
+    ones another simulation is running on. On a workstation that made the ice
+    tutorial manage 15 ps in eleven minutes, and the long run beside it lose
+    four fifths of its speed. Checked here without a real simulation:
+
+    - the choice itself, on made-up computers: a free one, one with a
+      simulation pinned to some cores, a page kept to some cores, a
+      container's share, every core busy, threads or pinning set by hand, an
+      MPI build, mpirun, cores sharing a physical core, another Comfy-gmx's
+      fresh claim, busy cores with no simulation, no taskset, a Mac, more
+      cores than GROMACS takes, every core held by other simulations (it must
+      wait, not start on theirs), and the claim each choice leaves, also for
+      the whole computer; and the graphics card free, busy, one of two
+      busy, hidden, named by CUDA_VISIBLE_DEVICES, unknown, set by hand;
+    - the readers: core lists, /proc/stat, nvidia-smi's two listings,
+      CUDA_VISIBLE_DEVICES, and the claims file two pages share;
+    - runs through the executor with a stand-in for gmx that writes down its
+      command, its cores and its CUDA_VISIBLE_DEVICES: kept to the free cores
+      and off a busy card; sharing the card when the run says so; the result
+      reused though the computer changed; nothing of it in an export;
+      nothing when switched off in Settings; threads set in Settings left
+      alone; waiting while every core is held, then starting, with the wait
+      kept out of the time the block took; Cancel ending a wait; and two
+      pages pressing Run in the same second on a free computer, where the
+      second must wait for the first;
+    - the page's question, asked only when it matters;
+    - and a look at this computer, which must work and change nothing.
+    """
+    import copy
+    import tempfile
+    import time as _time
+    from comfygmx import resources as R
+    from comfygmx.executor import Executor
+    from comfygmx.export import export_workflow, ExportError
+    from comfygmx.nodes.base import Step
+    from comfygmx.runner import render_script, render_step
+    from comfygmx.server import h_resources_check
+
+    judged = [0]
+
+    def expect(condition: bool, message: str) -> None:
+        judged[0] += 1
+        check(condition, "fit to the computer: " + message)
+
+    def computer(**kw):
+        base = dict(cores=set(range(24)), allowed=set(range(24)),
+                    load={c: 0.02 for c in range(24)})
+        base.update(kw)
+        return R.Snapshot(**base)
+
+    mdrun = ["gmx", "mdrun", "-s", "md.tpr", "-deffnm", "md", "-v"]
+    other = R.Simulation(4242, "gmx mdrun -deffnm prod -ntomp 6 -pin on",
+                         set(range(6)), True)
+    held = {c: (1.0 if c < 6 else 0.02) for c in range(24)}
+
+    # -- the cores ---------------------------------------------------------
+    d = R.decide(computer(), mdrun)
+    expect(not d.changed and not R.wrap_for(d) and not R.flags_for(d),
+           f"a free computer changed the command: {R.wrap_for(d)} {R.flags_for(d)}")
+    expect(any("nothing else is running" in line for line in d.lines),
+           "a free computer's log does not say that nothing else is running")
+
+    d = R.decide(computer(load=held, simulations=[other]), mdrun)
+    expect(d.cores == set(range(6, 24)) and d.threads == 18,
+           f"with cores 0-5 pinned by another simulation: {d.cores} {d.threads}")
+    expect(R.wrap_for(d) == ["taskset", "-c", "6-23"]
+           and R.flags_for(d) == ["-ntmpi", "1", "-ntomp", "18", "-pin", "off"],
+           f"pinned elsewhere: {R.wrap_for(d)} {R.flags_for(d)}")
+    expect(any("4242" in line for line in d.lines),
+           "the log does not name the simulation that holds the cores")
+
+    d = R.decide(computer(allowed=set(range(12, 24))), mdrun)
+    expect(d.cores is None and d.threads == 12
+           and R.flags_for(d) == ["-ntmpi", "1", "-ntomp", "12"],
+           f"a page kept to cores 12-23 on a free computer: {d.cores} {R.flags_for(d)}")
+
+    d = R.decide(computer(quota=2.0, load={c: (0.3 if c < 2 else 0.0) for c in range(24)}),
+                 mdrun)
+    expect(d.threads == 2 and d.cores == {2, 3},
+           f"a container with two cores' worth: {d.threads} threads on {d.cores}")
+
+    d = R.decide(computer(load={c: 1.0 for c in range(24)}, simulations=[other]), mdrun)
+    expect(d.threads == 1 and d.cores == {6} and any("slow" in line for line in d.lines),
+           f"every core busy: {d.threads} thread(s) on {d.cores}, not one on a core "
+           "no simulation holds")
+
+    everything = [R.Simulation(4343, "gmx mdrun -deffnm long -pin on", set(range(24)), True)]
+    d = R.decide(computer(load={c: 1.0 for c in range(24)}, simulations=everything), mdrun)
+    expect(d.wait and d.threads is None and d.cores is None and not R.wrap_for(d)
+           and not R.flags_for(d)
+           and any("4343" in line and "waits" in line for line in d.lines),
+           f"every core held by another simulation, and it did not wait: wait={d.wait} "
+           f"threads={d.threads} cores={d.cores} {d.lines}")
+    d = R.decide(computer(claimed={c: "another page" for c in range(24)}), mdrun)
+    expect(d.wait and any("another page" in line for line in d.lines),
+           f"every core claimed a moment ago by another page, and it did not wait: {d.lines}")
+    d = R.decide(computer(allowed=set(range(12, 24)), load=held, simulations=[
+        other, R.Simulation(4444, "gmx mdrun -deffnm b", set(range(12, 24)), True)]), mdrun)
+    expect(d.wait and any("4444" in line for line in d.lines)
+           and not any("4242" in line for line in d.lines),
+           f"a page kept to cores 12-23, all held: the wait must name what holds them, "
+           f"and only that: {d.lines}")
+    halves = {c: {c + 12 if c < 12 else c - 12} for c in range(24)}
+    d = R.decide(computer(siblings=halves, simulations=[R.Simulation(
+        7, "gmx mdrun", set(range(12)), True)], load={c: (1.0 if c < 12 else 0.0)
+                                                       for c in range(24)}), mdrun)
+    expect(d.wait, "every free core shares a physical core with a pinned simulation, "
+                   f"and it started anyway: {d.cores}")
+    expect(R.decide(computer(), mdrun).claim == set(range(24)),
+           "a simulation given the whole computer leaves no claim, so one started "
+           "a second later sees a free computer too")
+    expect(R.decide(computer(load=held, simulations=[other]), mdrun).claim
+           == set(range(6, 24)), "the cores given are not the cores claimed")
+    expect(R.decide(computer(allowed=set(range(12, 24))), mdrun).claim == set(range(12, 24)),
+           "a page kept to cores 12-23 claims other cores than it may use")
+    expect(R.decide(computer(load=held, simulations=[other]), mdrun + ["-ntomp", "4"]).claim
+           is None, "threads set by hand, and still cores were claimed for it")
+
+    for told in (["-ntomp", "4"], ["-nt", "4"], ["-pin", "on"], ["-pinoffset", "6"],
+                 ["-dd", "2", "2", "1"], ["-gputasks", "0011"], ["-multidir", "a", "b"]):
+        d = R.decide(computer(load=held, simulations=[other]), mdrun + told)
+        expect(d.cores is None and d.threads is None,
+               f"{' '.join(told)} set by hand was overruled: {d.cores} {d.threads}")
+
+    d = R.decide(computer(load=held, simulations=[other]), mdrun, mpi=True)
+    expect(R.flags_for(d) == ["-ntomp", "18", "-pin", "off"],
+           f"an MPI build was given {R.flags_for(d)} (it has no -ntmpi)")
+    d = R.decide(computer(load=held, simulations=[other]), mdrun, mpi=True, launcher=True)
+    expect(d.cores is None and d.threads is None,
+           "a GROMACS started through mpirun had its threads changed")
+
+    pairs = {c: {c + 12 if c < 12 else c - 12} for c in range(24)}
+    d = R.decide(computer(siblings=pairs, simulations=[R.Simulation(
+        7, "gmx mdrun", {0, 1}, True)], load={c: (1.0 if c < 2 else 0.0) for c in range(24)}),
+        mdrun)
+    expect(d.cores == set(range(24)) - {0, 1, 12, 13},
+           f"cores sharing a physical core with a pinned simulation were used: {d.cores}")
+
+    d = R.decide(computer(claimed={20: "another page", 21: "another page"}), mdrun)
+    expect(d.cores == set(range(20)) | {22, 23} and d.threads == 22,
+           f"cores another Comfy-gmx claimed a moment ago were used: {d.cores}")
+
+    d = R.decide(computer(load={**{c: 0.0 for c in range(24)}, 8: 0.9, 9: 0.95}), mdrun)
+    expect(d.cores == set(range(24)) - {8, 9}
+           and any("busy with other programs" in line for line in d.lines),
+           f"busy cores with no simulation on them: {d.cores}")
+
+    d = R.decide(computer(load=held, simulations=[other]), mdrun, can_restrict=False)
+    expect(d.cores is None and R.flags_for(d) == ["-ntmpi", "1", "-ntomp", "18"]
+           and any("taskset" in line for line in d.lines),
+           f"without taskset: {d.cores} {R.flags_for(d)}")
+
+    d = R.decide(R.Snapshot(readable=False, problems=["no /proc here"]), mdrun)
+    expect(not d.changed and any("could not look" in line for line in d.lines),
+           "a computer that cannot be read (a Mac) was not left to GROMACS")
+
+    d = R.decide(computer(cores=set(range(100)), allowed=set(range(100)),
+                          load={c: (1.0 if c == 99 else 0.0) for c in range(100)}), mdrun)
+    expect(d.threads == R.MAX_THREADS,
+           f"{d.threads} threads on a computer with 99 free cores; GROMACS takes "
+           f"{R.MAX_THREADS}")
+
+    # -- the graphics cards --------------------------------------------------
+    busy = R.Card(0, "GPU-aaa", "Test card", users=[(4242, "gmx mdrun -deffnm prod")],
+                  utilization=40.0)
+    free = R.Card(1, "GPU-bbb", "Test card", utilization=3.0)
+    d = R.decide(computer(cards=[busy], load={c: 1.0 for c in range(24)},
+                          simulations=everything), mdrun, gpu_policy="processor")
+    expect(d.wait and d.cuda_visible is None and not R.wrap_for(d),
+           "a simulation that has to wait for cores already had its card decided")
+    d = R.decide(computer(cards=[busy]), mdrun, gpu_policy="processor")
+    expect(R.wrap_for(d) == ["env", "CUDA_VISIBLE_DEVICES="] and not R.flags_for(d),
+           f"a busy card, processor only: {R.wrap_for(d)} {R.flags_for(d)}")
+    d = R.decide(computer(cards=[busy]), mdrun, gpu_policy="share")
+    expect(d.cuda_visible is None and any("shares it" in line for line in d.lines),
+           "a busy card, sharing: the card was hidden")
+    d = R.decide(computer(cards=[busy]), mdrun, gpu_policy="ask")
+    expect(d.cuda_visible == "" and any("nobody was asked" in line for line in d.lines),
+           "a busy card nobody was asked about did not go to the processor")
+    d = R.decide(computer(cards=[busy, free]), mdrun, gpu_policy="processor")
+    expect(d.cuda_visible == "GPU-bbb",
+           f"one of two cards busy: CUDA_VISIBLE_DEVICES={d.cuda_visible}")
+    d = R.decide(computer(cards=[busy]), mdrun + ["-nb", "cpu"])
+    expect(d.cuda_visible is None and any("left as it is" in line for line in d.lines),
+           "a card set by hand (-nb cpu) was changed")
+    d = R.decide(computer(cards=[busy], cuda_visible=""), mdrun)
+    expect(d.cuda_visible is None and not d.lines[1:],
+           "cards hidden from the page already were looked at again")
+    d = R.decide(computer(cards=[busy, free], cuda_visible="0"), mdrun)
+    expect(d.cuda_visible == "",
+           "CUDA_VISIBLE_DEVICES=0 names the busy card only, and it was still used")
+    d = R.decide(computer(cards=[busy], cuda_visible="MIG-1234"), mdrun)
+    expect(d.cuda_visible is None and any("left as it is" in line for line in d.lines),
+           "a card named in a way nvidia-smi does not list was changed")
+    d = R.decide(computer(cards=[R.Card(0, "GPU-ccc", "Test card", utilization=95.0)]),
+                 mdrun, gpu_policy="processor")
+    expect(d.cuda_visible == "", "a card 95 % busy with other work counted as free")
+    d = R.decide(computer(cards=None), mdrun)
+    expect(d.cuda_visible is None, "no nvidia-smi, and still the cards were changed")
+
+    # -- the readers -----------------------------------------------------------
+    expect(R.parse_cpu_list("0-3,8,10-11") == {0, 1, 2, 3, 8, 10, 11}
+           and R.parse_cpu_list("") == set() and R.parse_cpu_list("x") == set(),
+           "core lists are misread")
+    expect(R.cpu_list({0, 1, 2, 3, 8, 10, 11}) == "0-3,8,10-11"
+           and R.cpu_list({5}) == "5" and R.cpu_list(set()) == "",
+           "core lists are miswritten")
+    first = ("cpu  1 2 3 4\ncpu0 100 0 0 900 0 0 0 0 0 0\n"
+             "cpu1 0 500 0 500 0 0 0 0 0 0\ncpu2 0 0 0 900 100 0 0 0 0 0\n")
+    second = ("cpu  1 2 3 4\ncpu0 150 0 0 950 0 0 0 0 0 0\n"
+              "cpu1 0 600 0 500 0 0 0 0 0 0\ncpu2 0 0 0 950 150 0 0 0 0 0\n")
+    load = R.core_load(R.parse_proc_stat(first), R.parse_proc_stat(second))
+    expect(load == {0: 0.5, 1: 1.0, 2: 0.0},
+           f"/proc/stat misread (a niced simulation is busy, waiting is not): {load}")
+    expect(R.parse_cuda_visible(None) is None and R.parse_cuda_visible("") == []
+           and R.parse_cuda_visible("0,1") == ["0", "1"]
+           and R.parse_cuda_visible("1,-1,2") == ["1"] and R.parse_cuda_visible("-1") == [],
+           "CUDA_VISIBLE_DEVICES is misread")
+    cards = R.parse_cards(
+        "0, GPU-aaa, NVIDIA Test, 41\n1, GPU-bbb, NVIDIA Test, [N/A]\n",
+        "GPU-aaa, 26427, /usr/lib/vmware/VMwareBlastServer, 1974\n"
+        "GPU-aaa, 4242, gmx, 504\nGPU-bbb, 777, /opt/gromacs/bin/gmx_mpi, 300\n"
+        "GPU-aaa, 555, gmx, 10\n",
+        own={555}, is_simulation=lambda pid: None)
+    expect(len(cards) == 2 and cards[0].users == [(4242, "gmx")]
+           and cards[0].utilization == 41.0 and cards[1].utilization is None
+           and cards[1].users == [(777, "/opt/gromacs/bin/gmx_mpi")],
+           f"nvidia-smi's listings are misread: {cards}")
+    expect(R.explicit(mdrun) == {"threads": False, "pin": False, "gpu": False}
+           and R.explicit(mdrun + ["-gputasks", "00"])["gpu"],
+           "options set by hand are not recognised")
+    expect(R.has_launcher("mpirun -np 4 gmx_mpi") and R.is_mpi_command("/opt/gmx_mpi")
+           and not R.is_mpi_command("/opt/gromacs_mpi/bin/gmx")
+           and not R.has_launcher("/home/me/gromacs-2026.3/bin/gmx"),
+           "MPI builds and launchers are not told apart from the usual gmx")
+
+    step = Step(argv=list(mdrun) + ["-ntmpi", "1", "-ntomp", "18", "-pin", "off"], tool="gmx",
+                wrap=["env", "CUDA_VISIBLE_DEVICES=", "taskset", "-c", "6-23"])
+    rendered = render_step(step, "/opt/gromacs/bin/gmx")["command"]
+    expect(rendered == "env CUDA_VISIBLE_DEVICES= taskset -c 6-23 /opt/gromacs/bin/gmx "
+                       "mdrun -s md.tpr -deffnm md -v -ntmpi 1 -ntomp 18 -pin off",
+           f"the command is put together wrongly: {rendered}")
+
+    class Gmx:
+        command = "/opt/gromacs/bin/gmx"
+        prelude = ""
+    script = render_script([step], Path("/tmp"), lambda tool: Gmx())
+    expect('$__nice env CUDA_VISIBLE_DEVICES= taskset -c 6-23 /opt/gromacs/bin/gmx'
+           in script, "nice no longer comes first in the script")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "claims.json"
+        with R.Claims(path) as claims:
+            claims.add({3, 4}, "a test")
+            mine = [entry["cores"] for entry in claims.current()]
+        expect(mine in ([[3, 4]], []), f"a claim did not come back: {mine}")
+        locking = bool(mine)
+        if locking:
+            entries = json.loads(path.read_text())
+            entries.append({"pid": 2 ** 22 + 12345, "cores": [7], "who": "gone",
+                            "at": _time.time()})
+            entries.append({"pid": os.getpid(), "cores": [8], "who": "old",
+                            "at": _time.time() - R.CLAIM_SECONDS - 5})
+            path.write_text(json.dumps(entries))
+            with R.Claims(path) as claims:
+                standing = sorted(c for e in claims.current() for c in e["cores"])
+            expect(standing == [3, 4],
+                   f"claims of a program that has ended, or too old, still count: {standing}")
+            with R.Claims(path) as claims:
+                token = claims.add({9}, "a test that ends")
+                claims.release([token])
+                standing = sorted(c for e in claims.current() for c in e["cores"])
+            expect(standing == [3, 4], f"a claim given back still counts: {standing}")
+            path.write_text("{not json")
+            with R.Claims(path) as claims:
+                expect(claims.current() == [], "a broken claims file was not read as empty")
+
+    # -- through the executor, with a stand-in for gmx ------------------------
+    if not hasattr(os, "sched_getaffinity") or not Path("/proc/self/status").exists():
+        print("fit to the computer: judged on made-up computers only "
+              "(no /proc here to run the stand-in)")
+        return
+    allowed = set(os.sched_getaffinity(0))
+    tmp = tempfile.mkdtemp(prefix="comfygmx-fit-")
+    saved_env = {key: os.environ.get(key)
+                 for key in ("XDG_CACHE_HOME", "CUDA_VISIBLE_DEVICES", "FAKE_GMX_SLEEP")}
+    original_look = R.look_at_graphics_cards
+    os.environ["XDG_CACHE_HOME"] = str(Path(tmp) / "cache")
+    try:
+        fake = Path(tmp) / "gmx"
+        fake.write_text(_FAKE_GMX)
+        fake.chmod(0o755)
+        tpr = Path(tmp) / "in.tpr"
+        tpr.write_text("not a real run file\n")
+        settings = Settings()
+        settings.set("gmx_binary", str(fake))
+        settings.set("gmxrc", "")
+        settings.set("tools", {})
+        settings.set("mdrun", {"ntomp": 0, "ntmpi": 0, "gpu_id": "", "extra": ""})
+        settings.set("resources", {"auto": True, "gpu_busy": "ask"})
+        # The cache index and the times blocks took stay in the test folder,
+        # not in the real data folder of whoever runs this.
+        settings.set("data_dir", str(Path(tmp) / "data"))
+
+        # Another simulation pinned to the lowest core this test may use, and
+        # holding the one graphics card.
+        lowest = min(allowed)
+        expected = allowed - {lowest} if len(allowed) > 1 else allowed
+        made_up = R.Snapshot(
+            cores=set(allowed), allowed=set(allowed),
+            load={c: (1.0 if c == lowest else 0.0) for c in allowed},
+            simulations=[R.Simulation(4242, "gmx mdrun -deffnm prod", {lowest}, True)],
+            cards=[busy], cuda_visible=None)
+
+        class MadeUp(Executor):
+            def look_at_computer(self, claims=None):
+                # As the real look does: what another Comfy-gmx claimed a
+                # moment ago counts as taken.
+                snapshot = copy.deepcopy(made_up)
+                for entry in (claims.current() if claims is not None else []):
+                    for core in entry.get("cores") or []:
+                        snapshot.claimed[int(core)] = str(entry.get("who"))
+                return snapshot
+
+        graph = {"nodes": [
+            {"id": "tpr", "type": "io.file", "pos": [0, 0], "params": {"path": str(tpr)}},
+            {"id": "md", "type": "gmx.mdrun", "pos": [300, 0], "params": {"deffnm": "md"}}],
+            "links": [{"from_node": "tpr", "from_port": "file",
+                       "to_node": "md", "to_port": "tpr"}]}
+        runs = Path(tmp) / "runs"
+
+        def finish(run, seconds=60):
+            deadline = _time.monotonic() + seconds
+            while run.status in ("queued", "running") and _time.monotonic() < deadline:
+                _time.sleep(0.05)
+
+        def record_of(state):
+            folder = Path(state.workdir) if state.workdir else None
+            record = {}
+            if folder and (folder / "fake_gmx_record.txt").exists():
+                for line in (folder / "fake_gmx_record.txt").read_text().splitlines():
+                    key, _, value = line.partition(":")
+                    record[key] = value.strip()
+            return record
+
+        def go(force=True, **kw):
+            executor = MadeUp(settings)
+            run = executor.start(graph, output_dir=str(runs),
+                                 force=["md"] if force else None, **kw)
+            finish(run)
+            state = run.nodes["md"]
+            folder = Path(state.workdir) if state.workdir else None
+            command = (folder / "command.sh").read_text() if folder and (
+                folder / "command.sh").exists() else ""
+            return run, state, record_of(state), command
+
+        run, state, record, command = go()
+        expect(state.status == "done", f"the stand-in run ended '{state.status}': "
+               + " | ".join(list(state.log)[-5:]))
+        if len(allowed) > 1:
+            expect(R.parse_cpu_list(record.get("cores", "")) == expected,
+                   f"the simulation ran on cores {record.get('cores')}, not "
+                   f"{R.cpu_list(expected)}")
+            expect(f"-ntmpi 1 -ntomp {len(expected)} -pin off" in record.get("argv", ""),
+                   f"the simulation was given {record.get('argv')}")
+        expect("env CUDA_VISIBLE_DEVICES= " in command,
+               "a busy card nobody was asked about was not hidden from the simulation")
+        expect(any(line.startswith("[this computer] ") for line in state.log),
+               "the block's log does not say what was chosen")
+
+        # Two simulations one after the other in one run, as a minimisation
+        # and a heating are: the second must find the cores the first had,
+        # not "every core claimed" by a simulation that has ended.
+        chain = {"nodes": graph["nodes"] + [
+            {"id": "md2", "type": "gmx.mdrun", "pos": [600, 0], "params": {"deffnm": "md2"}}],
+            "links": graph["links"] + [{"from_node": "tpr", "from_port": "file",
+                                        "to_node": "md2", "to_port": "tpr"}]}
+        executor = MadeUp(settings)
+        both = executor.start(chain, output_dir=str(runs), force=["md", "md2"])
+        deadline = _time.monotonic() + 60
+        while both.status in ("queued", "running") and _time.monotonic() < deadline:
+            _time.sleep(0.05)
+        given = []
+        for node_id in ("md", "md2"):
+            given.append(R.parse_cpu_list(record_of(both.nodes[node_id]).get("cores", "")))
+        expect(len(allowed) < 2 or given == [expected, expected],
+               f"two simulations in a row got cores {[R.cpu_list(g) for g in given]}, not "
+               f"{R.cpu_list(expected)} each: the first one's claim outlived it")
+        with R.Claims() as claims:
+            left = claims.current()
+        expect(not left, f"claims are left over after the runs ended: {left}")
+
+        run, state, record, command = go(gpu_busy="share")
+        expect(state.status == "done" and "CUDA_VISIBLE_DEVICES" not in command,
+               "a run told to share the card still hid it")
+
+        # Every core held by another simulation for the first two looks: the
+        # simulation waits, says so once, and then starts on what came free.
+        every = R.Snapshot(
+            cores=set(allowed), allowed=set(allowed), load={c: 1.0 for c in allowed},
+            simulations=[R.Simulation(4343, "gmx mdrun -deffnm long -pin on",
+                                      set(allowed), True)])
+        looks = []
+
+        class Queue(MadeUp):
+            WAIT_SECONDS = 0.5
+
+            def look_at_computer(self, claims=None):
+                looks.append(1)
+                if len(looks) <= 2:
+                    return copy.deepcopy(every)
+                return super().look_at_computer(claims)
+
+        executor = Queue(settings)
+        run = executor.start(graph, output_dir=str(runs), force=["md"])
+        finish(run)
+        state = run.nodes["md"]
+        log = list(state.log)
+        record = record_of(state)
+        shown = [e.get("progress") for e in run.bus.since(0, timeout=0)
+                 if e["type"] == "progress" and e.get("node") == "md"]
+        expect(state.status == "done" and len(looks) == 3,
+               f"a simulation waiting for cores ended '{state.status}' after "
+               f"{len(looks)} looks (expected done after 3): " + " | ".join(log[-4:]))
+        expect(sum("waits for cores" in line for line in log) == 1
+               and sum("looking again every" in line for line in log) == 1
+               and any("cores came free after" in line for line in log),
+               "the wait is not said once, with its end: " + " | ".join(log))
+        expect(shown[:2] == ["waiting for free cores", ""],
+               f"the block did not show the wait, or kept showing it: {shown}")
+        if len(allowed) > 1:
+            expect(R.parse_cpu_list(record.get("cores", "")) == expected,
+                   f"after the wait the simulation ran on {record.get('cores')}, not "
+                   f"{R.cpu_list(expected)}")
+        took = (state.finished or 0) - (state.started or 0)
+        timed = (executor._timings.get("gmx.mdrun") or [None])[-1]
+        expect(state.waited >= 0.9 and timed is not None
+               and abs(timed - (took - state.waited)) < 0.05,
+               f"the wait ({state.waited:.2f} s) counted as time the block took "
+               f"({timed} s of {took:.2f} s)")
+
+        # Cancel while it waits: the wait ends at once, nothing is started.
+        class Held(MadeUp):
+            WAIT_SECONDS = 30.0
+
+            def look_at_computer(self, claims=None):
+                return copy.deepcopy(every)
+
+        executor = Held(settings)
+        run = executor.start(graph, output_dir=str(runs), force=["md"])
+        state = run.nodes["md"]
+        deadline = _time.monotonic() + 20
+        while (not any("waits for cores" in line for line in list(state.log))
+               and _time.monotonic() < deadline):
+            _time.sleep(0.05)
+        pressed = _time.monotonic()
+        executor.cancel(run.id)
+        finish(run, 30)
+        took = _time.monotonic() - pressed
+        expect(state.status == "cancelled" and run.status == "cancelled"
+               and not record_of(state) and took < 5
+               and any("never started" in line for line in state.log),
+               f"Cancel during the wait: block '{state.status}', run '{run.status}', "
+               f"stand-in started: {bool(record_of(state))}, {took:.1f} s to stop")
+        expect(state.progress == "",
+               f"a cancelled wait still says '{state.progress}' under its block")
+
+        # Two pages press Run in the same second on a free computer. The
+        # first gets the whole computer; the second must see its claim and
+        # wait, not start on the same cores before the first has finished.
+        if locking:
+            calm = R.Snapshot(cores=set(allowed), allowed=set(allowed),
+                              load={c: 0.0 for c in allowed})
+
+            class Page(MadeUp):
+                WAIT_SECONDS = 0.2
+
+                def look_at_computer(self, claims=None):
+                    snapshot = copy.deepcopy(calm)
+                    for entry in (claims.current() if claims is not None else []):
+                        for core in entry.get("cores") or []:
+                            snapshot.claimed[int(core)] = str(entry.get("who"))
+                    return snapshot
+
+            os.environ["FAKE_GMX_SLEEP"] = "1.5"
+            try:
+                first = Page(settings).start(graph, output_dir=str(runs), force=["md"])
+                # The second presses Run once the first has made its choice.
+                deadline = _time.monotonic() + 20
+                while (not any(line.startswith("[this computer]")
+                               for line in list(first.nodes["md"].log))
+                       and _time.monotonic() < deadline):
+                    _time.sleep(0.02)
+                second = Page(settings).start(graph, output_dir=str(runs), force=["md"])
+                finish(first)
+                finish(second)
+            finally:
+                os.environ.pop("FAKE_GMX_SLEEP", None)
+            one, two = first.nodes["md"], second.nodes["md"]
+            ended = float(record_of(one).get("end") or "inf")
+            began = float(record_of(two).get("start") or "-inf")
+            expect(one.status == "done" and two.status == "done" and began >= ended,
+                   f"two pages at once: the second started {began - ended:+.2f} s after "
+                   f"the first ended ({one.status}, {two.status}); it must wait for it")
+            expect(any("nothing else is running" in line for line in one.log)
+                   and any("waits for cores" in line for line in two.log),
+                   "two pages at once: the logs do not say who got the computer and "
+                   "who waited")
+            with R.Claims() as claims:
+                left = claims.current()
+            expect(not left, f"claims are left over after two pages ran: {left}")
+
+        made_up.simulations = []
+        made_up.load = {c: 0.0 for c in allowed}
+        run, state, record, command = go(force=False)
+        again = list((runs / run.id).rglob("fake_gmx_record.txt"))
+        expect(state.status == "cached" and not again,
+               f"a second run did not reuse the first ({state.status}, stand-in run "
+               f"{len(again)} time(s)): the choice of cores must not change what "
+               "counts as the same block")
+
+        settings.set("resources", {"auto": False, "gpu_busy": "ask"})
+        run, state, record, command = go()
+        expect("taskset" not in command and "CUDA_VISIBLE_DEVICES" not in command
+               and any("switched off" in line for line in state.log),
+               "switched off in Settings, and still the simulation was fitted")
+
+        settings.set("resources", {"auto": True, "gpu_busy": "processor"})
+        settings.set("mdrun", {"ntomp": 2, "ntmpi": 0, "gpu_id": "", "extra": ""})
+        run, state, record, command = go()
+        expect("-ntomp 2" in record.get("argv", "") and "-nt " not in record.get("argv", "")
+               and "taskset" not in command,
+               f"threads set in Settings were changed: {record.get('argv')}")
+        settings.set("mdrun", {"ntomp": 0, "ntmpi": 0, "gpu_id": "", "extra": ""})
+
+        try:
+            export_workflow(graph, settings, Path(tmp) / "bundle", label="fit")
+            exported = "\n".join(p.read_text() for p in (Path(tmp) / "bundle").rglob("*.sh"))
+            expect("taskset" not in exported and "CUDA_VISIBLE_DEVICES=" not in exported
+                   and "-pin off" not in exported,
+                   "an export carries this computer's choice of cores or card")
+        except ExportError as exc:
+            failures.append(f"fit to the computer: export failed: {exc}")
+
+        # -- the page's question --------------------------------------------
+        class Pretend:
+            def __init__(self, body):
+                self.body = body
+                self.replies = []
+                self.app = type("App", (), {})()
+                self.app.settings = settings
+                self.app.executor = MadeUp(settings)
+
+            def _body(self):
+                return self.body
+
+            def _json(self, data, status=200):
+                self.replies.append(data)
+
+        def ask(body):
+            handler = Pretend(body)
+            h_resources_check(handler)
+            return handler.replies[0] if handler.replies else {}
+
+        os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        R.look_at_graphics_cards = lambda own: [busy]
+        settings.set("resources", {"auto": True, "gpu_busy": "ask"})
+        reply = ask({"graph": graph, "force": ["md"]})
+        expect(reply.get("ask") is True and "4242" in reply.get("message", ""),
+               f"a busy card and a simulation to start, but no question: {reply}")
+        expect(ask({"graph": graph}).get("ask") is False,
+               "asked although the simulation's result is reused and nothing starts")
+        expect(ask({"graph": {"nodes": graph["nodes"][:1], "links": []}}).get("ask") is False,
+               "asked although the run starts no simulation")
+        settings.set("mdrun", {"ntomp": 0, "ntmpi": 0, "gpu_id": "", "extra": "-nb cpu"})
+        expect(ask({"graph": graph, "force": ["md"]}).get("ask") is False,
+               "asked although the card is set in Settings (-nb cpu)")
+        settings.set("mdrun", {"ntomp": 0, "ntmpi": 0, "gpu_id": "", "extra": ""})
+        for prefs in ({"auto": True, "gpu_busy": "processor"},
+                      {"auto": False, "gpu_busy": "ask"}):
+            settings.set("resources", prefs)
+            expect(ask({"graph": graph, "force": ["md"]}).get("ask") is False,
+                   f"asked although Settings says {prefs}")
+        settings.set("resources", {"auto": True, "gpu_busy": "ask"})
+        R.look_at_graphics_cards = lambda own: [free]
+        expect(ask({"graph": graph, "force": ["md"]}).get("ask") is False,
+               "asked although the card is free")
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        R.look_at_graphics_cards = lambda own: [busy]
+        expect(ask({"graph": graph, "force": ["md"]}).get("ask") is False,
+               "asked although the page sees no card at all")
+    finally:
+        R.look_at_graphics_cards = original_look
+        for key, value in saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # -- GROMACS itself, with a prime number of free cores ----------------
+    with_gromacs = _fit_with_gromacs(R, mdrun, expect)
+
+    # -- this computer, as it is -------------------------------------------
+    snapshot = R.take_snapshot(sample=0.2)
+    if snapshot.readable:
+        expect(bool(snapshot.cores) and snapshot.allowed <= snapshot.cores
+               and bool(snapshot.load),
+               f"a look at this computer came back empty: {snapshot.problems}")
+    print(f"fit to the computer: {judged[0]} checks; a stand-in gmx kept to the free "
+          "cores and off a busy card, the result reused, nothing in an export, "
+          "nothing when switched off, and the question asked only when it matters"
+          + ("; gmx mdrun itself took the options on a prime number of free cores"
+             if with_gromacs else ""))
+
+
+def _fit_with_gromacs(R, mdrun, expect) -> bool:
+    """gmx mdrun runs with the options a prime number of free cores gets.
+
+    Free cores come in any number. With -nt, GROMACS split the box into one
+    piece per thread and refused 17 of them ("contains a large prime factor
+    17"), which stopped a heating run on a workstation where six cores were
+    held and one busy. The options are now one part with N threads; this
+    hands them to GROMACS itself, on a small box of water, for ten steps,
+    off the graphics card. Only where gmx and taskset are there, and at least
+    three cores may be used. Returns whether it ran.
+    """
+    gmx = shutil.which("gmx")
+    if not gmx or not shutil.which("taskset") or not hasattr(os, "sched_getaffinity"):
+        return False
+    mine = sorted(os.sched_getaffinity(0))
+    primes = [p for p in (3, 5, 7, 11, 13, 17, 19, 23, 29, 31) if p < len(mine)]
+    if not primes:
+        return False
+    free = set(mine[-primes[-1]:])
+    snapshot = R.Snapshot(
+        cores=set(mine), allowed=set(mine),
+        load={c: (0.0 if c in free else 1.0) for c in mine},
+        simulations=[R.Simulation(4242, "gmx mdrun -deffnm prod", set(mine) - free, True)])
+    decision = R.decide(snapshot, mdrun)
+    expect(decision.threads == len(free) and decision.cores == free,
+           f"{len(free)} free cores gave {decision.threads} threads on {decision.cores}")
+    work = Path(tempfile.mkdtemp(prefix="fit-gromacs-"))
+    env = dict(os.environ, LC_ALL="C", CUDA_VISIBLE_DEVICES="")
+    try:
+        def gmx_run(*args: str) -> subprocess.CompletedProcess:
+            return subprocess.run([gmx, *args], cwd=work, env=env,
+                                  capture_output=True, text=True)
+        made = gmx_run("solvate", "-cs", "spc216.gro", "-box", "3", "3", "3",
+                       "-o", "water.gro")
+        if made.returncode:
+            expect(False, "gmx solvate could not make a box of water:\n" + made.stderr[-400:])
+            return True
+        waters = int((work / "water.gro").read_text().splitlines()[1]) // 3
+        (work / "water.top").write_text(
+            '#include "oplsaa.ff/forcefield.itp"\n#include "oplsaa.ff/spce.itp"\n\n'
+            f"[ system ]\nwater\n\n[ molecules ]\nSOL {waters}\n")
+        (work / "md.mdp").write_text(
+            "integrator = md\nnsteps = 10\ndt = 0.002\ncutoff-scheme = Verlet\n"
+            "coulombtype = PME\nrcoulomb = 1.0\nrvdw = 1.0\ntcoupl = V-rescale\n"
+            "tc-grps = System\ntau-t = 0.1\nref-t = 300\nconstraints = h-bonds\n")
+        ready = gmx_run("grompp", "-f", "md.mdp", "-c", "water.gro", "-p", "water.top",
+                        "-o", "md.tpr", "-maxwarn", "1")
+        if ready.returncode:
+            expect(False, "gmx grompp could not make the run input:\n" + ready.stderr[-400:])
+            return True
+        command = (R.wrap_for(decision) + [gmx, "mdrun", "-s", "md.tpr", "-deffnm", "md"]
+                   + R.flags_for(decision))
+        ran = subprocess.run(command, cwd=work, env=env, capture_output=True, text=True)
+        expect(ran.returncode == 0,
+               f"gmx mdrun refused the options for {len(free)} free cores "
+               f"({' '.join(R.flags_for(decision))}):\n" + (ran.stdout + ran.stderr)[-600:])
+        # The count that stopped the heating run: seventeen free cores out of
+        # 24. Run in the cores this test may use, more threads than cores for
+        # ten steps, because what matters is whether GROMACS takes the options
+        # at all: with -nt 17 it does not.
+        seventeen = R.decide(R.Snapshot(
+            cores=set(range(24)), allowed=set(range(24)),
+            load={c: (1.0 if c < 7 else 0.0) for c in range(24)},
+            simulations=[R.Simulation(4242, "gmx mdrun", set(range(6)), True)]), mdrun)
+        options = R.flags_for(seventeen)
+        ran = subprocess.run([gmx, "mdrun", "-s", "md.tpr", "-deffnm", "md17"] + options,
+                             cwd=work, env=env, capture_output=True, text=True)
+        expect(seventeen.threads == 17 and ran.returncode == 0,
+               f"gmx mdrun refused the options for 17 free cores ({' '.join(options)}):\n"
+               + (ran.stdout + ran.stderr)[-600:])
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    return True
+
+
+def check_gpu_question() -> None:
+    """Pressing Run asks "share the graphics card, or the processor only?"
+    only when the server says this run would meet a card another simulation
+    holds, and each answer reaches the run. `tools/gpu_question.js` loads
+    app.js with a stand-in for the page and for the server."""
+    node = shutil.which("node")
+    if not node:
+        print("question at Run: skipped -- node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "gpu_question.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the question-at-Run test failed:\n" + (proc.stdout or proc.stderr))
+    print("question at Run: asked only when it matters, and each answer reaches the run")
+
+
+def check_cancel_end() -> None:
+    """A run that ends a moment after Cancel still shows its last lines.
+
+    A simulation waiting for free cores ends at once when cancelled, while
+    its last lines are still on their way down the page's stream. The page
+    must repaint the blocks from the server, line under each included, and
+    give the stream a moment instead of stopping it.
+    `tools/cancel_end.js` loads app.js with a stand-in for the page and for
+    the server."""
+    node = shutil.which("node")
+    if not node:
+        print("end of a cancelled run: skipped -- node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "cancel_end.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the end-of-a-cancelled-run test failed:\n" + (proc.stdout or proc.stderr))
+    print("end of a cancelled run: blocks repainted with their last line, and the "
+          "stream given its moment to bring the rest")
+
 def check_canvas_panning() -> None:
     """Can you move the canvas about on a laptop trackpad?
 
@@ -3770,6 +4524,9 @@ CHECKS = (
     check_trajectory_carries_its_run_file,
     check_trajectory_groups,
     check_whole_lump,
+    check_fit_to_computer,
+    check_gpu_question,
+    check_cancel_end,
     check_file_tidying,
     check_chain_letters_survive,
     check_following_a_run,

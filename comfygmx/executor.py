@@ -31,6 +31,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional, Set
 
+from . import resources
 from .config import Settings
 from .environments import Toolbox
 from .graph import Graph, GraphError
@@ -540,7 +541,7 @@ def resolve_output_dir(settings: Settings, output_dir: str = "") -> Path:
 class NodeState:
     __slots__ = ("id", "type", "status", "started", "finished", "error",
                  "outputs", "notes", "log", "signature", "workdir", "returncode",
-                 "progress")
+                 "progress", "claims", "waited")
 
     def __init__(self, node_id: str, node_type: str):
         self.id = node_id
@@ -556,6 +557,12 @@ class NodeState:
         self.workdir = ""
         self.returncode: Optional[int] = None
         self.progress = ""
+        #: Cores claimed for this block's simulations while they start, given
+        #: back when the block ends (see resources.Claims).
+        self.claims: List[str] = []
+        #: Seconds spent waiting for cores to come free before its simulation
+        #: could start: not part of how long this kind of block takes.
+        self.waited = 0.0
 
     def to_dict(self, with_log: bool = False) -> Dict[str, Any]:
         data = {
@@ -602,6 +609,10 @@ class Run:
         #: with everything before it finished, so you can look at what came out
         #: and change what happens next before letting it go on.
         self.paused: str = ""
+        #: What to do when another simulation holds the graphics card, as
+        #: answered when Run was pressed: "processor" or "share". Empty when
+        #: nobody was asked; then Settings decides (see resources.py).
+        self.gpu_busy: str = ""
         self.gate = threading.Condition()
         self.lock = threading.Lock()
         self.thread: Optional[threading.Thread] = None
@@ -1076,6 +1087,7 @@ class Executor:
         output_dir: str = "",
         session: str = "",
         isolate: bool = False,
+        gpu_busy: str = "",
     ) -> Run:
         graph = Graph(graph_data)
         problems = [p for p in graph.validate() if p["level"] == "error"]
@@ -1134,6 +1146,7 @@ class Executor:
             raise GraphError(f"cannot create the output directory {workdir}: {exc}") from exc
 
         run = Run(run_id, graph, workdir, label, session)
+        run.gpu_busy = gpu_busy if gpu_busy in ("processor", "share") else ""
         run.order = order
         signatures = graph.signatures()
         for node_id in order:
@@ -1570,7 +1583,12 @@ class Executor:
         run.bus.emit({"type": "node", "node": node_id, "status": "running",
                       "workdir": state.workdir})
 
-        rc = self._run_node(run, state, node, workdir, produced, toolbox)
+        try:
+            rc = self._run_node(run, state, node, workdir, produced, toolbox)
+        finally:
+            # The cores claimed for its simulation go back now that it has
+            # ended, or the next simulation would find them taken.
+            self._release_claims(state)
 
         state.finished = time.time()
         state.returncode = rc
@@ -1588,7 +1606,8 @@ class Executor:
         state.status = "done"
         produced[node_id] = state.outputs
         if state.started and state.finished:
-            self._record_timing(node_type, state.finished - state.started)
+            self._record_timing(node_type,
+                                state.finished - state.started - state.waited)
         self._cache_store(state.signature, {
             "version": CACHE_VERSION,
             "workdir": str(workdir), "outputs": state.outputs,
@@ -1637,6 +1656,9 @@ class Executor:
 
         def resolve(tool_id: str):
             return toolbox.resolve(tool_id, env_override)
+
+        if not self._fit_to_computer(run, state, plan, resolve):
+            return 1          # cancelled while it waited: nothing was started
 
         script = render_script(plan.steps, workdir, resolve,
                                nice=bool(self.settings.get("nice", True)))
@@ -1719,6 +1741,133 @@ class Executor:
     def _log(self, run: Run, state: NodeState, line: str) -> None:
         state.log.append(line)
         run.bus.emit({"type": "log", "node": state.id, "line": line})
+
+    # -- fitting a simulation to the computer ------------------------------
+
+    def look_at_computer(self, claims: Optional["resources.Claims"] = None
+                         ) -> "resources.Snapshot":
+        """What the computer looks like at this moment.
+
+        A method of its own so that a test can put a made-up computer in its
+        place: the self-test cannot arrange for another simulation to be
+        pinned to some cores just to see this one keep off them.
+        """
+        return resources.take_snapshot(claims=claims)
+
+    def _release_claims(self, state: NodeState) -> None:
+        if not state.claims:
+            return
+        try:
+            with resources.Claims() as claims:
+                claims.release(state.claims)
+        except Exception:                                  # noqa: BLE001
+            pass                    # a claim left over lapses by itself
+        state.claims = []
+
+    #: How often a simulation waiting for cores looks again, in seconds. Here
+    #: rather than only in resources.py so that the self-test can shorten it.
+    WAIT_SECONDS = resources.WAIT_SECONDS
+
+    def _fit_to_computer(self, run: Run, state: NodeState, plan: Plan,
+                         resolve: Callable[[str], Any]) -> bool:
+        """Give each simulation in this plan only what the computer has free.
+
+        Done here, when the simulation is about to start, and nowhere else:
+        a plan made for a preview or an export is for another moment or
+        another computer. Only plain ``gmx mdrun`` steps are touched. Their
+        command keeps every word it had; the choice is added in front
+        (``env``, ``taskset``) and at the end (``-ntmpi 1 -ntomp N``, ``-pin off``), and the
+        block's log says what was chosen and why. See resources.py.
+
+        When every core is held by other simulations, this waits, looking
+        again every WAIT_SECONDS, with "waiting for free cores" on the block.
+        Returns False only when the run was cancelled during that wait: the
+        simulation has then not started.
+        """
+        steps = [step for step in plan.steps
+                 if not step.shell and step.tool == "gmx"
+                 and resources.is_mdrun(step.argv)]
+        if not steps:
+            return True
+        prefs = self.settings.get("resources")
+        prefs = prefs if isinstance(prefs, dict) else {}
+        if prefs.get("auto", True) is False:
+            self._log(run, state, "[this computer] fitting simulations to what is "
+                                  "free is switched off in Settings: GROMACS "
+                                  "chooses for itself")
+            return True
+        policy = run.gpu_busy or str(prefs.get("gpu_busy") or "ask")
+        if policy not in resources.GPU_POLICIES:
+            policy = "ask"
+        try:
+            command = resolve("gmx").command or "gmx"
+        except Exception:                                  # noqa: BLE001
+            command = "gmx"
+        launcher = resources.has_launcher(command)
+        mpi = resources.is_mpi_command(command)
+        can_restrict = shutil.which("taskset") is not None
+        waited_since: Optional[float] = None
+        while True:
+            decisions = []
+            try:
+                with resources.Claims() as claims:
+                    snapshot = self.look_at_computer(claims=claims)
+                    for step in steps:
+                        decisions.append((step, resources.decide(
+                            snapshot, step.argv, gpu_policy=policy, mpi=mpi,
+                            can_restrict=can_restrict, launcher=launcher)))
+                    if not any(decision.wait for _, decision in decisions):
+                        # A sweep's simulations run one after another on the
+                        # same cores: one claim covers them all.
+                        cores: Set[int] = set()
+                        for _, decision in decisions:
+                            cores |= decision.claim or set()
+                        if cores:
+                            state.claims.append(claims.add(
+                                cores, f"a simulation Comfy-gmx is starting "
+                                       f"(run {run.id}, block {state.id})"))
+                        break
+            except Exception as exc:                       # noqa: BLE001
+                # The look must never stop a simulation: it runs as planned.
+                self._log(run, state, f"[this computer] could not look at the "
+                                      f"computer ({exc}): GROMACS chooses for itself")
+                return True
+            if waited_since is None:
+                waited_since = time.monotonic()
+                waiting = next(decision for _, decision in decisions if decision.wait)
+                for line in waiting.lines:
+                    self._log(run, state, "[this computer] " + line)
+                self._log(run, state,
+                          f"[this computer] looking again every {self.WAIT_SECONDS:g} s; "
+                          "Cancel stops the wait. To start it now anyway, beside the "
+                          "other simulation, cancel and put a number in the block's "
+                          "thread box: a number set by hand is used as it is")
+                state.progress = "waiting for free cores"
+                run.bus.emit({"type": "progress", "node": state.id,
+                              "progress": state.progress})
+            until = time.monotonic() + self.WAIT_SECONDS
+            while time.monotonic() < until:
+                if run.cancelled:
+                    state.progress = ""
+                    run.bus.emit({"type": "progress", "node": state.id, "progress": ""})
+                    self._log(run, state, "[this computer] cancelled while waiting "
+                                          "for free cores: the simulation never started")
+                    return False
+                time.sleep(min(0.25, max(0.0, until - time.monotonic())))
+        if waited_since is not None:
+            waited = time.monotonic() - waited_since
+            state.waited += waited
+            self._log(run, state, "[this computer] cores came free after "
+                                  + (f"{waited / 60:.0f} min" if waited >= 90
+                                     else f"{waited:.0f} s"))
+            state.progress = ""
+            run.bus.emit({"type": "progress", "node": state.id, "progress": ""})
+        for step, decision in decisions:
+            step.wrap = resources.wrap_for(decision) + list(step.wrap)
+            step.argv = list(step.argv) + resources.flags_for(decision)
+            for line in decision.lines:
+                self._log(run, state, "[this computer] " + line)
+        return True
 
 
 def _link_key(link: Dict[str, Any]):

@@ -54,6 +54,13 @@ def _default_settings() -> Dict[str, Any]:
         "tools": {},
         # Default resources handed to `gmx mdrun` when a node leaves them blank.
         "mdrun": {"ntomp": 0, "ntmpi": 0, "gpu_id": "", "extra": ""},
+        # What a simulation does about other work on this computer. With
+        # "auto" on, a simulation whose threads nobody set gets only the cores
+        # nothing else is using, and keeps off a graphics card another
+        # simulation holds -- or shares it, as "gpu_busy" says: "ask" (in the
+        # page, when Run is pressed), "processor" or "share". When nothing
+        # else is running it changes nothing. See resources.py.
+        "resources": {"auto": True, "gpu_busy": "ask"},
         # Where atomistic GROMACS force fields (folders ending in .ff) that
         # did not come with GROMACS are kept. Blank means
         # <data_dir>/forcefields/gromacs; GROMACS is told about it through
@@ -104,9 +111,13 @@ class Settings:
                 merged = _default_settings()
                 merged.update(stored)
                 # keep nested defaults for keys the file predates
-                for key in ("mdrun",):
+                for key in ("mdrun", "resources"):
                     base = _default_settings()[key]
-                    base.update(stored.get(key) or {})
+                    value = stored.get(key)
+                    # A hand-edited file with something else there gets
+                    # the defaults rather than a server that will not start.
+                    if isinstance(value, dict):
+                        base.update(value)
                     merged[key] = base
                 self.data = merged
 

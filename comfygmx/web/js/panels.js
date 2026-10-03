@@ -1803,6 +1803,22 @@ const Panels = {
     });
     const parallel = UI.el('input', { type: 'number', min: '1', max: '16',
       value: String(current.max_parallel_nodes || 1) });
+    /* What a simulation does about other work on this computer. Read from
+       the settings as they are, with the defaults for a file older than the
+       choice: on, and ask about the graphics card. */
+    const fitting = Object.assign({ auto: true, gpu_busy: 'ask' }, current.resources || {});
+    const autoFit = UI.el('input', { type: 'checkbox' });
+    autoFit.checked = fitting.auto !== false;
+    const gpuBusy = UI.el('select', {}, [
+      UI.el('option', { value: 'ask', text: 'ask me when I press Run' }),
+      UI.el('option', { value: 'processor', text: 'run on the processor only' }),
+      UI.el('option', { value: 'share', text: 'share the graphics card' }),
+    ]);
+    gpuBusy.value = ['ask', 'processor', 'share'].includes(fitting.gpu_busy)
+      ? fitting.gpu_busy : 'ask';
+    const paintFitting = () => { gpuBusy.disabled = !autoFit.checked; };
+    autoFit.addEventListener('change', paintFitting);
+    paintFitting();
     const ffDir = UI.el('input', { type: 'text', value: current.gmx_forcefield_dir || '',
       placeholder: (forcefields && forcefields.dir) || '<data directory>/forcefields/gromacs' });
 
@@ -1855,7 +1871,30 @@ const Panels = {
         field('-ntomp', ntomp), field('-ntmpi', ntmpi), field('-gpu_id', gpu),
       ]),
       UI.el('div', { class: 'hint',
-        text: 'Used when an mdrun node leaves the corresponding field at 0. 0 means "let GROMACS decide".' }),
+        text: 'Used when an mdrun node leaves the corresponding field at 0. 0 means: '
+            + 'what is free on this computer (below), or, with that switched off, '
+            + '"let GROMACS decide".' }),
+
+      UI.el('h3', { text: 'This computer' }),
+      UI.el('div', { class: 'field' }, [
+        UI.el('label', {}, [autoFit, ' Fit each simulation to what is free on this computer']),
+        UI.el('div', { class: 'hint',
+          text: 'Just before a simulation starts, Comfy-gmx looks at which processor cores '
+              + 'and graphics cards other programs are using, and gives the simulation only '
+              + 'the free ones: it is kept to the free cores and starts that many threads. '
+              + 'Without this, GROMACS takes every core, also the ones another simulation '
+              + 'is running on, and both become slow. When nothing else is running, nothing '
+              + 'changes: GROMACS chooses, as always. When every core is held by another '
+              + 'simulation, the new one waits until some come free, and its block says '
+              + '"waiting for free cores"; Cancel stops the wait. A block whose threads, '
+              + 'pinning or graphics card you set yourself is left as you set it. The '
+              + 'block\'s log says what was chosen and why.' }),
+      ]),
+      field('When another simulation is using the graphics card', gpuBusy,
+        'Sharing is faster for a big system, but slows the simulation that is already '
+        + 'on the card. The processor only leaves that one alone. "Ask" asks when you '
+        + 'press Run, and only when it matters; a run started from the command line '
+        + 'then uses the processor only.'),
 
       UI.el('h3', { text: 'General' }),
       field('Nodes at once', parallel,
@@ -1933,6 +1972,7 @@ const Panels = {
         ntmpi: parseInt(ntmpi.value, 10) || 0,
         gpu_id: gpu.value.trim(),
       },
+      resources: { auto: autoFit.checked, gpu_busy: gpuBusy.value },
     });
 
     UI.modal('Settings', body, [
@@ -4122,6 +4162,31 @@ const Panels = {
       waits for everything else to finish before starting one, and starts nothing else
       while it runs.</p>
       <p>Set it to 1 for strictly one node at a time, which is what it always did.</p>
+
+      <h3>Other work on this computer</h3>
+      <p>A simulation nobody set threads for lets GROMACS decide, and GROMACS decides as
+      if the computer were its own: a thread on every core, each fixed to its core, and
+      the graphics card. When another simulation is already running, both become slow:
+      the new one at the pace of its threads that share a core, the old one losing most
+      of its speed.</p>
+      <p>So just before a simulation starts, Comfy-gmx spends half a second looking at
+      the computer: which cores another simulation holds, which are busy, which this
+      program may use at all, and who is on the graphics card. The simulation is kept to
+      the free cores (<code>taskset</code>) and starts that many threads
+      (<code>-ntmpi 1 -ntomp</code>). When another simulation holds the graphics card, it either
+      keeps off it or shares it: <b>Settings → This computer</b> says which, or asks when
+      you press <b>Run</b>. When nothing else is running nothing changes, and a block
+      whose threads, pinning or graphics card you set yourself is left as it is. The
+      block's log says what was chosen and why, in lines that start
+      <code>[this computer]</code>. Exported scripts never carry any of it: they run on
+      another computer.</p>
+      <p>When every core is already held by other simulations, a new one waits rather
+      than start on their cores, where it would slow them down for as long as both run.
+      Its block says <i>waiting for free cores</i>, it looks again every 15 seconds, and
+      <b>Cancel</b> stops the wait. Each simulation also leaves a note of the cores it
+      was given, so one started a few seconds later, in another session or another page,
+      keeps off them before the first is visible. To run two side by side anyway, give
+      each a number of threads by hand.</p>
 
       <h3>What Run will actually do</h3>
       <p>Beside the Run button is a line saying how much of the graph would really

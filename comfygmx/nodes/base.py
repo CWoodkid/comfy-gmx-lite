@@ -294,11 +294,18 @@ class Step:
     #: have to travel with the scripts, and the only ones whose absolute path
     #: must be rewritten to point inside the exported folder.
     imports: List[Dict[str, str]] = field(default_factory=list)
+    #: Words put in front of the command when it runs, after the tool's own
+    #: command has been filled in: ``env CUDA_VISIBLE_DEVICES= taskset -c
+    #: 6-23``. Only the executor sets it, just before a simulation starts,
+    #: from what the computer looks like at that moment (see resources.py).
+    #: A plan made for a preview or an export never has it, because the
+    #: computer that will run those is not this one.
+    wrap: List[str] = field(default_factory=list)
 
     def render(self) -> str:
         if self.shell:
             return self.argv[0] if self.argv else ""
-        return " ".join(shlex.quote(str(a)) for a in self.argv)
+        return " ".join(shlex.quote(str(a)) for a in self.wrap + self.argv)
 
 
 @dataclass

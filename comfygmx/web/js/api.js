@@ -60,6 +60,10 @@ const API = (() => {
     preview:     (graph, node) => post('api/graph/preview', { graph, node }),
 
     run:         (graph, opts = {}) => post('api/run', Object.assign({ graph }, opts)),
+    /* Just before a run: would it start a simulation while another one holds
+       the graphics card, with Settings saying to ask? {ask: false} otherwise. */
+    resourcesCheck: (graph, opts = {}) =>
+      post('api/resources/check', Object.assign({ graph }, opts)),
     // The workflow as a folder of shell scripts, with the files it reads.
     exportScripts: (graph, opts = {}) => post('api/export', Object.assign({ graph }, opts)),
     runs:        () => get('api/runs'),

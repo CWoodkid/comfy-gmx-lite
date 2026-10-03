@@ -33,6 +33,9 @@ const App = {
   tutorialMeta: {},
   selectedNode: null,
   clipboard: null,
+  /* How long a run found over after Cancel waits for the stream to bring its
+     last lines before it is settled without them (see reconcile). */
+  streamGrace: 2500,
   logNode: null,
   _planTimer: null,
 
@@ -1622,6 +1625,45 @@ const App = {
   },
 
   /* ---------------------------------------------------------------- run */
+  /* "Another simulation holds the graphics card: share it, or use the
+     processor only?" Resolves to {policy, remember}, or to null when the
+     dialog is closed without an answer -- by its ×, by Escape, or by another
+     dialog taking its place -- and then no run starts. */
+  askAboutCard(question) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (value) => {
+        if (settled) return;
+        settled = true;
+        clearInterval(watch);
+        resolve(value);
+      };
+      const remember = UI.el('input', { type: 'checkbox' });
+      const said = question.message || 'the graphics card is in use';
+      const body = UI.el('div', {}, [
+        UI.el('p', { text: said.charAt(0).toUpperCase() + said.slice(1) + '.' }),
+        UI.el('p', { text: 'This run will start a simulation. Sharing the card is faster for '
+          + 'a big system, but slows the simulation that is already on it. The processor '
+          + 'only leaves that one alone; a small system loses little.' }),
+        UI.el('label', {}, [remember,
+          ' remember this answer (Settings › This computer changes it)']),
+      ]);
+      UI.modal('The graphics card is busy', body, [
+        { label: 'Cancel', action: () => settle(null) },
+        { label: 'Share the graphics card',
+          action: () => settle({ policy: 'share', remember: remember.checked }) },
+        { label: 'Use the processor only', primary: true,
+          action: () => settle({ policy: 'processor', remember: remember.checked }) },
+      ]);
+      // Closed some other way: every opening and closing of a dialog moves
+      // this number on, so a change means this one is gone.
+      const generation = UI._generation;
+      const watch = setInterval(() => {
+        if (UI._generation !== generation) settle(null);
+      }, 250);
+    });
+  },
+
   /* `only`     which nodes to run.
      `force`    which of them to redo even if the answer is already stored.
      `isolate`  true means "these and nothing else": what the nodes before them
@@ -1637,6 +1679,31 @@ const App = {
     }
     if (!Editor.nodes.size) { UI.toast('nothing to run', 'warn'); return; }
 
+    // Another simulation may hold the graphics card. When Settings says to
+    // ask, the server says whether this run would meet that, and the answer
+    // goes along with the run. Trouble asking is no reason to stop the run:
+    // it then goes as Settings says.
+    const graph = Editor.toJSON();
+    let gpuBusy = '';
+    let question = null;
+    try {
+      question = await API.resourcesCheck(graph, {
+        only: only || null, force: force || null, isolate: Boolean(isolate),
+      });
+    } catch (err) { question = null; }
+    if (question && question.ask) {
+      const answer = await this.askAboutCard(question);
+      if (!answer) return;                  // closed without an answer: no run
+      gpuBusy = answer.policy;
+      if (answer.remember) {
+        API.saveSettings({ resources: { gpu_busy: answer.policy } })
+          .then(() => UI.toast('remembered: '
+            + (answer.policy === 'share' ? 'share the graphics card' : 'use the processor only')
+            + ' when another simulation holds it. Settings › This computer changes it.', 'ok', 7000))
+          .catch((err) => UI.toast(err.message, 'error'));
+      }
+    }
+
     Editor.resetStatuses();
     document.getElementById('log-output').innerHTML = '';
     // A run starts unpinned so the log pane tracks the active node; clicking a
@@ -1645,13 +1712,14 @@ const App = {
 
     let started;
     try {
-      started = await API.run(Editor.toJSON(), {
+      started = await API.run(graph, {
         only: only || null,
         force: force || null,
         isolate: Boolean(isolate),
         label: session.name,
         output_dir: session.outputDir || '',
         session: session.id,
+        gpu_busy: gpuBusy,
       });
     } catch (err) {
       UI.toast(err.message, 'error', 9000);
@@ -2015,10 +2083,27 @@ const App = {
       for (const [nodeId, state] of Object.entries(detail.nodes || {})) {
         Sessions.noteNode(session, nodeId, state.status, state.error || '');
         if (session.id === Sessions.activeId) {
-          Editor.setStatus(nodeId, state.status, { error: state.error || '' });
+          // The line under the block too: "waiting for free cores" must not
+          // stay on a block whose wait was cancelled.
+          Editor.setStatus(nodeId, state.status, { error: state.error || '',
+                                                   progress: state.progress || '' });
         }
       }
       if (settled(detail.status)) {
+        // A run can end a moment after Cancel -- one waiting for free cores
+        // ends at once -- while its last lines are still on their way down
+        // the stream. Stopping the stream now loses them: the block's
+        // "cancelled while waiting", the log's title. So the stream gets a
+        // moment to bring them, and settles the run itself; this settles it
+        // only if the stream does not.
+        if (session.stop) {
+          setTimeout(() => {
+            if (session.run && session.run.id === runId) {
+              this.onRunStatus(session, detail.status);
+            }
+          }, this.streamGrace);
+          return;
+        }
         this.onRunStatus(session, detail.status);
         return;
       }

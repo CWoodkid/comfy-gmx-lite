@@ -1195,7 +1195,9 @@ class MdrunNode(Node):
     params = (
         Param("deffnm", "str", "Output prefix (-deffnm)", "md"),
         Param("ntomp", "int", "OpenMP threads (-ntomp)", 0, min=0,
-              help="0 lets GROMACS pick. Set it when other jobs share the machine."),
+              help="0: Comfy-gmx gives the simulation the cores nothing else is using "
+                   "(Settings → This computer), and GROMACS picks when the computer is "
+                   "free. A number here is used as it is."),
         Param("ntmpi", "int", "MPI ranks (-ntmpi)", 0, min=0),
         Param("gpu_id", "str", "GPU ids (-gpu_id)", "", placeholder="e.g. 0 or 01"),
         Param("nb", "choice", "Non-bonded on", "auto", choices=["auto", "cpu", "gpu"], advanced=True),

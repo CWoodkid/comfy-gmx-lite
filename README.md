@@ -135,6 +135,19 @@ point to the `GMXRC` file of an installed GROMACS, or **Environments → Build
 from source** can build one. Runs and settings are kept in
 `~/.comfy-gmx-lite`. `./run.sh --help` lists other ways to start the editor.
 
+A computer that is already running another simulation is shared rather than
+fought over. Left to itself, GROMACS takes every core and the graphics card,
+and two simulations on the same cores both become slow. So just before a
+simulation starts, the editor looks at which cores and graphics cards other
+programs are using. The simulation is kept to the free cores and starts that
+many threads. When another simulation holds the graphics card, the new one
+keeps off it or shares it, as **Settings → This computer** says; by default
+the question comes when **Run** is pressed. When every core is held by
+another simulation, the new one waits until some come free; its block says
+*waiting for free cores*, and **Cancel** stops the wait. On a computer with
+nothing else running nothing changes, and a block whose threads are set by
+hand keeps them. The block's log says what was chosen and why.
+
 On Windows, use WSL (Linux inside Windows), or Docker with the files in
 [binder/](binder/).
 
