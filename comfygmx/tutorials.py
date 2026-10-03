@@ -85,9 +85,10 @@ _LYSOZYME_NODES: List[Dict[str, Any]] = [
           "STEPS 1-2 - Topology\n"
           "1AKI is hen egg white lysozyme. The crystal waters are stripped before "
           "pdb2gmx; keeping them would be right only if one were functional.\n\n"
-          "The tutorial uses CHARMM36, which GROMACS does not ship. Point the "
-          "'Force field directory' node at your unpacked *.ff folder, or delete that "
-          "node and pick a bundled force field on pdb2gmx instead.\n\n"
+          "The tutorial uses CHARMM36, which does not come with GROMACS. The "
+          "'Force field directory' node downloads it by itself (the July 2022 "
+          "release, from the MacKerell lab) and passes it to pdb2gmx along the "
+          "wire.\n\n"
           "Point at any socket to see what kind of file goes through it; Help "
           "(the ? at the top) lists them all."),
     # Fetched rather than left blank. The tutorial does use CHARMM36 and does
