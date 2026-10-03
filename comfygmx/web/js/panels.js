@@ -4453,6 +4453,10 @@ const Panels = {
     });
     search.addEventListener('keydown', (event) => event.stopPropagation());
 
-    UI.modal('Help', body, [{ label: 'Close' }]);
+    UI.modal('Help', body, [
+      // The two-minute tour of the mouse and keyboard (tour.js), again.
+      { label: 'Show the basics', action: () => { Tour.open(); return false; } },
+      { label: 'Close' },
+    ]);
   },
 };

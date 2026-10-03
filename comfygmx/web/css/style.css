@@ -1744,3 +1744,51 @@ button.form-open { align-self: flex-start; margin-top: 3px; }
 .box-sides .hint { margin: 0 0 8px; }
 .box-sides button.ghost { margin-top: 4px; }
 
+
+/* ------------------------------------------------------------------ tour */
+/* The basics (tour.js): a short tour of the mouse and keyboard. Narrower than
+   the other windows, so each picture and its few lines read as one card.
+   It keeps one size from slide to slide, so Next stays where the pointer
+   already is; in a short browser window the picture gives up the room the
+   words need (330 px is everything but the picture on the longest slide). */
+#modal.tour-panel { width: min(600px, 94vw); height: min(600px, 92vh); max-height: none; }
+#modal.tour-panel .modal-body {
+  flex: 1 1 auto; min-height: 0; padding: 14px 18px 10px;
+  display: flex; flex-direction: column;
+}
+.tour { flex: 1 0 auto; display: flex; flex-direction: column; }
+.tour-picture { line-height: 0; }
+.tour-art {
+  display: block; width: 100%; height: auto; max-height: calc(min(600px, 92vh) - 330px);
+  border: 1px solid var(--line); border-radius: 6px; background: #14171c;
+}
+.tour-art text { font-family: var(--font); }
+.tour-text h2 { font-size: 16px; font-weight: 600; margin: 14px 0 6px; color: var(--text); }
+.tour-text p { font-size: 13px; line-height: 1.55; margin: 0 0 8px; color: var(--text); }
+/* A key to press, drawn like the key itself. */
+.tour-text kbd {
+  display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 4px;
+  border: 1px solid var(--line-strong); border-bottom-width: 2px;
+  background: var(--bg-raised); font: 12px var(--font); text-align: center;
+}
+.tour-dots { display: flex; justify-content: center; gap: 7px; margin: auto 0 2px; padding-top: 8px; }
+.tour-dots button {
+  width: 10px; height: 10px; padding: 0; border-radius: 50%;
+  background: var(--line-strong); border: none;
+}
+.tour-dots button.current { background: var(--accent); }
+.tour-never {
+  margin-right: auto; display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-dim); cursor: pointer;
+}
+/* The first slide: a mouse or a touchpad, as two big buttons with pictures,
+   under the question. With no picture above it, the title starts at the top. */
+.tour > .tour-text:first-child h2 { margin-top: 2px; }
+.tour-choice { display: flex; gap: 14px; margin: 6px 0 4px; }
+.tour-option {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 10px 12px; border-radius: 8px; font-size: 14px;
+}
+.tour-option.chosen { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tour-choice-art { width: 140px; height: 105px; display: block; }
+.tour-option-label { font-weight: 600; }

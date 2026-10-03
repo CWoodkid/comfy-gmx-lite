@@ -2194,6 +2194,98 @@ def check_picture_sizes() -> None:
           "again whenever that changes, and the plot keeps a height of its own")
 
 
+def check_tour() -> None:
+    """The basics: a two-minute tour of the mouse, the touchpad and the keys.
+
+    A workshop found that pupils who grew up on phones did not know what a
+    mouse expects: that dragging is press, hold, move and let go, that the
+    right button opens a menu, that Ctrl+Z is one key held while another is
+    pressed. So the page opens with ten slides, each with a small moving
+    picture, once per browser tab, after any window that setting up asks
+    first; ? > Show the basics brings it back. `tools/tour_slides.js` checks
+    the slides and how the tour behaves; here each picture is also read as
+    SVG, and the timings of every moving part are checked against each
+    other, because a browser that finds them disagreeing quietly drops that
+    movement and the picture stands still."""
+    import xml.etree.ElementTree as ET
+
+    web = ROOT / "comfygmx" / "web"
+    html = (web / "index.html").read_text()
+    order = [html.find(f'<script src="js/{name}"></script>') for name in ("panels.js", "tour.js", "app.js")]
+    check(-1 not in order and order == sorted(order),
+          "tour: index.html no longer loads js/tour.js after panels.js and before app.js")
+    check(re.search(r"offerSetup\(\)\.then\(\(\) => \{[^}]*Tour\.atStart\(\)", (web / "js" / "app.js").read_text()),
+          "tour: the page no longer opens the tour by itself once setting up has asked its question")
+    panels = (web / "js" / "panels.js").read_text()
+    check("'Show the basics'" in panels and "Tour.open()" in panels,
+          "tour: Help (the ? button) no longer offers Show the basics")
+    api = (web / "js" / "api.js").read_text()
+    check("opts.panelClass" in api and "className = 'modal-panel';" in api,
+          "tour: the shared window no longer takes the tour's size and gives every other "
+          "window its usual size back")
+    css = (web / "css" / "style.css").read_text()
+    panel = re.search(r"(?m)^#modal\.tour-panel\s*\{([^}]*)\}", css)
+    check(panel and re.search(r"(?<!-)height:", panel.group(1)),
+          "tour: its window no longer keeps one height, so Next moves from slide to slide")
+
+    node = shutil.which("node")
+    if not node:
+        print("tour: page wiring checked; the slides were not, node is not installed")
+        return
+    script = str(ROOT / "tools" / "tour_slides.js")
+    proc = subprocess.run([node, script], capture_output=True, text=True)
+    check(proc.returncode == 0, "the tour test failed:\n" + (proc.stdout or proc.stderr))
+    proc = subprocess.run([node, script, "--pictures"], capture_output=True, text=True)
+    try:
+        pictures = json.loads(proc.stdout)
+    except ValueError:
+        check(False, "tour: tools/tour_slides.js --pictures did not print its pictures:\n"
+              + (proc.stderr or proc.stdout[:400]))
+        return
+
+    def numbers(text: str) -> list[float]:
+        return [float(v) for v in text.replace(",", " ").split()]
+
+    moving = 0
+    for picture in pictures:
+        name = f"tour: the {picture['kind']} picture for \"{picture['id']}\""
+        try:
+            root = ET.fromstring(picture["svg"])
+        except ET.ParseError as err:
+            check(False, f"{name} is not well-formed SVG ({err})")
+            continue
+        ids = {e.get("id") for e in root.iter() if e.get("id")}
+        for element in root.iter():
+            for value in element.attrib.values():
+                for target in re.findall(r"url\(#([^)]+)\)", value):
+                    check(target in ids, f"{name} points at #{target}, which it does not have")
+            tag = element.tag.split("}")[-1]
+            if tag not in ("animate", "animateTransform", "animateMotion"):
+                continue
+            moving += 1
+            what = f"{name}: a moving part ({tag} {element.get('attributeName') or 'along a path'})"
+            dur = re.fullmatch(r"([\d.]+)s", element.get("dur") or "")
+            check(dur and float(dur.group(1)) > 0, f"{what} has no length")
+            times = [float(t) for t in (element.get("keyTimes") or "").split(";") if t.strip()]
+            steps = element.get("keyPoints") if tag == "animateMotion" else element.get("values")
+            steps = [s for s in (steps or "").split(";") if s.strip()]
+            check(len(times) == len(steps),
+                  f"{what} has {len(steps)} steps but {len(times)} moments for them")
+            check(times and times[0] == 0 and all(a <= b for a, b in zip(times, times[1:]))
+                  and times[-1] <= 1, f"{what} has its moments out of order: {times}")
+            mode = element.get("calcMode") or ("paced" if tag == "animateMotion" and not times else "linear")
+            if mode != "discrete":
+                check(times and times[-1] == 1, f"{what} does not end at the end of its picture")
+            if mode == "spline":
+                splines = [numbers(s) for s in (element.get("keySplines") or "").split(";") if s.strip()]
+                check(len(splines) == len(times) - 1
+                      and all(len(s) == 4 and all(0 <= v <= 1 for v in s) for s in splines),
+                      f"{what} has {len(splines)} easing curves for {len(times) - 1} moves")
+    print(f"tour: {len(pictures)} pictures well formed, {moving} moving parts whose timings "
+          "agree; ten slides for a mouse and for a touchpad, opening once per tab after any "
+          "other window, ? > Show the basics brings it back")
+
+
 def check_workflow_tools() -> None:
     """A workflow says which programs it needs, and which versions it used.
 
@@ -4618,6 +4710,7 @@ CHECKS = (
     check_side_panels,
     check_page_fits,
     check_picture_sizes,
+    check_tour,
     check_param_boxes,
     check_mdp_boxes,
     check_mdp_with_gromacs,

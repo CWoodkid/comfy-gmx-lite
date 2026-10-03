@@ -120,7 +120,9 @@ const App = {
     this.restore();
 
     UI.status(`Comfy-gmx ${info.version} · ${info.nodes} node types · data in ${info.data_dir}`);
-    this.offerSetup();
+    // The tour of the mouse and keyboard (tour.js) waits for any window that
+    // setting up asks first.
+    this.offerSetup().then(() => { if (typeof Tour !== 'undefined') Tour.atStart(); });
   },
 
   /* On a machine that is not ready, say so once and offer to fix it.

@@ -376,6 +376,10 @@ const UI = {
     // the second is up would leave the new one buried under it.
     if (UI._subOpen) UI.closeSubModal();
     UI._generation += 1;
+    // A window that wants a size of its own (the tour) names a class for it;
+    // every other window gets the usual size back.
+    document.getElementById('modal').className =
+      `modal-panel${opts.panelClass ? ` ${opts.panelClass}` : ''}`;
     const backdrop = document.getElementById('modal-backdrop');
     const open = !backdrop.classList.contains('hidden');
     if (open && UI._modalReopen && UI._modalReopen !== opts.reopen) {
@@ -485,6 +489,7 @@ const UI = {
     if (UI._subOpen) { UI.closeSubModal(); return; }
     UI._generation += 1;
     document.getElementById('modal-backdrop').classList.add('hidden');
+    document.getElementById('modal').className = 'modal-panel';
     UI._modalStack = [];
     UI._modalReopen = null;
     UI._paintBack();

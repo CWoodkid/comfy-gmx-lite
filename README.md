@@ -32,6 +32,12 @@ first-time user sees 27 blocks rather than hundreds.
   graphs side by side.
 - Every block and every setting carries a plain-language explanation. Each
   tutorial also explains its steps in notes on the canvas.
+- The first time the page opens in a browser tab, a two-minute tour shows how
+  to work it with your hands: clicking, dragging, wires, moving around,
+  zooming, right-click menus, undo and running. Each of its ten slides has a
+  small moving picture, for a mouse or for a touchpad, whichever you say you
+  use. **?** → **Show the basics** brings it back, and a tick box stops it
+  opening by itself.
 - **Check** lists missing connections and unusable settings before anything
   runs. Beside **Run**, a line says how many blocks will run, how many stored
   results will be reused, and roughly how long the run will take.
@@ -107,6 +113,10 @@ Limits of mybinder.org:
 - Share the link behind the button. Each person gets a separate copy, so
   nobody can affect anybody else's work.
 - Start the copies at the beginning of the lesson, not when they are needed.
+- The page opens with a two-minute tour of the mouse, the touchpad and the
+  keys. Let everyone go through it before loading a tutorial: dragging,
+  right-clicking and Ctrl+Z are not obvious to somebody who mostly uses a
+  phone. **?** → **Show the basics** opens it again.
 - Load the tutorial and press **Run** first, then read the notes on the canvas
   while it works. Each tutorial explains itself step by step.
 - Lysozyme in Water is a shortened version of a published tutorial. Its notes
