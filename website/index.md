@@ -1,12 +1,31 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
+<div class="hero" markdown>
+<div markdown>
+
 # Comfy-gmx lite tutorials
 
-Comfy-gmx lite runs molecular dynamics simulations in a web browser. A
-molecular dynamics simulation is a calculation that follows how molecules
-move, one tiny step in time after another. You do not type commands: you
-put **blocks** on a canvas and join them with **wires**. Each block does one
-step, such as building a box of water, running the simulation program
-GROMACS, or drawing a plot. Each wire carries a file from the block that
-makes it to the block that needs it.
+Molecular dynamics simulations in a web browser, without typing commands:
+put **blocks** on a canvas, join them with **wires**, and press **Run**.
+
+[Start with the ice cube](ice/index.md){ .md-button .md-button--primary }
+[Open the editor online](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/){ .md-button }
+
+</div>
+
+![Part of the ice tutorial after its run: blocks joined by wires, a plot of the temperature and a movie of the ice cube](pictures/ice_melting/hero.webp)
+
+</div>
+
+A molecular dynamics simulation is a calculation that follows how molecules
+move, one tiny step in time after another. Each block does one step, such as
+building a box of water, running the simulation program GROMACS, or drawing
+a plot. Each wire carries a file from the block that makes it to the block
+that needs it.
 
 The editor comes with two tutorials, ready to load and run. On the canvas,
 each tutorial is split into boxes: one box of blocks for each step, with its

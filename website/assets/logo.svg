@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Two blocks joined by a wire: what the editor is about, in one picture.
+       White, for the dark bar along the top of the website. -->
+  <rect x="1.5" y="3.5" width="8.5" height="7" rx="1.8" stroke="#ffffff" stroke-width="1.6"/>
+  <rect x="14" y="13.5" width="8.5" height="7" rx="1.8" stroke="#ffffff" stroke-width="1.6"/>
+  <path d="M10 7c4.2 0 0 10 4 10" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="10" cy="7" r="1.6" fill="#d8a84f"/>
+  <circle cx="14" cy="17" r="1.6" fill="#4f9dd8"/>
+</svg>

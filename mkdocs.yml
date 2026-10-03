@@ -44,26 +44,33 @@ theme:
   language: en
   # The computer's own fonts, so that opening a page asks nothing of Google.
   font: false
+  # Two blocks joined by a wire, in white for the dark bar along the top;
+  # the browser tab gets the same on a dark square.
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   icon:
-    logo: material/cube-outline
     repo: fontawesome/brands/github
+  # "custom": the colours are the editor's own, set in stylesheets/extra.css.
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: blue grey
-      accent: light blue
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Dark pages
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue grey
-      accent: light blue
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Light pages
   features:
     - announce.dismiss
+    # The four parts of the site as tabs along the top; the list on the
+    # left then shows only the part you are in.
+    - navigation.tabs
     - navigation.footer
     - navigation.indexes
     - navigation.sections

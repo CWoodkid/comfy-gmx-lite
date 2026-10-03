@@ -36,3 +36,180 @@
   margin-left: 0.4em;
   white-space: nowrap;
 }
+
+/* ---- The editor's own colours ------------------------------------------
+   mkdocs.yml sets the palette to "custom"; these are the colours. The dark
+   of the editor's toolbar for the bars along the top, its blue for links
+   and highlights. On white pages the links are a deeper blue, so they stay
+   easy to read. */
+:root {
+  --cg-dark: #1b1f26;
+  --cg-darker: #14171c;
+  --cg-grid: #232a33;
+  --cg-blue: #4f9dd8;
+  --cg-blue-deep: #2d6d9c;
+  --cg-amber: #d8a84f;
+}
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: var(--cg-dark);
+  --md-primary-fg-color--light: #2c333d;
+  --md-primary-fg-color--dark: var(--cg-darker);
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: var(--cg-blue);
+  --md-accent-fg-color--transparent: rgba(79, 157, 216, 0.1);
+  --md-accent-bg-color: #ffffff;
+  --md-accent-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+[data-md-color-scheme="default"] {
+  --md-typeset-a-color: var(--cg-blue-deep);
+}
+/* Dark pages take the editor's blue-black. */
+[data-md-color-scheme="slate"] {
+  --md-hue: 215;
+  --md-typeset-a-color: var(--cg-blue);
+}
+
+/* The system's own interface font (Segoe UI, San Francisco, Ubuntu...):
+   friendlier than the fallback, and still nothing is fetched from Google. */
+:root {
+  --md-text-font: system-ui;
+}
+
+/* A thin stripe in the colours of the boxes on the canvas, under the bar
+   at the top. */
+.md-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 3px;
+  background: linear-gradient(90deg, #4a7a4a, #b58b2a, #b06634, #a1309b,
+                              #3f789e, #3f6d7d);
+}
+
+/* Page titles: darker and bolder than the theme's pale grey. */
+.md-typeset h1 {
+  color: var(--md-default-fg-color);
+  font-weight: 700;
+}
+
+/* Pictures of the canvas: rounded, with a soft shadow. */
+.md-typeset img.canvas {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* "In this box", at the top of each box's page: tinted in the editor's
+   blue. */
+.md-typeset .admonition.abstract,
+.md-typeset details.abstract {
+  border-color: var(--cg-blue);
+}
+.md-typeset .abstract > .admonition-title,
+.md-typeset .abstract > summary {
+  background-color: rgba(79, 157, 216, 0.12);
+}
+.md-typeset .abstract > .admonition-title::before,
+.md-typeset .abstract > summary::before {
+  background-color: var(--cg-blue);
+}
+
+/* The two tutorial cards on the home page: rounded, each with a coloured
+   top edge (the ice blue, the Lysozyme green). */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 10px;
+  border-top-width: 4px;
+}
+.md-typeset .grid.cards > ul > li:nth-child(1) { border-top-color: #3f789e; }
+.md-typeset .grid.cards > ul > li:nth-child(2) { border-top-color: #4a7a4a; }
+
+/* The welcome panel at the top of the home page: the editor's dark canvas
+   with its grid, the title and two buttons on the left, a tutorial on the
+   right. On a phone the picture goes below. */
+.md-typeset .hero {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 1.6rem;
+  align-items: center;
+  margin: 0 0 2rem;
+  padding: 1.8rem;
+  border-radius: 12px;
+  color: #d7dde5;
+  background-color: var(--cg-darker);
+  background-image:
+    linear-gradient(var(--cg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cg-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.md-typeset .hero h1 {
+  margin: 0 0 0.5em;
+  color: #ffffff;
+}
+.md-typeset .hero p {
+  margin: 0 0 1em;
+}
+.md-typeset .hero strong {
+  color: #ffffff;
+}
+.md-typeset .hero img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+.md-typeset .hero .md-button {
+  margin: 0.3em 0.4em 0.3em 0;
+  border-radius: 8px;
+}
+.md-typeset .hero .md-button--primary {
+  color: var(--cg-darker);
+  background-color: var(--cg-amber);
+  border-color: var(--cg-amber);
+}
+.md-typeset .hero .md-button:not(.md-button--primary) {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.md-typeset .hero .md-button:hover {
+  color: var(--cg-darker);
+  background-color: #ffffff;
+  border-color: #ffffff;
+}
+@media screen and (max-width: 52em) {
+  .md-typeset .hero {
+    grid-template-columns: 1fr;
+    padding: 1.2rem;
+  }
+}
+
+/* The bar with the Binder button: warm and light, so it stands apart from
+   the dark bars below it. */
+.md-banner {
+  color: #3b2f14;
+  background-color: #fbecc8;
+}
+.md-banner .md-banner__button {
+  color: #3b2f14;
+}
+[data-md-color-scheme="slate"] .md-banner {
+  color: #f3e2bb;
+  background-color: #3a3122;
+}
+[data-md-color-scheme="slate"] .md-banner .md-banner__button {
+  color: #f3e2bb;
+}
+
+/* Section headings: a little bolder than the theme's thin default. */
+.md-typeset h2 {
+  font-weight: 500;
+}
+
+/* On dark pages the welcome panel gets a thin outline, so it does not melt
+   into the page around it. */
+[data-md-color-scheme="slate"] .md-typeset .hero {
+  box-shadow: 0 0 0 1px #2c333d;
+}

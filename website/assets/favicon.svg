@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- The same two blocks and wire, on the editor's dark background, for the
+       browser tab. -->
+  <rect width="24" height="24" rx="5" fill="#1b1f26"/>
+  <rect x="2.5" y="4" width="8" height="6.5" rx="1.6" stroke="#ffffff" stroke-width="1.5"/>
+  <rect x="13.5" y="13.5" width="8" height="6.5" rx="1.6" stroke="#ffffff" stroke-width="1.5"/>
+  <path d="M10.5 7.25c4 0 -1 9.5 3 9.5" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="10.5" cy="7.25" r="1.5" fill="#d8a84f"/>
+  <circle cx="13.5" cy="16.75" r="1.5" fill="#4f9dd8"/>
+</svg>
