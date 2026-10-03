@@ -1,0 +1,59 @@
+# Builds the tutorial website (the folder website/, set up in mkdocs.yml) and
+# publishes it at https://cwoodkid.github.io/comfy-gmx-lite/.
+#
+# It runs after every push to main that changes the website, and can be
+# started by hand from the Actions tab ("Run workflow"). It only publishes
+# once GitHub Pages is switched on for the repository: Settings, Pages,
+# "Source": GitHub Actions.
+#
+# The pages are built with --strict, so a broken link, a missing picture or
+# a missing generated file stops the build instead of publishing a broken
+# page. The versions are pinned: the makers of the Material theme warn that
+# MkDocs 2.0 will not run it.
+
+name: website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "mkdocs.yml"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publication at a time; a newer push waits for the one before it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install MkDocs and the Material theme
+        run: pip install mkdocs==1.6.1 mkdocs-material==9.7.7
+      - name: Build the pages
+        run: mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

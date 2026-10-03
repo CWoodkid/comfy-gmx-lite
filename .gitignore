@@ -13,6 +13,9 @@ venv/
 runs/
 *.log
 
+# The tutorial website as "mkdocs build" writes it; GitHub builds its own
+site/
+
 # GROMACS leftovers, in case anyone runs a job inside the checkout
 \#*\#
 *.trr

@@ -80,6 +80,11 @@ measured on mybinder.org in September 2026, where each copy had one
 processor. The extra boxes of the ice tutorial were timed on one processor
 of a workstation instead.
 
+To build a tutorial yourself, box by box, follow the
+[tutorial website](https://cwoodkid.github.io/comfy-gmx-lite/): which blocks
+to add, which settings to change, which wires to draw, what comes out, and
+the GROMACS commands behind every block.
+
 ## Running online
 
 The button above starts a private copy of Comfy-gmx lite on
@@ -171,6 +176,7 @@ membrane builders, ligands, and installers for programs other than GROMACS.
 
 | file | contents |
 | --- | --- |
+| [the tutorial website](https://cwoodkid.github.io/comfy-gmx-lite/) | both tutorials, box by box, to build by hand; its pages are in [website/](website), and [website/README.md](website/README.md) says how they are made |
 | [docs/nodes.md](docs/nodes.md) | every block and its settings |
 | [docs/tutorials.md](docs/tutorials.md) | the two tutorials, what was shortened in them and why, and how to cite them |
 | [docs/ice-melting.md](docs/ice-melting.md) | the ice tutorial: what it shows, the science for the teacher, and how it was set up |

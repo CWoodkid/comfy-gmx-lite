@@ -1,0 +1,90 @@
+[
+ {
+  "n": 1,
+  "title": "1. Topology (pdb2gmx)",
+  "blocks": [
+   "ff",
+   "fetch",
+   "clean",
+   "top"
+  ]
+ },
+ {
+  "n": 2,
+  "title": "3. Box and solvent",
+  "blocks": [
+   "box",
+   "solv"
+  ]
+ },
+ {
+  "n": 3,
+  "title": "4. Add ions",
+  "blocks": [
+   "mdp_ions",
+   "ions"
+  ]
+ },
+ {
+  "n": 4,
+  "title": "5. Energy minimisation",
+  "blocks": [
+   "mdp_min",
+   "grompp_em",
+   "mdrun_em",
+   "energy_pot",
+   "plot_pot"
+  ]
+ },
+ {
+  "n": 5,
+  "title": "6. NVT equilibration",
+  "blocks": [
+   "mdp_nvt",
+   "grompp_nvt",
+   "mdrun_nvt",
+   "energy_temp",
+   "plot_temp"
+  ]
+ },
+ {
+  "n": 6,
+  "title": "7. NPT equilibration",
+  "blocks": [
+   "mdp_npt",
+   "grompp_npt",
+   "mdrun_npt",
+   "energy_press",
+   "plot_press",
+   "energy_dens",
+   "plot_dens"
+  ]
+ },
+ {
+  "n": 7,
+  "title": "8. Production MD",
+  "blocks": [
+   "mdp_md",
+   "grompp_md",
+   "mdrun_md"
+  ]
+ },
+ {
+  "n": 8,
+  "title": "9-10. Analysis",
+  "blocks": [
+   "pbc",
+   "rms",
+   "plot_rms",
+   "rms_xtal",
+   "plot_rms_xtal",
+   "gyrate",
+   "plot_rg",
+   "dssp",
+   "plot_dssp",
+   "hbond",
+   "plot_hb",
+   "watch"
+  ]
+ }
+]

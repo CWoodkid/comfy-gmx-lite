@@ -2194,6 +2194,52 @@ def check_picture_sizes() -> None:
           "again whenever that changes, and the plot keeps a height of its own")
 
 
+def check_website() -> None:
+    """The tutorial website (website/, mkdocs.yml) agrees with the tutorials.
+
+    Its lists of blocks, settings, wires and commands are written by
+    tools/website.py from the tutorials themselves. A tutorial changed
+    without running that script again leaves the website describing boxes
+    that are no longer there. Every picture and every generated file a page
+    names has to be there as well. Where MkDocs is installed, the pages are
+    also built the way GitHub builds them, with --strict, into a folder that
+    is thrown away afterwards."""
+    before = len(failures)
+    proc = subprocess.run([sys.executable, str(ROOT / "tools" / "website.py"), "--check"],
+                          capture_output=True, text=True, cwd=ROOT)
+    check(proc.returncode == 0,
+          "the website's generated files are out of date; run python3 tools/website.py:\n"
+          + (proc.stdout + proc.stderr).strip()[-1500:])
+    pages = [p for p in sorted((ROOT / "website").rglob("*.md"))
+             if "_generated" not in p.parts and p.name != "README.md"]
+    # A picture is named twice on a page, shown and as what a click opens.
+    missing = {}
+    for page in pages:
+        text = page.read_text()
+        for target in re.findall(r"\]\(([^)\s]+\.(?:webp|png|jpg|svg))\)", text):
+            if not (page.parent / target).is_file():
+                missing[f"{page.relative_to(ROOT)}: {target}"] = True
+        for target in re.findall(r'--8<-- "([^"]+)"', text):
+            if not (ROOT / "website" / target).is_file():
+                missing[f"{page.relative_to(ROOT)}: {target}"] = True
+    check(not missing, "website pages name files that are not there:\n    " + "\n    ".join(missing))
+    try:
+        import mkdocs    # noqa: F401
+        import material  # noqa: F401
+    except ImportError:
+        if len(failures) == before:
+            print(f"website: {len(pages)} pages, their generated parts up to date and every "
+                  "picture there (MkDocs is not installed here, so they were not built)")
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        build = subprocess.run([sys.executable, "-m", "mkdocs", "build", "--strict",
+                                "--site-dir", tmp], capture_output=True, text=True, cwd=ROOT)
+    check(build.returncode == 0, "mkdocs build --strict failed:\n" + build.stderr[-1500:])
+    if len(failures) == before:
+        print(f"website: {len(pages)} pages, their generated parts up to date, every picture "
+              "there, and built with mkdocs --strict")
+
+
 def check_tour() -> None:
     """The basics: a two-minute tour of the mouse, the touchpad and the keys.
 
@@ -4742,6 +4788,7 @@ CHECKS = (
     check_note_heights,
     check_tutorials_measured,
     check_salty_ice,
+    check_website,
 )
 
 

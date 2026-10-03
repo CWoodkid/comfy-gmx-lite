@@ -1,0 +1,26 @@
+/* Small additions to the Material look for the tutorial pages. */
+
+/* A socket's dot, in the colour the editor draws it, beside its name in the
+   wiring tables (tools/website.py writes them). */
+.socket {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.25em;
+  border-radius: 50%;
+  vertical-align: -0.05em;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+/* Pictures of the canvas: a thin frame, so a dark picture keeps its edge on
+   a dark page. */
+.md-typeset img.canvas {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 6px;
+}
+
+/* The numbered headings of the blocks to add sit a little closer together
+   than ordinary headings. */
+.md-typeset h3 {
+  margin-top: 1.4em;
+}

@@ -1,0 +1,81 @@
+[
+ {
+  "n": 1,
+  "title": "1. An ice cube in empty space",
+  "blocks": [
+   "ice",
+   "box",
+   "look",
+   "em_mdp",
+   "em_pp",
+   "em"
+  ]
+ },
+ {
+  "n": 2,
+  "title": "2. Heat it: 200 K to 1000 K",
+  "blocks": [
+   "heat_mdp",
+   "heat_pp",
+   "heat",
+   "temp",
+   "temp_plot",
+   "count",
+   "count_plot",
+   "size",
+   "size_plot",
+   "energy",
+   "energy_plot",
+   "drop",
+   "drop_plot",
+   "watch"
+  ]
+ },
+ {
+  "n": 3,
+  "title": "3. Extra: the same with salt",
+  "blocks": [
+   "salt_ice",
+   "salt_box",
+   "salt_em_mdp",
+   "salt_em_pp",
+   "salt_em",
+   "salt_heat_mdp",
+   "salt_heat_pp",
+   "salt_heat",
+   "salt_count",
+   "salt_drop",
+   "cmp_ice",
+   "cmp_drop",
+   "salt_watch"
+  ]
+ },
+ {
+  "n": 4,
+  "title": "4. Extra: cool it down again",
+  "blocks": [
+   "cool_mdp",
+   "cool_pp",
+   "cool",
+   "cool_count",
+   "cool_count_plot",
+   "cool_drop",
+   "cool_drop_plot",
+   "cool_watch"
+  ]
+ },
+ {
+  "n": 5,
+  "title": "5. Extra: cool the salty one down too",
+  "blocks": [
+   "salt_cool_mdp",
+   "salt_cool_pp",
+   "salt_cool",
+   "salt_cool_count",
+   "salt_cool_drop",
+   "cmp_cool_ice",
+   "cmp_cool_drop",
+   "salt_cool_watch"
+  ]
+ }
+]

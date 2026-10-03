@@ -1,0 +1,111 @@
+# The tutorial website, https://cwoodkid.github.io/comfy-gmx-lite/
+#
+# MkDocs turns the pages in website/ into the site, with the Material look.
+# GitHub builds and publishes it after every push that changes it
+# (.github/workflows/website.yml). To look at it on your own computer first:
+#
+#   pip install mkdocs==1.6.1 mkdocs-material==9.7.7
+#   mkdocs serve            then open http://127.0.0.1:8000
+#
+# website/README.md says how the pages and their pictures are made.
+#
+# The lists of blocks, settings, wires and commands on the tutorial pages are
+# written by tools/website.py from the tutorials themselves, into
+# website/_generated/; the pages pull them in with lines like
+#   --8<-- "_generated/ice_melting/box-1-build.md"
+
+site_name: Comfy-gmx lite tutorials
+site_url: https://cwoodkid.github.io/comfy-gmx-lite/
+site_description: >-
+  Build the Comfy-gmx lite tutorials yourself, box by box: which blocks to
+  add, which settings to change, which wires to draw, what comes out, and
+  the GROMACS commands behind every block.
+repo_url: https://github.com/CWoodkid/comfy-gmx-lite
+repo_name: CWoodkid/comfy-gmx-lite
+edit_uri: ""
+copyright: Comfy-gmx lite · MIT licence
+
+docs_dir: website
+# The generated parts are pulled into pages, not pages of their own, and
+# the folder's README is for people changing the website.
+exclude_docs: |
+  _generated/
+  /README.md
+
+theme:
+  name: material
+  language: en
+  # The computer's own fonts, so that opening a page asks nothing of Google.
+  font: false
+  icon:
+    logo: material/cube-outline
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: Dark pages
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: light blue
+      toggle:
+        icon: material/weather-sunny
+        name: Light pages
+  features:
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  # The small pictures on the home page's two cards, from Material's own set.
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      base_path: [website]
+      check_paths: true
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Before you start: basics.md
+  - An ice cube melting:
+      - ice/index.md
+      - 1. An ice cube in empty space: ice/1-cube.md
+      - 2. Heat it: ice/2-heat.md
+      - 3. Extra, the same with salt: ice/3-salt.md
+      - 4. Extra, cool it down again: ice/4-cool.md
+      - 5. Extra, cool the salty one: ice/5-cool-salty.md
+  - Lysozyme in water:
+      - lysozyme/index.md
+      - 1–2. Topology: lysozyme/1-topology.md
+      - 3. Box and solvent: lysozyme/3-box.md
+      - 4. Add ions: lysozyme/4-ions.md
+      - 5. Energy minimisation: lysozyme/5-minimisation.md
+      - 6. NVT equilibration: lysozyme/6-nvt.md
+      - 7. NPT equilibration: lysozyme/7-npt.md
+      - 8. Production MD: lysozyme/8-production.md
+      - 9–10. Analysis: lysozyme/9-analysis.md
