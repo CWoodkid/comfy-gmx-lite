@@ -25,7 +25,7 @@ This box asks whether the simulation shows both of those effects.
   comparison needs the same treatment for both cubes: if you change the
   heating in box 2, change it here too.
 - **Count the ice** and **Water in the drop** measure the salty run, and two
-  **Compare graphs** blocks draw each next to its pure-water partner from
+  **Compare plots** blocks draw each next to its pure-water partner from
   box 2.
 - **Preview trajectory** makes the salty movie, with the ions in it.
 

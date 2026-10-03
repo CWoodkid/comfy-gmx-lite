@@ -430,7 +430,7 @@ FILE_GUIDE: Dict[str, Dict[str, str]] = {
                 "rest.",
     },
     "xvg": {
-        "name": "Graph data", "endings": ".xvg",
+        "name": "Plot data", "endings": ".xvg",
         "what": "A table of numbers ready to plot, such as temperature against "
                 "time, with the title and the labels of the axes written at the "
                 "top. Plain text; GROMACS's measuring tools all write it.",
@@ -452,7 +452,7 @@ FILE_GUIDE: Dict[str, Dict[str, str]] = {
         "name": "Energies", "endings": ".edr",
         "what": "Temperature, pressure, the different kinds of energy and more, "
                 "noted down many times during the run. 'Energy terms' takes out "
-                "the ones you ask for and turns them into a graph.",
+                "the ones you ask for and turns them into a plot.",
     },
     "checkpoint": {
         "name": "Checkpoint", "endings": ".cpt",

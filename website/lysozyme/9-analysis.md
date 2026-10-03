@@ -71,7 +71,7 @@ just as well.
 
 Press **Run**. The analysis takes about 20 seconds online.
 
-[![The box after the run, with its graphs and movie](../pictures/lysozyme/box-8-results.webp){ .canvas }](../pictures/lysozyme/box-8-results.webp)
+[![The box after the run, with its plots and movie](../pictures/lysozyme/box-8-results.webp){ .canvas }](../pictures/lysozyme/box-8-results.webp)
 
 === "RMSD"
 

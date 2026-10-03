@@ -9,7 +9,7 @@
 This box cools the salty gas exactly as box 4 cools the pure gas, starting
 from the last picture of the salty heating run in box 3. Its **Run
 parameters (.mdp)** is a copy of box 4's: if you change one, change the
-other, or the comparison is not fair. Two **Compare graphs** blocks set the
+other, or the comparison is not fair. Two **Compare plots** blocks set the
 salty run's ice count and water in the drop next to the pure run's from box
 4. **Preview trajectory** makes the movie, with the ions in it and
 *Periodic boundary* set to **lump**, as in box 4.

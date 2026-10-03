@@ -137,4 +137,4 @@ if (failures) {
   console.log(`${failures} problem(s)`);
   process.exit(1);
 }
-console.log(`plot labels: every number fits, on ${graphs.length} graphs and the secondary-structure map`);
+console.log(`plot labels: every number fits, on ${graphs.length} plots and the secondary-structure map`);

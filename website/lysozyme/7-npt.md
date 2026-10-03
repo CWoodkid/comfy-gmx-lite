@@ -53,13 +53,13 @@ The blocks:
 
 Press **Run**. The run takes almost 2 minutes online.
 
-[![The box after the run, with its graphs](../pictures/lysozyme/box-6-results.webp){ .canvas }](../pictures/lysozyme/box-6-results.webp)
+[![The box after the run, with its plots](../pictures/lysozyme/box-6-results.webp){ .canvas }](../pictures/lysozyme/box-6-results.webp)
 
 === "Density"
 
     [![The density over the 5 ps](../pictures/lysozyme/plot_dens.webp){ .canvas }](../pictures/lysozyme/plot_dens.webp)
 
-    **This is the graph to judge the box by.** The density climbs from
+    **This is the plot to judge the box by.** The density climbs from
     985 kg/m³ at the start to about 1022 kg/m³. Over the last picosecond it
     averaged 1021.8 kg/m³ in our run. The published tutorial reports 1025.3
     as its average over 500 ps. The density is higher than that of pure water,

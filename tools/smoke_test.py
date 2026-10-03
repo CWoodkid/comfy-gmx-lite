@@ -612,7 +612,7 @@ def check_same_name_inputs() -> None:
     Everything a block is given is put into its one work folder under its own
     name. Two files called conf.gro -- a box and a molecule from two other
     blocks -- used to land on top of each other, and Insert molecules put the
-    box into itself. Compare graphs named its own inputs, but only in a run:
+    box into itself. Compare plots named its own inputs, but only in a run:
     the command preview and an exported folder still used the old names, and
     the exported script copied files that were not there. The second file now
     arrives as 2_conf.gro -- in a run, in the preview and in an export alike.
@@ -4492,7 +4492,7 @@ def check_salty_ice() -> None:
         hydrogens of the rest untouched -- and GROMACS takes the topology
       * "Water in the drop" counts water that stays in the drop, not gas that
         brushes past it for a frame, and it sees a drop across the box's edge
-      * "Compare graphs" reads each run's own file when the two have the same
+      * "Compare plots" reads each run's own file when the two have the same
         name. The second ice.xvg used to land on top of the first, and the
         block drew the salty run against itself.
     """
@@ -4656,7 +4656,7 @@ def _salty_ice(work: Path) -> None:
               "water in the drop: the file does not say how many molecules, or "
               "has no legend")
 
-    # ---- Compare graphs ---------------------------------------------------
+    # ---- Compare plots ----------------------------------------------------
     run_a, run_b, folder = work / "run_a", work / "run_b", work / "compare"
     for path in (run_a, run_b, folder):
         path.mkdir()

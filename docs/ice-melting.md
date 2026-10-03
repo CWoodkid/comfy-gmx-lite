@@ -184,7 +184,7 @@ per kilogram of water, more than three times as salty as the sea (about 0.6).
 The box settles the cube and heats it exactly as boxes 1 and 2 do, with copies
 of the same two *Run parameters (.mdp)* blocks. If you change the heating in
 box 2, change the copy in box 3 too, or the comparison is not fair. Two
-*Compare graphs* blocks set the pure and the salty cube side by side: the ice
+*Compare plots* blocks set the pure and the salty cube side by side: the ice
 count, and the water still in the drop. Its movie shows the ions too, sodium
 in purple and chloride in green.
 

@@ -750,29 +750,29 @@ A rough look at a run: wire a trajectory and its tpr in and it plays the motion 
 | Stop above (MB) | int | `200` | advanced. A frame of a big selection is a lot of text: 200 frames of 13000 atoms is 195 MB of PDB, written into the run directory and kept. Above this the node takes fewer frames instead, and says so. 0 turns the limit off. |
 | Output name | str | `frames.pdb` | advanced. |
 
-### Compare graphs
+### Compare plots
 
 `view.compare` · tool: `python`
 
-Draws two or three graphs as one, so they can be compared line against line: the same measurement from two runs, say. Wire the graphs in, give each a name for the key, and it draws them together inside the block.  The first graph sets the points along the bottom axis, and the others are read off at the same points, so runs saved at different intervals still line up. Only the stretch that every graph covers is drawn. From a file that holds several lines, it takes the first; 'Which line of each graph' picks another.
+Draws two or three plots as one, so they can be compared line against line: the same measurement from two runs, say. Wire the plots in, give each a name for the key, and it draws them together inside the block.  The first plot sets the points along the bottom axis, and the others are read off at the same points, so runs saved at different intervals still line up. Only the stretch that every plot covers is drawn. From a file that holds several lines, it takes the first; 'Which line of each plot' picks another.
 
 | Input | Type | Required |
 |---|---|---|
-| the first graph | `xvg` | yes |
-| the second graph | `xvg` | yes |
-| a third graph | `xvg` | no |
+| the first plot | `xvg` | yes |
+| the second plot | `xvg` | yes |
+| a third plot | `xvg` | no |
 
 | Output | Type |
 |---|---|
-| the graphs together | `xvg` |
+| the plots together | `xvg` |
 
 | Parameter | Type | Default | Notes |
 |---|---|---|---|
-| Name of the first | str |  | What the first graph's line is called in the key. |
+| Name of the first | str |  | What the first plot's line is called in the key. |
 | Name of the second | str |  |  |
 | Name of the third | str |  | advanced. |
 | Title | str |  |  |
-| Which line of each graph | int | `1` | advanced. A graph file can hold several lines -- gmx energy writes one for each thing it was asked for. 1 is the first. The same line is taken from every file. |
+| Which line of each plot | int | `1` | advanced. A plot file can hold several lines -- gmx energy writes one for each thing it was asked for. 1 is the first. The same line is taken from every file. |
 | Output name | str | `compare.xvg` | advanced. |
 
 ## Preconfigured chunks

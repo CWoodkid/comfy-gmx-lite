@@ -585,7 +585,7 @@ def quoted(line):
 
 
 def read(path, column):
-    """The title, the two axis labels and the points of one graph file."""
+    """The title, the two axis labels and the points of one plot file."""
     title = xlabel = ylabel = ""
     points = []
     with open(path, errors="replace") as fh:
@@ -628,7 +628,7 @@ def clean(text):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Put the same line from several "
-                                             "graph files into one graph.")
+                                             "plot files into one plot.")
     ap.add_argument("out")
     ap.add_argument("pairs", nargs="+", metavar="NAME FILE")
     ap.add_argument("--column", type=int, default=1,
@@ -636,21 +636,21 @@ def main(argv=None):
     ap.add_argument("--title", default="")
     args = ap.parse_args(argv)
     if len(args.pairs) % 2 or len(args.pairs) < 4:
-        sys.exit("give a name and a file for each graph, and at least two graphs")
+        sys.exit("give a name and a file for each plot, and at least two plots")
 
     graphs = []
     for name, path in zip(args.pairs[0::2], args.pairs[1::2]):
         title, xlabel, ylabel, xs, ys = read(path, args.column)
         if len(xs) < 2:
             sys.exit(f"{path} has fewer than two points in line {args.column}: is "
-                     f"it a graph, and does it have that many lines?")
+                     f"it a plot, and does it have that many lines?")
         graphs.append((name, path, title, xlabel, ylabel, xs, ys))
         print(f"{name}: {path}, {len(xs)} points, from {xs[0]:g} to {xs[-1]:g}")
 
     low = max(g[5][0] for g in graphs)
     high = min(g[5][-1] for g in graphs)
     if low > high:
-        sys.exit("the graphs do not overlap along the bottom axis, so there is "
+        sys.exit("the plots do not overlap along the bottom axis, so there is "
                  "nothing to compare")
     for label, which in (("bottom axes", 3), ("side axes", 4)):
         names = sorted({g[which] for g in graphs if g[which]})
@@ -662,7 +662,7 @@ def main(argv=None):
     first = graphs[0]
     xs = [x for x in first[5] if low <= x <= high]
     with open(args.out, "w") as fh:
-        fh.write("# written by Comfy-gmx's 'Compare graphs' block\n")
+        fh.write("# written by Comfy-gmx's 'Compare plots' block\n")
         fh.write("# columns: " + ", ".join([first[3] or "x"] + [g[0] for g in graphs]) + "\n")
         fh.write(f'@    title "{clean(args.title or first[2])}"\n')
         fh.write(f'@    xaxis  label "{clean(first[3])}"\n')
@@ -674,8 +674,8 @@ def main(argv=None):
             fh.write(f"{x:12.4f}" + "".join(f" {height(g[5], g[6], x):12.4f}"
                                            for g in graphs) + "\n")
     if low > min(g[5][0] for g in graphs) or high < max(g[5][-1] for g in graphs):
-        print(f"kept the stretch every graph covers: {low:g} to {high:g}")
-    print(f"{len(graphs)} graphs in one, {len(xs)} points each, in {args.out}")
+        print(f"kept the stretch every plot covers: {low:g} to {high:g}")
+    print(f"{len(graphs)} plots in one, {len(xs)} points each, in {args.out}")
     return 0
 
 
@@ -686,39 +686,39 @@ if __name__ == "__main__":
 
 class CompareNode(Node):
     type = "view.compare"
-    title = "Compare graphs"
+    title = "Compare plots"
     category = CATEGORY
     color = "#3f6d7d"
     tool = "python"
     preview_kind = "plot"
     preview_port = "xvg"
     description = (
-        "Draws two or three graphs as one, so they can be compared line "
+        "Draws two or three plots as one, so they can be compared line "
         "against line: the same measurement from two runs, say. Wire the "
-        "graphs in, give each a name for the key, and it draws them together "
+        "plots in, give each a name for the key, and it draws them together "
         "inside the block.\n\n"
-        "The first graph sets the points along the bottom axis, and the others "
+        "The first plot sets the points along the bottom axis, and the others "
         "are read off at the same points, so runs saved at different intervals "
-        "still line up. Only the stretch that every graph covers is drawn. "
+        "still line up. Only the stretch that every plot covers is drawn. "
         "From a file that holds several lines, it takes the first; 'Which "
-        "line of each graph' picks another."
+        "line of each plot' picks another."
     )
     inputs = (
-        Port("first", "xvg", "the first graph"),
-        Port("second", "xvg", "the second graph"),
-        Port("third", "xvg", "a third graph", optional=True),
+        Port("first", "xvg", "the first plot"),
+        Port("second", "xvg", "the second plot"),
+        Port("third", "xvg", "a third plot", optional=True),
     )
-    outputs = (Port("xvg", "xvg", "the graphs together"),)
+    outputs = (Port("xvg", "xvg", "the plots together"),)
     params = (
         Param("name_first", "str", "Name of the first", "", placeholder="first",
-              help="What the first graph's line is called in the key."),
+              help="What the first plot's line is called in the key."),
         Param("name_second", "str", "Name of the second", "", placeholder="second"),
         Param("name_third", "str", "Name of the third", "", placeholder="third",
               advanced=True),
-        Param("title", "str", "Title", "", placeholder="the first graph's title"),
-        Param("column", "int", "Which line of each graph", 1, min=1, max=100,
+        Param("title", "str", "Title", "", placeholder="the first plot's title"),
+        Param("column", "int", "Which line of each plot", 1, min=1, max=100,
               advanced=True,
-              help="A graph file can hold several lines -- gmx energy writes one "
+              help="A plot file can hold several lines -- gmx energy writes one "
                    "for each thing it was asked for. 1 is the first. The same "
                    "line is taken from every file."),
         Param("output", "str", "Output name", "compare.xvg", advanced=True),
@@ -734,7 +734,7 @@ class CompareNode(Node):
                 if port == "third":
                     continue
                 raise NodeError(f"input '{port}' is not connected")
-            # Each graph under a name of its own. The same measurement from two
+            # Each plot under a name of its own. The same measurement from two
             # runs usually has the same file name -- ice.xvg and ice.xvg -- and
             # taken in under that name the second would land on the first, and
             # the block would draw one run against itself.
@@ -746,7 +746,7 @@ class CompareNode(Node):
         if ctx.pstr("title"):
             argv += ["--title", ctx.pstr("title")]
         plan.files["compare.py"] = _COMPARE
-        plan.step(argv, tool="python", label="put the graphs together")
+        plan.step(argv, tool="python", label="put the plots together")
         plan.outputs["xvg"] = out
         return plan
 

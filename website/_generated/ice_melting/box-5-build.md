@@ -113,7 +113,7 @@ Wires into it, each from a dot on the right of one block to the dot of the same 
 | ③ **Run MD (mdrun)** | <span class="socket" style="background:#d9705f" title="traj"></span> trajectory | <span class="socket" style="background:#d9705f" title="traj"></span> trajectory |
 | ② **Preprocess (grompp)** | <span class="socket" style="background:#4f9dd8" title="tpr"></span> tpr | <span class="socket" style="background:#4f9dd8" title="tpr"></span> tpr |
 
-### ⑥ Compare graphs
+### ⑥ Compare plots
 
 In the list on the left, under **View**. Click it, or drag it onto the canvas.
 
@@ -127,10 +127,10 @@ Wires into it, each from a dot on the right of one block to the dot of the same 
 
 | from | its dot | into this block's dot |
 | --- | --- | --- |
-| ④ **Count the ice** in box *4. Extra: cool it down again* | <span class="socket" style="background:#c88fd0" title="xvg"></span> molecules in ice over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the first graph |
-| ④ **Count the ice** | <span class="socket" style="background:#c88fd0" title="xvg"></span> molecules in ice over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the second graph |
+| ④ **Count the ice** in box *4. Extra: cool it down again* | <span class="socket" style="background:#c88fd0" title="xvg"></span> molecules in ice over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the first plot |
+| ④ **Count the ice** | <span class="socket" style="background:#c88fd0" title="xvg"></span> molecules in ice over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the second plot |
 
-### ⑦ Compare graphs
+### ⑦ Compare plots
 
 In the list on the left, under **View**. Click it, or drag it onto the canvas.
 
@@ -144,8 +144,8 @@ Wires into it, each from a dot on the right of one block to the dot of the same 
 
 | from | its dot | into this block's dot |
 | --- | --- | --- |
-| ⑥ **Water in the drop** in box *4. Extra: cool it down again* | <span class="socket" style="background:#c88fd0" title="xvg"></span> share of the water in the drop over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the first graph |
-| ⑤ **Water in the drop** | <span class="socket" style="background:#c88fd0" title="xvg"></span> share of the water in the drop over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the second graph |
+| ⑥ **Water in the drop** in box *4. Extra: cool it down again* | <span class="socket" style="background:#c88fd0" title="xvg"></span> share of the water in the drop over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the first plot |
+| ⑤ **Water in the drop** | <span class="socket" style="background:#c88fd0" title="xvg"></span> share of the water in the drop over time | <span class="socket" style="background:#c88fd0" title="xvg"></span> the second plot |
 
 ### ⑧ Preview trajectory
 

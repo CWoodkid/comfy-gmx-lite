@@ -12,8 +12,9 @@ came out. This page shows each of them once.
    changed since it last ran. **Check** says what is missing before you
    run. **Save**, **Open**, **Export JSON** and **Import JSON** keep the
    whole canvas of blocks and wires, which the editor calls a *graph*, and
-   bring it back later. **New** empties the canvas, after asking first. **?**
-   opens the help and the tour.
+   bring it back later. (A chart of numbers is a *plot*, as in the
+   **Preview plot** block.) **New** empties the canvas, after asking first.
+   **?** opens the help and the tour.
 2. **The list of blocks.** **Nodes** has every kind of block, sorted by what
    it does (*node* is the editor's word for a block). **Chunks** has
    ready-made groups of blocks. **Tutorials** has the two tutorials. Typing

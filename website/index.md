@@ -5,7 +5,7 @@ molecular dynamics simulation is a calculation that follows how molecules
 move, one tiny step in time after another. You do not type commands: you
 put **blocks** on a canvas and join them with **wires**. Each block does one
 step, such as building a box of water, running the simulation program
-GROMACS, or drawing a graph. Each wire carries a file from the block that
+GROMACS, or drawing a plot. Each wire carries a file from the block that
 makes it to the block that needs it.
 
 The editor comes with two tutorials, ready to load and run. On the canvas,
@@ -31,7 +31,7 @@ see at the end, and the GROMACS commands behind every block.
 
     The classic first GROMACS tutorial: a protein in a box of water, taken
     through every step of a standard simulation, from describing the protein
-    to the graphs at the end. Every run is cut short so that it fits a
+    to the plots at the end. Every run is cut short so that it fits a
     lesson. About 9 minutes to run online.
 
 </div>
@@ -92,5 +92,5 @@ of your own, cite the original:
 published tutorial. Its
 [teacher's notes](https://github.com/CWoodkid/comfy-gmx-lite/blob/main/docs/ice-melting.md)
 explain the science behind what happens on the screen, why the tutorial was
-set up the way it is, what a class should see on each graph and in the movie,
+set up the way it is, what a class should see on each plot and in the movie,
 and what to try afterwards.

@@ -96,17 +96,17 @@ COMFYGMX_STDIN
 python count_drop.py drop_frames.gro drop.xvg --cutoff 0.35 --water OW
 ```
 
-**⑥ Compare graphs**
+**⑥ Compare plots**
 
 ```bash
-# put the graphs together
+# put the plots together
 python compare.py compare.xvg 'pure water' first_ice.xvg 'with salt' second_ice.xvg --column 1 --title 'Ice while cooling: pure water against salty'
 ```
 
-**⑦ Compare graphs**
+**⑦ Compare plots**
 
 ```bash
-# put the graphs together
+# put the plots together
 python compare.py compare.xvg 'pure water' first_drop.xvg 'with salt' second_drop.xvg --column 1 --title 'Water back in the drop while cooling: pure against salty'
 ```
 

@@ -56,7 +56,7 @@ The blocks:
 
 Press **Run**. The run takes almost 2 minutes online.
 
-[![The box after the run, with its graph](../pictures/lysozyme/box-5-results.webp){ .canvas }](../pictures/lysozyme/box-5-results.webp)
+[![The box after the run, with its plot](../pictures/lysozyme/box-5-results.webp){ .canvas }](../pictures/lysozyme/box-5-results.webp)
 
 [![The temperature over the 5 ps](../pictures/lysozyme/plot_temp.webp){ .canvas }](../pictures/lysozyme/plot_temp.webp)
 

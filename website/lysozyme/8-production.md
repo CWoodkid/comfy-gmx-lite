@@ -51,7 +51,7 @@ is left.
 
 [![The box after the run](../pictures/lysozyme/box-7-results.webp){ .canvas }](../pictures/lysozyme/box-7-results.webp)
 
-This box draws no graph. The trajectory it wrote is what box 9–10 looks at.
+This box draws no plot. The trajectory it wrote is what box 9–10 looks at.
 
 !!! question "Why not run the full 10 ns?"
     Online, mdrun simulated about 4 ns a day on one processor. At that pace

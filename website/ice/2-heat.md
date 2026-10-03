@@ -2,7 +2,7 @@
 
 !!! abstract "In this box"
     Give every molecule a speed, and heat the cube in one run from 200 K to
-    1000 K. Then look at what happened: five graphs and a movie. **14
+    1000 K. Then look at what happened: five plots and a movie. **14
     blocks.** The run takes about 2½ minutes on one processor.
 
 ## What it does, and why
@@ -60,9 +60,9 @@ blocks are marked in box *1. An ice cube in empty space*.
 
 Press **Run**. Only the new blocks run: box 1 is marked **cached**, since
 nothing in it changed. The heating run takes about 2½ minutes on one
-processor; the graphs follow within a minute.
+processor; the plots follow within a minute.
 
-[![The box after the run, with its graphs and movie](../pictures/ice_melting/box-2-results.webp){ .canvas }](../pictures/ice_melting/box-2-results.webp)
+[![The box after the run, with its plots and movie](../pictures/ice_melting/box-2-results.webp){ .canvas }](../pictures/ice_melting/box-2-results.webp)
 
 What happens, in order:
 
@@ -75,7 +75,7 @@ What happens, in order:
 4. **Boiling.** Molecules fly off the drop, a few at first, then in a rush.
 5. **Gas** for the last 30 to 50 ps. The molecules fill the whole box.
 
-How each graph shows it:
+How each plot shows it:
 
 === "Temperature"
 
@@ -83,7 +83,7 @@ How each graph shows it:
 
     The line follows the thermostat's target: a gentle slope, then a steep
     one. Use it to read off how hot the water was at any moment shown in
-    the other graphs.
+    the other plots.
 
 === "Count the ice"
 

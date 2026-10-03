@@ -16,7 +16,7 @@ To build along, open Comfy-gmx lite in another browser tab: [![Open in Binder](h
 | box | what it does | blocks |
 | --- | --- | --- |
 | [1. An ice cube in empty space](1-cube.md) | builds the crystal, puts it in a box of empty space, and lets every molecule settle | 6 |
-| [2. Heat it](2-heat.md) | heats it from 200 K to 1000 K in one run, and draws five graphs and a movie of what happens | 14 |
+| [2. Heat it](2-heat.md) | heats it from 200 K to 1000 K in one run, and draws five plots and a movie of what happens | 14 |
 | [3. Extra: the same with salt](3-salt.md) | the same cube with salt in it, heated the same way, and the two compared | 13 |
 | [4. Extra: cool it down again](4-cool.md) | cools the hot gas back to 200 K: does the ice come back? | 8 |
 | [5. Extra: cool the salty one down too](5-cool-salty.md) | the same for the salty gas, and the two compared | 8 |
@@ -43,6 +43,6 @@ how to add, wire and run blocks.
 
 The
 [teacher's notes](https://github.com/CWoodkid/comfy-gmx-lite/blob/main/docs/ice-melting.md)
-say what the class should see on each graph and in the movie, explain the
+say what the class should see on each plot and in the movie, explain the
 science behind the melting and the boiling, say how the tutorial was set up
 and why, and list things to try afterwards.

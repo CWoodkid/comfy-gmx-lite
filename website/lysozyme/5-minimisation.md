@@ -48,9 +48,9 @@ smaller. It stops when the strongest push on any atom is below
 Press **Run**. The minimisation takes about 40 seconds online, and grompp
 another 10.
 
-[![The box after the run, with its graph](../pictures/lysozyme/box-4-results.webp){ .canvas }](../pictures/lysozyme/box-4-results.webp)
+[![The box after the run, with its plot](../pictures/lysozyme/box-4-results.webp){ .canvas }](../pictures/lysozyme/box-4-results.webp)
 
-The graph in **Preview plot** falls steeply over the first few dozen steps,
+The energy in **Preview plot** falls steeply over the first few dozen steps,
 as the worst clashes are pulled apart, and then flattens out. In our run
 the energy went from −4.6 × 10⁵ to −6.24 × 10⁵ kJ/mol.
 
