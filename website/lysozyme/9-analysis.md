@@ -73,9 +73,9 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     [![RMSD from the start of the run](../pictures/lysozyme/plot_rms.webp){ .canvas }](../pictures/lysozyme/plot_rms.webp)
 
-    From the start of the run: it rises from 0 to 0.07 nm in our run, less
-    than the width of one atom. The protein shivers and shifts a little, as
-    it should, and that is all.
+    From the start of the run: it rises from 0 to about 0.08 nm in our
+    run, less than the width of one atom. The protein shivers and shifts a
+    little, as it should, and that is all.
 
 === "RMSD from the crystal"
 
@@ -83,15 +83,15 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     From the crystal structure: it starts at 0.03 nm, not 0, because the
     minimisation and the warm-ups already moved the protein a little, and
-    rises to 0.08 nm. The published tutorial finds about 0.09 nm over its
-    10 ns, for both RMSD curves. RMSD only says how far the protein has
-    moved. It does not say that a run is long enough.
+    rises to 0.08 to 0.09 nm. The published tutorial finds about 0.09 nm
+    over its 10 ns, for both RMSD curves. RMSD only says how far the
+    protein has moved. It does not say that a run is long enough.
 
 === "Radius of gyration"
 
     [![The radius of gyration](../pictures/lysozyme/plot_rg.webp){ .canvas }](../pictures/lysozyme/plot_rg.webp)
 
-    The top line, `Rg`, is the one to read: flat near 1.42 nm (from 1.41 to
+    The top line, `Rg`, is the one to read: flat near 1.42 nm (from 1.40 to
     1.43 in our run). The published tutorial finds 1.41 nm over its 10 ns.
     The protein stays folded. The three lower lines are the same measure
     around each of the three axes. Their names are written in codes meant
@@ -114,15 +114,15 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     | shape | share of the amino acids |
     | --- | --- |
-    | α-helix (H) | 29.2% |
-    | 3₁₀-helix (G) | 5.7% |
-    | polyproline helix (P) | 0.3% |
-    | strand (E) and bridge (B) | 6.5% and 4.3% |
-    | turn (T) and bend (S) | 25.7% and 12.5% |
-    | none | 15.9% |
+    | α-helix (H) | 30.0% |
+    | 3₁₀-helix (G) | 5.3% |
+    | polyproline helix (P) | 0.4% |
+    | strand (E) and bridge (B) | 6.8% and 4.1% |
+    | turn (T) and bend (S) | 24.8% and 12.5% |
+    | none | 16.1% |
 
-    In our run the four big helices sit at amino acids 5–14, 25–35, 89–99
-    and 109–113, and all four hold in every one of the 101 pictures. Two
+    In our run the four big helices sit at amino acids 5–14, 25–34, 89–99
+    and 109–114, and all four hold in every one of the 101 pictures. Two
     short ones, at 80–83 and 121–124, come and go. The small sheet is three
     short strands, at 43–45, 51–53 and 58–59.
 
@@ -139,7 +139,7 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     [![Hydrogen bonds inside the protein](../pictures/lysozyme/plot_hb.webp){ .canvas }](../pictures/lysozyme/plot_hb.webp)
 
-    Between 85 and 110 at any moment, 99 on average in our run. The
+    Between 90 and 114 at any moment, 100 on average in our run. The
     published tutorial counts them in parts instead: about 55 between
     backbone atoms, and about 20 between side chains. Our count is all of
     them, including the ones between a backbone atom and a side chain, so
@@ -153,9 +153,6 @@ Press **Run**. The analysis takes about 20 seconds online.
     picture to turn it. It answers questions you answer by looking: did it
     stay folded, does the end of the chain flap about. The movie is also
     saved as `frames.pdb`, which other viewers such as VMD or PyMOL open.
-
-The numbers along the side of the graphs are too long for them, so their
-left end is cut off. The values are in the text here.
 
 ## Under the hood
 

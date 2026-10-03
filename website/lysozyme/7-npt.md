@@ -58,7 +58,7 @@ Press **Run**. The run takes almost 2 minutes online.
     [![The density over the 5 ps](../pictures/lysozyme/plot_dens.webp){ .canvas }](../pictures/lysozyme/plot_dens.webp)
 
     **This is the graph to judge the box by.** It climbs from 985 kg/m³ at
-    the start to near 1025 kg/m³ in the last picosecond: 1025.2 on average
+    the start to about 1022 kg/m³ in the last picosecond: 1021.8 on average
     in our run. The published tutorial reports 1025.3 as its average over
     500 ps. It is higher than pure water, 1000 kg/m³, because of the protein
     and the ions.
@@ -67,15 +67,12 @@ Press **Run**. The run takes almost 2 minutes online.
 
     [![The pressure over the 5 ps](../pictures/lysozyme/plot_press.webp){ .canvas }](../pictures/lysozyme/plot_press.webp)
 
-    It jumps up and down by hundreds of bar, from −598 to +190 in our run,
+    It jumps up and down by hundreds of bar, from −691 to +305 in our run,
     and that is normal. The pressure of a box this small changes from one
     moment to the next by far more than its target of 1 bar. Only its
     average over a long run means anything, and 5 ps is not long: our
-    average was −148 bar. Over its 500 ps, the published tutorial's average
+    average was −154 bar. Over its 500 ps, the published tutorial's average
     is −3 bar, close to the target.
-
-The numbers along the side of these graphs are too long for them, so their
-left end is cut off. The values are in the text here.
 
 ## Under the hood
 

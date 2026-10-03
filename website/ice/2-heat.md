@@ -66,8 +66,8 @@ What happens, in order:
 1. **Ice** for about the first 30 ps. The molecules shiver harder and
    harder, but the honeycomb holds.
 2. **Melting.** The corners go first, then the edges, then the faces. By
-   about 70 ps, near 340 K, the crystal is gone and the liquid has pulled
-   itself into a round drop.
+   60 to 70 ps, at 320 to 340 K, the crystal is gone and the liquid has
+   pulled itself into a round drop.
 3. **A drop of hot water** for about 40 to 50 ps, far above 100 °C.
 4. **Boiling.** Molecules fly off the drop, a few at first, then in a rush.
 5. **Gas** for the last 30 to 50 ps. The molecules fill the whole box.
@@ -88,8 +88,8 @@ How each graph shows it:
     It starts well below 768, because a molecule on the surface has too few
     neighbours to pass the test for ice, and it drops within the first
     picosecond, as the shivering makes some molecules fail the strict test
-    though the crystal is still there. Its fall to zero, by about 70 ps, is
-    the melting.
+    though the crystal is still there. Its fall to zero, between 60 and
+    70 ps, is the melting.
 
 === "Size"
 
@@ -125,17 +125,13 @@ How each graph shows it:
     Press ▶ to play it, drag the slider to go to a moment, and drag the
     picture to turn it: a cube, then a ball, then a cloud.
 
-On the temperature and energy graphs the numbers along the side are too
-long for the graph, so their left end is cut off: the top number of the
-temperature is 1034, for example.
-
 !!! question "Why does it melt and boil so late?"
     This water's ice melts at 272 K, and real water boils at 373 K. Here the
-    crystal is gone only near 340 K, and the drop boils above 400 K. The heat
-    arrives far faster than in any kitchen, 2 degrees every picosecond and
-    later 6, and a crystal needs time to come apart. So the ice is briefly
-    warmer than its melting point, and the drop warmer than its boiling
-    point.
+    crystal is gone only at 320 to 340 K, and the drop boils above 400 K.
+    The heat arrives far faster than in any kitchen, 2 degrees every
+    picosecond and later 6, and a crystal needs time to come apart. So the
+    ice is briefly warmer than its melting point, and the drop warmer than
+    its boiling point.
 
 Your numbers will differ a little from these. Two computers round their
 arithmetic in slightly different ways, the differences grow over a run, and
