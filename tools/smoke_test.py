@@ -1381,6 +1381,48 @@ def check_fit_to_computer() -> None:
            and any("busy with other programs" in line for line in d.lines),
            f"busy cores with no simulation on them: {d.cores}")
 
+    # One core or several: the log's words agree with the number.
+    worded = []
+
+    def says(d, text):
+        worded.extend(d.lines)
+        return any(text in line for line in d.lines)
+
+    d = R.decide(computer(load={**{c: 0.0 for c in range(24)}, 17: 0.9}), mdrun)
+    expect(says(d, "core 17 is busy with other programs")
+           and says(d, "this simulation gets cores 0-16,18-23: 23 threads ("),
+           f"one busy core: {d.lines}")
+    lone = R.Simulation(4545, "gmx mdrun -deffnm one -pin on", {5}, True)
+    d = R.decide(computer(simulations=[lone], siblings={5: {17}, 17: {5}},
+                          load={**{c: 0.0 for c in range(24)}, 5: 1.0}), mdrun)
+    expect(says(d, "core 5 is held by another simulation (process 4545")
+           and says(d, "core 17 shares a physical core with held core 5, so it is "
+                       "left alone too"),
+           f"one held core and the other half of its physical core: {d.lines}")
+    d = R.decide(computer(allowed={12}), mdrun)
+    expect(says(d, "this program may only use core 12")
+           and says(d, "this simulation gets the core it may use: 1 thread ("),
+           f"a page kept to one core: {d.lines}")
+    d = R.decide(computer(load={c: 1.0 for c in range(24)}, simulations=[other]), mdrun)
+    expect(says(d, "this simulation gets core 6: 1 thread ("),
+           f"one thread on one core: {d.lines}")
+    d = R.decide(computer(quota=1.0), mdrun)
+    expect(says(d, "may use 1 core's worth of the processor, so it starts 1 thread"),
+           f"a container with one core's worth: {d.lines}")
+    d = R.decide(computer(quota=2.0), mdrun)
+    expect(says(d, "may use 2 cores' worth of the processor, so it starts 2 threads"),
+           f"a container with two cores' worth: {d.lines}")
+    d = R.decide(computer(load=held, simulations=[other]), mdrun + ["-ntomp", "4"])
+    expect(says(d, "note: cores 0-5 are held by"), f"threads set by hand: {d.lines}")
+    d = R.decide(computer(load=held, simulations=[lone]), mdrun + ["-ntomp", "4"])
+    expect(says(d, "note: core 5 is held by"), f"threads set by hand, one core: {d.lines}")
+    # A list of cores is written "6-16,18-23": a comma or dash inside it is
+    # followed by a digit, one that ends a phrase is not.
+    wrong = [line for line in worded
+             if "(s)" in line or re.search(r"\bcores \d+(?!\d|[,-]\d)", line)
+             or re.search(r"\bcore \d+[,-]\d", line)]
+    expect(not wrong, f"a number and its words disagree: {wrong}")
+
     d = R.decide(computer(load=held, simulations=[other]), mdrun, can_restrict=False)
     expect(d.cores is None and R.flags_for(d) == ["-ntmpi", "1", "-ntomp", "18"]
            and any("taskset" in line for line in d.lines),
@@ -1410,6 +1452,11 @@ def check_fit_to_computer() -> None:
     d = R.decide(computer(cards=[busy]), mdrun, gpu_policy="share")
     expect(d.cuda_visible is None and any("shares it" in line for line in d.lines),
            "a busy card, sharing: the card was hidden")
+    second = R.Card(1, "GPU-ccc", "Test card", users=[(4646, "gmx mdrun -deffnm c")],
+                    utilization=50.0)
+    d = R.decide(computer(cards=[busy, second]), mdrun, gpu_policy="share")
+    expect(d.cuda_visible is None and any("shares them" in line for line in d.lines),
+           f"two busy cards, sharing: {d.lines}")
     d = R.decide(computer(cards=[busy]), mdrun, gpu_policy="ask")
     expect(d.cuda_visible == "" and any("nobody was asked" in line for line in d.lines),
            "a busy card nobody was asked about did not go to the processor")

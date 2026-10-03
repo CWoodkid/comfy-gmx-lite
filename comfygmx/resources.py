@@ -640,6 +640,16 @@ def _short(command: str, width: int = 60) -> str:
     return command if len(command) <= width else command[: width - 3] + "..."
 
 
+def _cores(cores: Iterable[int]) -> str:
+    """'core 17' or 'cores 6-16,18-23': the log names one core or several."""
+    cores = set(cores)
+    return ("core " if len(cores) == 1 else "cores ") + cpu_list(cores)
+
+
+def _threads(count: int) -> str:
+    return f"{count} thread" + ("" if count == 1 else "s")
+
+
 def decide(snapshot: Snapshot, argv: Sequence[str], *,
            gpu_policy: str = "processor", mpi: bool = False,
            can_restrict: bool = True, launcher: bool = False) -> Decision:
@@ -673,8 +683,8 @@ def decide(snapshot: Snapshot, argv: Sequence[str], *,
         for sim in snapshot.simulations:
             held |= sim.cores
         if held and not told["pin"]:
-            lines.append(f"note: cores {cpu_list(held)} are held by "
-                         f"{_who(snapshot, held)}")
+            lines.append(f"note: {_cores(held)} {'is' if len(held) == 1 else 'are'} "
+                         f"held by {_who(snapshot, held)}")
     else:
         _decide_cores(snapshot, decision, can_restrict)
     if decision.wait:
@@ -711,8 +721,9 @@ def _decide_cores(snapshot: Snapshot, decision: Decision, can_restrict: bool) ->
     limit = snapshot.quota
 
     if not taken and not restricted and limit is None:
-        lines.append(f"nothing else is running on the {len(allowed)} cores: "
-                     "GROMACS chooses the threads itself, as usual")
+        lines.append("nothing else is running on the "
+                     + ("one core" if len(allowed) == 1 else f"{len(allowed)} cores")
+                     + ": GROMACS chooses the threads itself, as usual")
         # GROMACS will take all of them. Claimed, so that a simulation
         # starting a few seconds later does not see a free computer too.
         decision.claim = set(allowed)
@@ -725,8 +736,9 @@ def _decide_cores(snapshot: Snapshot, decision: Decision, can_restrict: bool) ->
             # least busy cores.
             keep = max(1, int(limit))
             chosen = sorted(sorted(chosen, key=lambda c: (snapshot.load.get(c, 0.0), c))[:keep])
-            lines.append(f"this program may use {limit:g} core(s)' worth of the "
-                         f"processor, so it starts {keep} thread(s)")
+            worth = "1 core's" if limit == 1 else f"{limit:g} cores'"
+            lines.append(f"this program may use {worth} worth of the processor, "
+                         f"so it starts {_threads(keep)}")
         if len(chosen) > MAX_THREADS:
             chosen = chosen[:MAX_THREADS]
             lines.append(f"more free cores than GROMACS takes in one process: "
@@ -752,17 +764,26 @@ def _decide_cores(snapshot: Snapshot, decision: Decision, can_restrict: bool) ->
         lines.append("every core this program may use is busy: this simulation "
                      "gets one thread, and will be slow")
 
-    if held & allowed:
-        lines.append(f"cores {cpu_list(held & allowed)} are held by "
-                     f"{_who(snapshot, held & allowed)}")
-    if near & allowed - held:
-        lines.append(f"cores {cpu_list(near & allowed - held)} share a physical "
-                     "core with those, so they are left alone too")
+    mine = held & allowed
+    if mine:
+        lines.append(f"{_cores(mine)} {'is' if len(mine) == 1 else 'are'} held by "
+                     f"{_who(snapshot, mine)}")
+    halves = near & allowed - held
+    if halves:
+        # Named with the held cores they share with: those are not always
+        # in the line above, which names only the cores this program may use.
+        partners = {c for c in held if snapshot.siblings.get(c, set()) & halves}
+        lines.append(f"{_cores(halves)} "
+                     + ("shares a physical core" if len(halves) == 1
+                        else "share physical cores")
+                     + f" with held {_cores(partners)}, so "
+                     + ("it is" if len(halves) == 1 else "they are") + " left alone too")
     other_busy = (busy & allowed) - held - near
     if other_busy:
-        lines.append(f"cores {cpu_list(other_busy)} are busy with other programs")
+        lines.append(f"{_cores(other_busy)} {'is' if len(other_busy) == 1 else 'are'} "
+                     "busy with other programs")
     if restricted:
-        lines.append(f"this program may only use cores {cpu_list(allowed)}")
+        lines.append(f"this program may only use {_cores(allowed)}")
 
     decision.threads = len(chosen)
     decision.claim = set(chosen)
@@ -772,8 +793,11 @@ def _decide_cores(snapshot: Snapshot, decision: Decision, can_restrict: bool) ->
         else:
             lines.append("taskset is not installed, so the simulation cannot be "
                          "kept to those cores; it only starts fewer threads")
-    where = f"cores {cpu_list(chosen)}" if decision.cores else "the cores it may use"
-    lines.append(f"this simulation gets {where}: {len(chosen)} thread(s) "
+    if decision.cores:
+        where = _cores(chosen)
+    else:
+        where = "the core it may use" if len(chosen) == 1 else "the cores it may use"
+    lines.append(f"this simulation gets {where}: {_threads(len(chosen))} "
                  f"({' '.join(flags_for(decision)[:4 if not decision.mpi else 2])})")
 
 
@@ -851,7 +875,8 @@ def _decide_cards(snapshot: Snapshot, decision: Decision, policy: str) -> None:
                      + ", ".join(f"card {c.index}" for c in free)
                      + ", which " + ("is" if len(free) == 1 else "are") + " free")
     elif policy == "share":
-        lines.append("this simulation shares it, as chosen")
+        lines.append("this simulation shares " + ("it" if len(busy) == 1 else "them")
+                     + ", as chosen")
     else:
         decision.cuda_visible = ""
         why = "as chosen" if policy == "processor" else (
