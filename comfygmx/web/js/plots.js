@@ -75,9 +75,11 @@ const Plot = {
 
 /* The same curve, on the inspector's canvas or inside a node.
 
-   Compact drops what a 300 px wide canvas has no room for -- axis titles, half
-   the ticks, the left margin that a five-digit label needs -- rather than
-   drawing the full thing and letting it collide with itself. */
+   Compact drops what a 300 px wide canvas has no room for -- axis titles and
+   half the ticks -- rather than drawing the full thing and letting it collide
+   with itself. The strip on the left for the numbers up the side is as wide
+   as the longest of them needs: a potential energy of -623975.94 is ten
+   characters, and in a fixed strip its first digits were cut off. */
 function drawPlot(canvas, data, options = {}) {
   const { hover = null, compact = false,
           empty = 'select an .xvg in the Files tab' } = options;
@@ -107,9 +109,6 @@ function drawPlot(canvas, data, options = {}) {
       ? { left: 40, right: 8, top: 8, bottom: 18 }
       : { left: 58, right: 14, top: 12, bottom: 30 };
     const ticks = compact ? 3 : 5;
-    const plotW = width - pad.left - pad.right;
-    const plotH = height - pad.top - pad.bottom;
-    if (plotW < 20 || plotH < 20) return;
     const { x, series } = data;
 
     let yMin = Infinity;
@@ -128,6 +127,18 @@ function drawPlot(canvas, data, options = {}) {
     const xMin = x[0];
     const xMax = x[x.length - 1] || 1;
 
+    // The numbers up the side, measured in the font they are written in. The
+    // axis title, in the Plot tab, stands to their left.
+    ctx.font = compact ? '9px system-ui' : '10px system-ui';
+    const yLabels = [];
+    for (let i = 0; i <= ticks; i += 1) yLabels.push(fmt(yMin + (i / ticks) * (yMax - yMin)));
+    const widest = Math.max(...yLabels.map((label) => ctx.measureText(label).width));
+    const titleRoom = !compact && data.ylabel ? 22 : 2;
+    pad.left = Math.max(pad.left, Math.ceil(widest) + 6 + titleRoom);
+    const plotW = width - pad.left - pad.right;
+    const plotH = height - pad.top - pad.bottom;
+    if (plotW < 20 || plotH < 20) return;
+
     const sx = (value) => pad.left + ((value - xMin) / (xMax - xMin || 1)) * plotW;
     const sy = (value) => pad.top + plotH - ((value - yMin) / (yMax - yMin || 1)) * plotH;
 
@@ -145,7 +156,7 @@ function drawPlot(canvas, data, options = {}) {
       ctx.moveTo(pad.left, py);
       ctx.lineTo(pad.left + plotW, py);
       ctx.stroke();
-      ctx.fillText(fmt(value), pad.left - 6, py);
+      ctx.fillText(yLabels[i], pad.left - 6, py);
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -156,7 +167,8 @@ function drawPlot(canvas, data, options = {}) {
       ctx.moveTo(px, pad.top);
       ctx.lineTo(px, pad.top + plotH);
       ctx.stroke();
-      ctx.fillText(fmt(value), px, pad.top + plotH + 6);
+      const label = fmt(value);
+      ctx.fillText(label, inside(px, ctx.measureText(label).width, width), pad.top + plotH + 6);
     }
 
     // axis labels
@@ -226,6 +238,13 @@ function drawPlot(canvas, data, options = {}) {
   }
 }
 
+/* Where to centre a number so that all of it is on the canvas: under its
+   line, unless that would push it over an edge. */
+function inside(centre, textWidth, canvasWidth) {
+  const half = textWidth / 2;
+  return Math.max(half, Math.min(canvasWidth - half, centre));
+}
+
 function fmt(value) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   const abs = Math.abs(value);
@@ -283,6 +302,9 @@ function drawDssp(canvas, data, options = {}) {
   const pad = compact
     ? { left: 30, right: 6, top: 6, bottom: 26 }
     : { left: 52, right: 16, top: 14, bottom: 48 };
+  ctx.font = compact ? '9px system-ui' : '10px system-ui';
+  const widest = ctx.measureText(String(data.n_residues)).width;
+  pad.left = Math.max(pad.left, Math.ceil(widest) + 5 + 2);
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   if (plotW < 20 || plotH < 20) return;
@@ -328,8 +350,9 @@ function drawDssp(canvas, data, options = {}) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   for (let i = 0; i <= ticks; i += 1) {
-    const frame = Math.round((i / ticks) * (data.n_frames - 1));
-    ctx.fillText(String(frame), pad.left + (i / ticks) * plotW, pad.top + plotH + 4);
+    const frame = String(Math.round((i / ticks) * (data.n_frames - 1)));
+    ctx.fillText(frame, inside(pad.left + (i / ticks) * plotW, ctx.measureText(frame).width, width),
+                 pad.top + plotH + 4);
   }
 
   // The legend is the whole point -- a band of colour means nothing until you

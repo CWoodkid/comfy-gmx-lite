@@ -2240,6 +2240,24 @@ def check_website() -> None:
               "there, and built with mkdocs --strict")
 
 
+def check_plot_labels() -> None:
+    """Every number beside a graph fits on the graph: the strip for the
+    numbers up the side is as wide as the longest of them, and the last
+    number along the bottom does not hang over the edge. A potential energy
+    of -623975.94 used to lose its first digits inside a block.
+    `tools/plot_labels.js` loads plots.js with a stand-in for the page."""
+    node = shutil.which("node")
+    if not node:
+        print("plot labels: skipped, node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "plot_labels.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "a number beside a graph is cut off:\n" + (proc.stdout or proc.stderr))
+    if proc.returncode == 0:
+        print(proc.stdout.strip())
+
+
 def check_tour() -> None:
     """The basics: a two-minute tour of the mouse, the touchpad and the keys.
 
@@ -4789,6 +4807,7 @@ CHECKS = (
     check_tutorials_measured,
     check_salty_ice,
     check_website,
+    check_plot_labels,
 )
 
 
