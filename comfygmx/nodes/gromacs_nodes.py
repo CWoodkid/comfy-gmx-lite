@@ -1471,22 +1471,42 @@ class TrjconvNode(Node):
         return plan
 
 
-_COUNT_ATOMS_SCRIPT = r'''#!/usr/bin/env python3
-# How many atoms a file holds, as cheaply as the format allows.
+#: Refuses an index file that was written for a different, usually bigger,
+#: system. This is the loudest failure in the whole program when it is missed:
+#: GROMACS does not check that the numbers in an index file fit the structure
+#: it was given, so it reads past the end of the frame and dies with a
+#: segmentation fault and no explanation at all.
+#:
+#: It counts the atoms itself, so that the command a reader sees, in the
+#: Command tab and in exported scripts, is one plain line:
+#:     python3 check_index.py index.ndx heat.tpr gmx
+_CHECK_INDEX_SCRIPT = r'''#!/usr/bin/env python3
+# Does this index file belong to this structure?
 #
-# This exists because a trajectory written for a subset -- protein only, fitted
-# -- will hand you a frame without a word about the atoms it does not contain.
-# Ask it for the protein and you get the protein; the membrane is simply not
-# there to be asked for. GROMACS only objects when the index reaches past the
-# end of the trajectory, which is the loud half of the same mistake.
+#     python3 check_index.py INDEX STRUCTURE [HOW GROMACS IS CALLED]
 #
-# An xtc states its atom count in bytes 4 to 8, so a 46 GB file answers in
-# microseconds rather than in the forty minutes it takes to read one.
+# An index file is a list of atom NUMBERS -- 1, 2, 3 ... -- grouped under
+# names. The numbers only mean anything against the file they were made from.
+# Hand GROMACS a set of numbers written for a 504,661-atom system together
+# with a 74,540-atom trajectory and it will happily ask for atom 504,661,
+# which is not there. What follows is a segmentation fault.
+#
+# STRUCTURE is the file the next command reads its atoms from. Most kinds
+# state their atom count at the very top, and it is read from there: an xtc
+# holds it in bytes 4 to 8, so a 46 GB file answers at once. A run input file
+# (.tpr) and a checkpoint (.cpt) are packed, and only GROMACS can read them:
+# for those, "gmx dump" is asked, and stopped as soon as it has printed the
+# count. The words after STRUCTURE say how GROMACS is called here, usually
+# just "gmx"; they are only used for those two kinds.
+import re
 import struct
+import subprocess
 import sys
+import threading
 
 
-def natoms(path):
+def atoms_in_header(path):
+    """The atom count a file states about itself, or None."""
     lowered = path.lower()
     if lowered.endswith(".gro"):
         with open(path, errors="replace") as handle:
@@ -1504,39 +1524,36 @@ def natoms(path):
                 elif line.startswith("ENDMDL"):
                     break
         return count or None
-
     with open(path, "rb") as handle:
-        head = handle.read(4)
-    if len(head) == 4 and struct.unpack(">i", head)[0] == 1995:      # xtc
-        with open(path, "rb") as handle:
-            return struct.unpack(">ii", handle.read(8))[1]
-    return None                       # tpr, trr, anything else: not our job
+        head = handle.read(8)
+    if len(head) == 8 and struct.unpack(">i", head[:4])[0] == 1995:     # xtc
+        return struct.unpack(">ii", head)[1]
+    return None
 
 
-if __name__ == "__main__":
-    for name in sys.argv[1:]:
-        try:
-            found = natoms(name)
-        except OSError:
-            found = None
-        print(found if found else "")
-'''
-
-
-#: Refuses an index file that was written for a different, usually bigger,
-#: system. This is the loudest failure in the whole program when it is missed:
-#: GROMACS does not check that the numbers in an index file fit the structure
-#: it was given, so it reads past the end of the frame and dies with a
-#: segmentation fault and no explanation at all.
-_CHECK_INDEX_SCRIPT = r'''#!/usr/bin/env python3
-# Does this index file belong to this structure?
-#
-# An index file is a list of atom NUMBERS -- 1, 2, 3 ... -- grouped under
-# names. The numbers only mean anything against the file they were made from.
-# Hand GROMACS a set of numbers written for a 504,661-atom system together
-# with a 74,540-atom trajectory and it will happily ask for atom 504,661,
-# which is not there. What follows is a segmentation fault.
-import sys
+def atoms_from_gromacs(path, gromacs):
+    """Ask "gmx dump" for the count; give it two minutes at most."""
+    flag = "-cp" if path.lower().endswith(".cpt") else "-s"
+    try:
+        dump = subprocess.Popen(gromacs + ["dump", flag, path, "-quiet"],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                text=True, errors="replace")
+    except OSError:
+        return None
+    watchdog = threading.Timer(120, dump.kill)
+    watchdog.start()
+    found = None
+    try:
+        for line in dump.stdout:
+            match = re.match(r"\s*#?n?atoms\s*=\s*(\d+)", line)
+            if match:
+                found = int(match.group(1))
+                break
+    finally:
+        watchdog.cancel()
+        dump.kill()
+        dump.wait()
+    return found
 
 
 def read_index(path):
@@ -1563,17 +1580,25 @@ def read_index(path):
 
 
 def main():
-    index, expected = sys.argv[1], sys.argv[2]
-    try:
-        atoms = int(expected)
-    except (TypeError, ValueError):
-        atoms = 0
+    if len(sys.argv) < 3:
+        print("usage: python3 check_index.py INDEX STRUCTURE [HOW GROMACS IS CALLED]")
+        return 0
+    index, structure, gromacs = sys.argv[1], sys.argv[2], sys.argv[3:] or ["gmx"]
+    if structure.isdigit():
+        atoms = int(structure)        # older scripts hand over the count itself
+    else:
+        try:
+            atoms = atoms_in_header(structure) or atoms_from_gromacs(structure, gromacs)
+        except OSError:
+            atoms = None
+    if not atoms:
+        return 0                      # nothing to check against: let it run
     try:
         groups, biggest = read_index(index)
     except OSError as err:
         print(f">> could not read the index file: {err}")
         return 0                      # not our place to stop the run over this
-    if not atoms or not biggest or biggest <= atoms:
+    if not biggest or biggest <= atoms:
         return 0
 
     say = print
@@ -1612,30 +1637,6 @@ if __name__ == "__main__":
 '''
 
 
-def atom_count_shell(var: str, path: str) -> str:
-    """Shell that puts the number of particles in `path` into `var`, cheaply.
-
-    Most formats state their own size in the first few bytes, and
-    ``count_atoms.py`` reads it straight out of there. Two do not: a run input
-    file (.tpr) and a checkpoint (.cpt) are packed binary. For those, ask
-    ``gmx dump``, which prints the count near the top of its output -- and
-    stop reading as soon as that line arrives.
-
-    Not ``gmx check``: on this kind of system it reads the file in a second
-    and then spends minutes checking every bonded interaction in it, which is
-    work nobody asked for. Measured at over eight minutes on a coarse-grained
-    membrane run, against a third of a second here.
-    """
-    q = shlex.quote(path)
-    flag = "-cp" if path.lower().endswith(".cpt") else "-s"
-    return (
-        var + "=$(python3 count_atoms.py " + q + " 2>/dev/null); "
-        'if [ -z "$' + var + '" ]; then ' + var + "=$(timeout 120 {cmd} dump "
-        + flag + " " + q + " -quiet 2>/dev/null "
-        "| grep -m1 -E '^[[:space:]]*#?n?atoms[[:space:]]*=' | tr -dc '0-9'); fi; "
-    )
-
-
 def make_folder(plan: Plan, name: str) -> None:
     """Create the folder an output name points into, before the tool needs it.
 
@@ -1654,20 +1655,21 @@ def index_guard(plan: Plan, index_file: str, against: str) -> None:
 
     `against` is whatever the command will read the structure from -- the tpr,
     the .gro, the pdb. The atom count comes from the file header where the
-    format states one, and from ``gmx check`` for a tpr, which does not.
+    format states one, and from ``gmx dump`` for a tpr or cpt, which do not.
 
     Not a note and not a warning: a run that goes ahead here ends in a
     segmentation fault, which says nothing about what was wrong.
     """
     if not index_file or not against:
         return
-    plan.files["count_atoms.py"] = _COUNT_ATOMS_SCRIPT
     plan.files["check_index.py"] = _CHECK_INDEX_SCRIPT
-    qi = shlex.quote(index_file)
+    # {cmd} becomes however GROMACS is called here (gmx, gmx_mpi, ...); the
+    # script needs it only for a .tpr or .cpt, whose atom count only GROMACS
+    # can read.
     plan.sh(
-        atom_count_shell("__s", against)
-        + "python3 check_index.py " + qi + ' "${__s:-0}"',
-        tool="gmx", label="check the index file fits the structure",
+        "python3 check_index.py " + shlex.quote(index_file) + " "
+        + shlex.quote(against) + " {cmd}",
+        tool="gmx", label="check that the index file belongs to this structure",
     )
 
 

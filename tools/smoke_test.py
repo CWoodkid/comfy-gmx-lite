@@ -2243,6 +2243,67 @@ def check_website() -> None:
               "there, and built with mkdocs --strict")
 
 
+def check_index_guard() -> None:
+    """An index file made for a different system is stopped before GROMACS
+    reads past the end of the frame and crashes without a word.
+
+    check_index.py counts the atoms itself -- from the top of a .gro, .pdb or
+    .xtc, and through `gmx dump` for a .tpr -- so the command a reader sees,
+    in the Command tab and in exported scripts, is one plain line. Here a
+    small stand-in plays gmx and prints the count the way gmx dump does."""
+    import struct
+    from comfygmx.nodes import gromacs_nodes
+    from comfygmx.nodes.base import Plan
+    before = len(failures)
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp)
+        (folder / "check_index.py").write_text(gromacs_nodes._CHECK_INDEX_SCRIPT)
+        (folder / "small.gro").write_text(
+            "three atoms\n    3\n"
+            + "".join(f"    1SOL     OW{i:5d}   0.000   0.000   0.000\n" for i in (1, 2, 3))
+            + "   1.00000   1.00000   1.00000\n")
+        (folder / "small.xtc").write_bytes(struct.pack(">ii", 1995, 4) + bytes(80))
+        (folder / "small.tpr").write_bytes(b"packed; only GROMACS reads this")
+        (folder / "stand_in_gmx.py").write_text(
+            "import sys\n"
+            "if 'dump' in sys.argv:\n"
+            "    print('small.tpr:')\n"
+            "    print('   natoms             = 7')\n")
+        for biggest in (3, 4, 5, 7, 8):
+            (folder / f"upto{biggest}.ndx").write_text(
+                "[ System ]\n" + " ".join(str(i) for i in range(1, biggest + 1)) + "\n")
+        gmx = [sys.executable, str(folder / "stand_in_gmx.py")]
+        cases = (
+            ("upto3.ndx", "small.gro", [], 0),
+            ("upto5.ndx", "small.gro", [], 1),
+            ("upto4.ndx", "small.xtc", [], 0),
+            ("upto5.ndx", "small.xtc", [], 1),
+            ("upto7.ndx", "small.tpr", gmx, 0),
+            ("upto8.ndx", "small.tpr", gmx, 1),
+            ("upto5.ndx", "3", [], 1),          # how older scripts call it
+            ("upto8.ndx", "small.tpr", [str(folder / "no-gromacs-here")], 0),
+        )
+        for index, structure, extra, wanted in cases:
+            proc = subprocess.run([sys.executable, "check_index.py", index, structure] + extra,
+                                  cwd=folder, capture_output=True, text=True, timeout=60)
+            check(proc.returncode == wanted,
+                  f"index check: {index} against {structure} ended with {proc.returncode}, "
+                  f"not {wanted}:\n{proc.stdout}{proc.stderr}")
+            if wanted == 1:
+                check("STOPPING" in proc.stdout,
+                      f"index check: {index} against {structure} stopped without saying why")
+    plan = Plan()
+    gromacs_nodes.index_guard(plan, "index.ndx", "heat.tpr")
+    line = plan.steps[-1].argv[0]
+    check(line == "python3 check_index.py index.ndx heat.tpr {cmd}",
+          f"index check: the command is not one plain line any more: {line}")
+    check(set(plan.files) == {"check_index.py"},
+          f"index check: it writes {sorted(plan.files)}, expected only check_index.py")
+    if len(failures) == before:
+        print(f"index check: {len(cases)} cases, a matching index runs and a mismatched one "
+              "stops, for .gro, .xtc and .tpr; the command is one line")
+
+
 def check_plot_labels() -> None:
     """Every number beside a graph fits on the graph: the strip for the
     numbers up the side is as wide as the longest of them, and the last
@@ -4811,6 +4872,7 @@ CHECKS = (
     check_salty_ice,
     check_website,
     check_plot_labels,
+    check_index_guard,
 )
 
 

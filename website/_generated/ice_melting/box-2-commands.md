@@ -112,8 +112,8 @@ Draws its file inside the block. It runs no program.
 **⑧ Measure something, frame by frame**
 
 ```bash
-# check the index file fits the structure
-__s=$(python3 count_atoms.py heat.tpr 2>/dev/null); if [ -z "$__s" ]; then __s=$(timeout 120 gmx dump -s heat.tpr -quiet 2>/dev/null | grep -m1 -E '^[[:space:]]*#?n?atoms[[:space:]]*=' | tr -dc '0-9'); fi; python3 check_index.py ice.ndx "${__s:-0}"
+# check that the index file belongs to this structure
+python3 check_index.py ice.ndx heat.tpr gmx
 
 # gmx gyrate
 gmx gyrate -s heat.tpr -o size.xvg -f heat.xtc -n ice.ndx -sel Oxygens -tu ps -mode mass
