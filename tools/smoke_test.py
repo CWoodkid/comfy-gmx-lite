@@ -2131,6 +2131,69 @@ def check_side_panels() -> None:
           "Ctrl+[ and Ctrl+], with the graph staying put and the choice remembered")
 
 
+def check_page_fits() -> None:
+    """The page never runs off the side of the window.
+
+    In a window narrower than the toolbar (1457 pixels of buttons with a
+    tutorial loaded, on 2026-10-03), the buttons at its right-hand end were
+    cut off where nobody could reach them: Settings and ? in a window 1366
+    pixels wide, Environments too at 1280. Bringing one into view from the
+    page's own code pushed the whole page sideways with no way back, 91
+    pixels at 1366 and 433 at 1024. Now the toolbar runs onto more lines
+    instead, the forecast beside Run gives up its room first, the rows below
+    take whatever height is left, and the page is clipped at its edges rather
+    than scrollable. That was looked at in a browser at 760, 1024, 1280, 1366
+    and 1600 pixels; this keeps the rules that do it from quietly going."""
+    css = (ROOT / "comfygmx" / "web" / "css" / "style.css").read_text()
+
+    def rule(selector: str) -> str:
+        found = re.search(r"(?m)^" + re.escape(selector) + r"\s*\{([^}]*)\}", css)
+        return found.group(1) if found else ""
+
+    topbar = rule("#topbar")
+    check("flex-wrap: wrap" in topbar and not re.search(r"(?<!min-)height:", topbar),
+          "page fits: the toolbar is one line of a fixed height again, so in a narrow "
+          "window its buttons run off the edge")
+    check("margin-left: auto" in rule(".toolgroup-end"),
+          "page fits: the buttons on the right no longer keep to the right-hand end")
+    check(re.search(r"flex:\s*1 1 \d+px", rule(".forecast")) and "min-width: 0" in rule(".forecast"),
+          "page fits: the forecast beside Run no longer gives up its room first")
+    check("overflow: clip" in rule("body"),
+          "page fits: the page can be scrolled sideways from its own code again")
+    layout = rule("#layout")
+    check("calc(" not in layout and re.search(r"flex:\s*1", layout),
+          "page fits: the columns' height is worked out from a one-line toolbar again")
+    markup = (ROOT / "comfygmx" / "web" / "index.html").read_text()
+    bar = markup[markup.find('<header id="topbar">'):markup.find("</header>")]
+    first_group = bar[bar.find('<div class="toolgroup">'):]
+    first_group = first_group[:first_group.find("</div>")]
+    check('id="forecast-line"' in bar and 'id="forecast-line"' not in first_group
+          and 'class="toolgroup toolgroup-end"' in bar,
+          "page fits: the forecast is back inside the Run buttons' group, or the "
+          "right-hand buttons lost their group, so they cannot make room separately")
+    print("page fits: the toolbar runs onto more lines in a narrow window instead of off "
+          "its edge, the rows below share what height is left, and the page cannot be "
+          "pushed sideways")
+
+
+def check_picture_sizes() -> None:
+    """The first structure in the Viewer tab is drawn at the size it is seen
+    at, not squashed into a space 39 pixels shorter once the line of text
+    under it appears; the picture is drawn again whenever its space changes
+    size; and the plot keeps a height of its own. `tools/picture_sizes.js`
+    loads viewer.js with a stand-in for the page."""
+    node = shutil.which("node")
+    if not node:
+        print("pictures: skipped, node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "picture_sizes.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the picture-size test failed:\n" + (proc.stdout or proc.stderr))
+    print("pictures: the first structure drawn at the room really left for it, drawn "
+          "again whenever that changes, and the plot keeps a height of its own")
+
+
 def check_workflow_tools() -> None:
     """A workflow says which programs it needs, and which versions it used.
 
@@ -4553,6 +4616,8 @@ CHECKS = (
     check_switch_off_editor,
     check_cached_tags,
     check_side_panels,
+    check_page_fits,
+    check_picture_sizes,
     check_param_boxes,
     check_mdp_boxes,
     check_mdp_with_gromacs,

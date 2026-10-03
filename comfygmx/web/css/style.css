@@ -35,6 +35,15 @@ html, body {
   font-family: var(--font); font-size: 13px;
   overflow: hidden;
 }
+/* The page from top to bottom: the toolbar, the session tabs, the three
+   columns, the status line. The columns take whatever height is left, so the
+   heights add up however many lines the toolbar needs in a narrow window.
+   Clipped rather than hidden at the edges: a page whose edges are only hidden
+   can still be scrolled from the page's own code, and when the toolbar was
+   wider than the window, bringing one of its buttons into view pushed the
+   whole page sideways with no way back. */
+body { display: flex; flex-direction: column; overflow: clip; }
+#topbar, #sessionbar, #statusbar { flex: 0 0 auto; }
 
 /* Links. Left alone, the browser paints them its own dark blue (#0000EE),
    which against this dark background comes out at a contrast of 1.8 -- the
@@ -104,14 +113,23 @@ input[type="checkbox"] { width: auto; }
 .hidden { display: none !important; }
 
 /* ---------------------------------------------------------------- topbar */
+/* One line where the window is wide enough. Where it is not, the forecast
+   beside Run gives up its room first, and then the buttons that no longer
+   fit move down to a second line, rather than running off the edge of the
+   window where nobody could reach them. */
 #topbar {
-  height: 42px; display: flex; align-items: center; gap: 14px;
-  padding: 0 12px; background: var(--bg-panel);
+  min-height: 42px; display: flex; flex-wrap: wrap; align-items: center;
+  align-content: center; gap: 6px 14px;
+  padding: 4px 12px; background: var(--bg-panel);
   border-bottom: 1px solid var(--line);
 }
 .brand { font-weight: 600; letter-spacing: .3px; }
 .brand span { color: var(--accent); font-weight: 400; }
-.toolgroup { display: flex; gap: 5px; }
+/* A group wider than the whole window breaks inside itself too. */
+.toolgroup { display: flex; flex-wrap: wrap; gap: 5px; }
+/* The status, Set up, Environments, Settings and ?: at the right-hand end of
+   whichever line they are on. */
+.toolgroup-end { margin-left: auto; align-items: center; }
 
 .status-pill {
   font-size: 11px; padding: 3px 9px; border-radius: 10px;
@@ -167,7 +185,7 @@ input[type="checkbox"] { width: auto; }
 #layout {
   display: grid;
   grid-template-columns: 250px 1fr 380px;
-  height: calc(100% - 42px - 30px - 24px);
+  flex: 1 1 0; min-height: 0;
 }
 /* Each of the three keeps its own column. A side panel that is put away
    (sides.js) leaves its column empty and no wider than nothing, instead of
@@ -764,8 +782,16 @@ textarea.code {
    Beside the Run button, because it is about what that button will do. Quiet:
    it changes after every edit and must not pull the eye each time. */
 .forecast {
-  font-size: 10.5px; color: var(--text-faint); margin-left: 8px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px;
+  font-size: 10.5px; color: var(--text-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* In a narrow window this is the first thing to give up room: the toolbar
+     counts it as 100 pixels wide when deciding what fits on a line (room for
+     "22 of 22 will run"), and it then takes whatever room is left there, up
+     to its whole text. Cut short, it ends in "…", and pointing at it shows
+     the rest. A fixed allowance rather than its length, which changes after
+     every edit: otherwise the buttons after it would jump between the lines
+     as the graph is worked on. */
+  flex: 1 1 100px; min-width: 0; max-width: max-content;
 }
 /* A node the run would take from the cache. Dashed rather than coloured: it is
    a statement about the future, and the solid borders all mean things that

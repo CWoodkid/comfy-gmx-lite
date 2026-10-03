@@ -485,17 +485,29 @@ const Viewer = {
       Panels.saveFile(this.path);
     });
     window.addEventListener('resize', () => this.draw());
+    // Drawn again whenever the picture's space changes size, not only when
+    // the window does. The line of text under the picture is empty until the
+    // first structure arrives and then takes room from it, and the panel the
+    // picture is in can be put away and brought back. A picture drawn for
+    // the old size is stretched or squashed into the new one until something
+    // draws it again. The space's size is set by the page around it, never
+    // by the picture, so drawing cannot set this off again.
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => this.draw()).observe(document.getElementById('viewer-canvas'));
+    }
   },
 
   show(data, path = '') {
     if (!data || data.error) { UI.toast((data && data.error) || 'nothing to show', 'error'); return; }
     this.data = data;
     this.path = path;
-    this.view.show(data);
+    // The words first, then the picture, so the picture is drawn for the
+    // room that is left once the line of text under it is there.
     document.getElementById('viewer-title').textContent = data.name;
     document.getElementById('viewer-info').textContent =
       `${describe(data)}  —  drag to turn, right-drag to slide, wheel to zoom, `
       + 'double-click an atom to turn around it';
+    this.view.show(data);
   },
 
   clear() {

@@ -1305,6 +1305,7 @@ const App = {
     if (!forecast || forecast.error || !forecast.total) {
       Editor.markCached([]);
       line.textContent = leftOutText ? `nothing will run · ${leftOutText}` : '';
+      line.title = line.textContent;
       line.classList.toggle('hidden', !leftOutText);
       return;
     }
@@ -1327,6 +1328,8 @@ const App = {
       line.textContent = parts.join(' · ');
     }
     if (leftOutText) line.textContent += ` · ${leftOutText}`;
+    // In a narrow window the line ends in "…"; pointing at it shows the rest.
+    line.title = line.textContent;
     const run = document.getElementById('btn-run');
     run.title = forecast.will_run
       ? `Run — ${line.textContent}`

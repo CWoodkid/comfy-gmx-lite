@@ -18,9 +18,11 @@
     <button id="btn-cancel" class="danger" disabled>Cancel</button>
     <!-- Only there while a run is actually being held at a node. -->
     <button id="btn-continue" class="primary hidden">Continue</button>
-    <!-- What Run would do, beside the button that would do it. -->
-    <span id="forecast-line" class="forecast hidden"></span>
   </div>
+  <!-- What Run would do, beside the button that would do it. A piece of the
+       bar on its own, so that in a narrow window it is the first thing to
+       give up room. -->
+  <span id="forecast-line" class="forecast hidden"></span>
 
   <div class="toolgroup">
     <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶</button>
@@ -37,12 +39,15 @@
     <button id="btn-clear">New</button>
   </div>
 
-  <div class="spacer"></div>
-  <div id="run-status" class="status-pill">idle</div>
-  <button id="btn-setup" class="hidden primary" title="Install what this machine is missing">Set up</button>
-  <button id="btn-env" title="Software and environments">Environments</button>
-  <button id="btn-settings" title="Settings">Settings</button>
-  <button id="btn-help" title="Keyboard shortcuts and help">?</button>
+  <!-- Kept together at the right-hand end, on the second line when the
+       window is too narrow for one. -->
+  <div class="toolgroup toolgroup-end">
+    <div id="run-status" class="status-pill">idle</div>
+    <button id="btn-setup" class="hidden primary" title="Install what this machine is missing">Set up</button>
+    <button id="btn-env" title="Software and environments">Environments</button>
+    <button id="btn-settings" title="Settings">Settings</button>
+    <button id="btn-help" title="Keyboard shortcuts and help">?</button>
+  </div>
 </header>
 
 <div id="sessionbar">
