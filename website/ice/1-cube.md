@@ -61,12 +61,6 @@ like: it says if a wire is missing.
 
 [![The box after the run](../pictures/ice_melting/box-1-results.webp){ .canvas }](../pictures/ice_melting/box-1-results.webp)
 
-**Define box (editconf)** now shows an orange note: the box shape was set to
-*triclinic*, because a size was typed into **Explicit box (nm)**. That is
-fine here. *Triclinic* only means a box whose edges may have any lengths and
-meet at any angles. One with three equal edges at right angles is the same
-5.5 nm cube, as the line under **Preview structure** says.
-
 **Preview structure** now shows the cube: oxygens red, hydrogens white.
 Drag the picture to turn it. Seen from one direction, straight down the
 crystal's z axis, the six-sided rings line up into open channels. That open

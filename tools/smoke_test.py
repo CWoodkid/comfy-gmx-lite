@@ -2304,6 +2304,61 @@ def check_index_guard() -> None:
               "stops, for .gro, .xtc and .tpr; the command is one line")
 
 
+def check_box_shape_note() -> None:
+    """Define box warns about a typed box only where the box would come out
+    wrong. Typed lengths with the shape left at dodecahedron or octahedron
+    would be folded into another, smaller shape, so the block makes the box
+    triclinic and says so. A cube with three equal edges is the same box
+    either way: it stays cubic and nothing is said. The ice tutorial's 5.5 nm
+    cube showed a warning for nothing until 2026-10-04. A cube with unequal
+    edges would come out as long as its first edge all round (GROMACS 2026.3
+    made "4 5 6" a 4 nm cube), so it is made triclinic, with a warning that
+    names that edge."""
+    before = len(failures)
+    settings = Settings()
+    cls = REGISTRY.get("gmx.editconf")
+
+    def plan_for(**params):
+        values = dict(cls.defaults())
+        values.update(params)
+        ctx = PlanContext(
+            node_id="box", node_type="gmx.editconf", params=values,
+            inputs={"structure": {"name": "ice.gro"}},
+            workdir=Path("/tmp/comfygmx-smoke"),
+            stage=lambda value, as_name=None: as_name or (value or {}).get("name") or "in.dat",
+            settings=settings, dry=False,
+        )
+        plan = cls().plan(ctx)
+        argv = plan.steps[-1].argv
+        return argv[argv.index("-bt") + 1], [n for n in plan.notes if "box shape" in n]
+
+    # (shape chosen, lengths typed, shape GROMACS is given, warning expected)
+    cases = [
+        ("cubic", "5.5 5.5 5.5", "cubic", False),
+        ("cubic", "5.5", "cubic", False),
+        ("cubic", "5.5, 5.50, 5.500", "cubic", False),
+        ("cubic", "", "cubic", False),
+        ("cubic", "4 5 6", "triclinic", True),
+        ("dodecahedron", "4.3 4.3 8.6", "triclinic", True),
+        ("octahedron", "5 5 5", "triclinic", True),
+        ("triclinic", "4 5 6", "triclinic", False),
+    ]
+    for shape, box, want, warned in cases:
+        got, notes = plan_for(box_type=shape, box=box)
+        check(got == want,
+              f"Define box with {shape} and '{box}' gives GROMACS -bt {got}, not {want}")
+        check(bool(notes) == warned,
+              f"Define box with {shape} and '{box}': "
+              + ("no warning, though the box would come out wrong" if warned
+                 else f"a warning for nothing: {notes}"))
+    _, notes = plan_for(box_type="cubic", box="4 5 6")
+    check(any("4 nm" in note for note in notes),
+          f"the warning for a cube with unequal edges does not name the 4 nm edge: {notes}")
+    if len(failures) == before:
+        print(f"box shape: {len(cases)} cases, a cube with equal edges stays cubic with no "
+              "warning; a warning only where the box would come out wrong")
+
+
 def check_plot_labels() -> None:
     """Every number beside a graph fits on the graph: the strip for the
     numbers up the side is as wide as the longest of them, and the last
@@ -4873,6 +4928,7 @@ CHECKS = (
     check_website,
     check_plot_labels,
     check_index_guard,
+    check_box_shape_note,
 )
 
 

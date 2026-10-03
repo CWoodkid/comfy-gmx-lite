@@ -601,20 +601,40 @@ class EditconfNode(Node):
         box = ctx.pstr("box")
         shape = ctx.pstr("box_type", "dodecahedron")
         if box:
-            argv += ["-box"] + box.replace(",", " ").split()
+            edges = box.replace(",", " ").split()
+            argv += ["-box"] + edges
             # -box gives the lengths and -bt reshapes them, so asking for
             # "4.3 4.3 8.6" and leaving the shape at dodecahedron builds a
             # dodecahedron with those edges -- a 56 nm3 box where 160 was
             # wanted, reported only as a line of numbers in the log. If you
             # typed the lengths you meant a plain rectangular box.
-            if shape != "triclinic":
+            #
+            # A cube needs no change when its edges are equal: cubic and
+            # triclinic then build the same box, so it stays cubic and there
+            # is nothing to warn about. With unequal edges GROMACS would make
+            # all three as long as the first one (tried with 2026.3: "4 5 6"
+            # gave a 4 nm cube).
+            try:
+                lengths = [float(edge) for edge in edges]
+            except ValueError:
+                lengths = []
+            if shape == "cubic" and lengths and len(set(lengths)) == 1:
+                pass
+            elif shape == "cubic":
+                plan.notes.append(
+                    "box shape set to triclinic: a cubic box has three equal "
+                    f"edges, so GROMACS would have made all three {edges[0]} nm "
+                    f"long, the first length in '{box}'. Triclinic keeps the "
+                    "lengths you typed. For a cube, type three equal lengths.")
+                shape = "triclinic"
+            elif shape != "triclinic":
                 plan.notes.append(
                     f"box shape forced to triclinic: an explicit box of "
                     f"'{box}' gives the three edge lengths, and a "
                     f"{shape} would fold them into a different shape with "
                     "a smaller volume. Clear the explicit box if you wanted "
                     f"a {shape}.")
-            shape = "triclinic"
+                shape = "triclinic"
         else:
             argv += ["-d", str(ctx.pfloat("distance", 1.2))]
         argv += ["-bt", shape]

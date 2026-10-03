@@ -11,7 +11,7 @@ python make_ice.py --cells 6 4 4 --seed 1 --gro ice.gro --top ice.top --ndx ice.
 
 ```bash
 # gmx editconf
-gmx editconf -f ice.gro -o cube.gro -c -box 5.5 5.5 5.5 -bt triclinic
+gmx editconf -f ice.gro -o cube.gro -c -box 5.5 5.5 5.5 -bt cubic
 ```
 
 **③ Preview structure**
