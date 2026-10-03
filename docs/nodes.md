@@ -799,11 +799,11 @@ Starting points for the run-parameters node. Reference copies of each live in `c
 | `nvt_atomistic` | md | 0.002 | NVT equilibration with position restraints and velocity generation. |
 | `npt_atomistic` | md | 0.002 | NPT equilibration, C-rescale barostat, restraints still on. |
 | `md_atomistic` | md | 0.002 | Unrestrained production MD, Parrinello-Rahman. |
-| `lysozyme_ions` | steep | — | Lysozyme tutorial, verbatim: throwaway minimisation used only to build the tpr genion needs (plain cutoff electrostatics). |
-| `lysozyme_min` | steep | — | Lysozyme tutorial, verbatim: steepest descent to Fmax < 1000, PME. |
-| `lysozyme_nvt` | md | 0.002 | Lysozyme tutorial, verbatim: 100 ps restrained NVT at 298 K, CHARMM36 force-switched LJ, velocities generated. |
-| `lysozyme_npt` | md | 0.002 | Lysozyme tutorial, verbatim: 500 ps restrained NPT, C-rescale barostat. |
-| `lysozyme_md` | md | 0.002 | Lysozyme tutorial, verbatim: 10 ns unrestrained production MD. |
+| `lysozyme_ions` | steep | — | Lysozyme tutorial, as published. Nothing runs with these settings: they only build the run file that genion needs to place the ions. |
+| `lysozyme_min` | steep | — | Lysozyme tutorial, as published. Energy minimisation: moves the atoms until the strongest force on any atom is below 1000 kJ/mol/nm. |
+| `lysozyme_nvt` | md | 0.002 | Lysozyme tutorial, as published. 100 ps at 298 K in a box of fixed size: new random speeds at the start, the protein held in place by springs. |
+| `lysozyme_npt` | md | 0.002 | Lysozyme tutorial, as published. 500 ps at 298 K and 1 bar: the box may shrink or grow, the protein is still held by springs. |
+| `lysozyme_md` | md | 0.002 | Lysozyme tutorial, as published. 10 ns at 298 K and 1 bar, with nothing holding the protein. |
 
 ## Blocks folded into others
 

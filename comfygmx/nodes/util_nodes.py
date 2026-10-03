@@ -214,7 +214,8 @@ class MdpNode(Node):
                 # the published preset, and both the title inside it and the
                 # name it is written under should say so rather than letting a
                 # tuned run look like a stock one months later.
-                title = f"{title} — edited here, not the stock {preset_name}"
+                title = (f"Started from the preset {preset_name}, then changed "
+                         f"in this block. The preset: {title}")
 
         for param_name, mdp_key in self._WIDGET_MAP.items():
             value = ctx.pstr(param_name)
