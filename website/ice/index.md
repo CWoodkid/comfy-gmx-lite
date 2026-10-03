@@ -1,14 +1,15 @@
 # An ice cube melting
 
-A tiny ice cube, 768 water molecules about 3 nanometres across, floats in
-empty space. One run heats it from 200 K (−73 °C), colder than any freezer,
-to 1000 K (727 °C), hotter than any kettle. On the way you see ice, a drop of
-liquid water and a gas, one after the other. Three extra boxes do it again
-with salt in the ice, and cool both back down.
+A tiny ice cube of 768 water molecules, about 3 nanometres across, floats in
+empty space. One run heats it from 200 kelvin (K), which is −73 °C and
+colder than any freezer, to 1000 K (727 °C), hotter than any kettle. On the
+way you see ice, a drop of liquid water and a gas, one after the other.
+Three extra boxes do it again with salt in the ice, then cool the pure gas
+and the salty gas back down.
 
 [![The whole tutorial on the canvas: five boxes](../pictures/ice_melting/whole.webp){ .canvas }](../pictures/ice_melting/whole.webp)
 
-To build along, open Comfy-gmx lite in another tab: [![Open in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/){ .binder-button }
+To build along, open Comfy-gmx lite in another browser tab: [![Open in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/){ .binder-button }
 
 ## The boxes
 
@@ -21,8 +22,9 @@ To build along, open Comfy-gmx lite in another tab: [![Open in Binder](https://m
 | [5. Extra: cool the salty one down too](5-cool-salty.md) | the same for the salty gas, and the two compared | 8 |
 
 Boxes 1 and 2 are the tutorial. Boxes 3 to 5 are extras for when there is
-time: in the ready-made tutorial they come switched off, so **Run** leaves
-them out until you switch them on.
+time. In the ready-made tutorial they come switched off, so **Run** leaves
+them out until you switch them on: right-click the box's title bar and
+choose **Switch this chunk back on**.
 
 ## How long it takes
 
@@ -33,11 +35,14 @@ Each extra box runs about as long again.
 ## What you need to know first
 
 Nothing about simulations. The pages say what each step is for as you build
-it. If the mouse and keyboard parts are new, read
-[Before you start](../basics.md) first.
+it. If you have not used the editor before, read
+[Before you start](../basics.md) first: it shows the parts of the screen and
+how to add, wire and run blocks.
 
 ## For teachers
 
-What the class should see, the science behind it, how the tutorial was set
-up and why, and things to try afterwards are in the
-[teacher's notes](https://github.com/CWoodkid/comfy-gmx-lite/blob/main/docs/ice-melting.md).
+The
+[teacher's notes](https://github.com/CWoodkid/comfy-gmx-lite/blob/main/docs/ice-melting.md)
+say what the class should see on each graph and in the movie, explain the
+science behind the melting and the boiling, say how the tutorial was set up
+and why, and list things to try afterwards.

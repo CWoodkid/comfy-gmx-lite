@@ -24,16 +24,20 @@ to, and how stiff those bonds are.
   fetches it from the website of the lab that makes it.
 - **Load structure** fetches entry 1AKI from the Protein Data Bank, the
   public archive of measured protein structures. It is hen egg-white
-  lysozyme, measured by X-ray crystallography.
+  lysozyme, measured by X-ray crystallography: from the way X-rays scatter
+  off a crystal of the protein.
 - **Clean structure** removes the water molecules that were measured in the
   crystal along with the protein. The simulation adds water of its own
-  later. Keeping crystal water is right only when it does a job, for example
-  inside the active site; here it does not.
-- **Topology (pdb2gmx)** reads the cleaned structure and writes three files:
-  the structure with hydrogens added, since X-ray structures rarely show
-  them; the topology; and a list of the protein's heavy atoms that later
-  runs use to hold the protein in place. It also chooses the water model,
-  TIP3P, which draws each water molecule as three points.
+  later. Keeping a crystal water molecule is right only when it has a part
+  to play, for example one lodged in the pocket where the protein does its
+  work (the active site). Here none has.
+- **Topology (pdb2gmx)** reads the cleaned structure and writes three files.
+  The first is the structure with hydrogens added: X-ray structures rarely
+  show them. The second is the topology. The third is a list of the
+  protein's *heavy atoms*, every atom but the hydrogens; boxes 6 and 7 use
+  it to hold the protein in place. The block also chooses the *water model*,
+  the rules for the water molecules: TIP3P, which draws each water molecule
+  as three points.
 
 ## What you will build
 
@@ -50,9 +54,10 @@ says where to find it, which settings to change, and which wires go into it.
 
 --8<-- "_generated/lysozyme/box-1-build.md"
 
-The **Force field** of ④ already says `charmm36-jul2022`, followed by *(not
-on this machine)*. That is fine: the computer's own GROMACS does not have
-it, and it arrives through the wire from ① instead.
+The **Force field** setting of ④ already says `charmm36-jul2022`, followed
+by *(not on this machine)*. That is fine. The GROMACS on the computer does
+not have CHARMM36 of its own; the force field arrives through the wire from
+① instead.
 
 When all four are in, you can draw a box around them
 ([how](../basics.md#draw-a-box-around-blocks)) and call it
@@ -62,19 +67,20 @@ the tutorial grows.
 ## Run it, and look
 
 Press **Run**. Online, the box takes about a second: the protein and the
-force field come already downloaded with the copy, so ① and ② are marked
-**cached**. On your own computer the downloads take a few seconds the first
-time.
+force field come already downloaded with the online copy, so ① and ② are
+marked **cached** and not run again. On your own computer the downloads
+take a few seconds the first time.
 
 [![The box after the run](../pictures/lysozyme/box-1-results.webp){ .canvas }](../pictures/lysozyme/box-1-results.webp)
 
 Click **Topology (pdb2gmx)** and read its **Log** on the right. Two lines
 matter:
 
-- `Now there are 129 residues with 1960 atoms`: the crystal structure has
-  1001 atoms, and pdb2gmx added 959 hydrogens.
+- `Now there are 129 residues with 1960 atoms`: a *residue* is one amino
+  acid of the chain. The crystal structure has 1001 atoms, and pdb2gmx added
+  959 hydrogens.
 - `Total charge 8.000 e`: the protein carries eight more positive charges
-  than negative ones. Box 4 deals with that.
+  than negative ones. Box 4 cancels that charge.
 
 ## Look inside the topology
 
@@ -83,9 +89,10 @@ read it here, open **Files** on the right, find the files of **Topology
 (pdb2gmx)**, and press **↓** beside `topol.top`. That saves the file to your
 computer, where any text editor opens it.
 
-Clicking the name instead shows only the end of the file in the **Log**
-tab, because the file is too long to show whole. The end has `[ molecules ]`
-and the line that includes the restraint file, but not the start.
+Clicking the name instead shows only the end of the file, in the **Log**
+tab: the whole file is too long to show there. The end holds the
+`[ molecules ]` list and the line that pulls in the restraint file, but not
+the start of the file.
 
 What to look for, in order from the top:
 
@@ -101,13 +108,13 @@ The published tutorial goes through each section in detail.
 
 ## Under the hood
 
-Each block runs a program, mostly GROMACS. These are the exact commands, the
+Most blocks run a program, usually GROMACS. These are the exact commands, the
 same ones **Export scripts** in the toolbar writes out for a whole graph.
 The **Command** tab on the right shows them for the block you click.
 
 **Clean structure** and **Topology (pdb2gmx)** also run small Python scripts
 that come with Comfy-gmx: one removes the water, the other checks that every
-atom is there before pdb2gmx starts. By hand, the published tutorial removes
-the water with `grep -v HOH 1aki.pdb > 1AKI_clean.pdb`.
+atom is there before pdb2gmx starts. The published tutorial removes the
+water by hand, with the command `grep -v HOH 1aki.pdb > 1AKI_clean.pdb`.
 
 --8<-- "_generated/lysozyme/box-1-commands.md"

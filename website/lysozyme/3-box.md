@@ -12,21 +12,22 @@ Published tutorial:
 - **Define box (editconf)** puts the protein in the middle of a cube, with
   at least 1.2 nm between the protein and every side. A simulation box
   repeats in every direction, like tiles, and the protein in the next tile
-  is a copy of this one. With 1.2 nm on every side, two copies are always at
-  least 2.4 nm apart, twice the distance over which the force field counts
-  how atoms act on each other. So the protein never feels its own copy.
+  is a copy of this one. The force field only counts how two atoms act on
+  each other up to a set distance. With 1.2 nm on every side, two copies are
+  always at least 2.4 nm apart, twice that distance, so the protein never
+  feels its own copy.
 - **Solvate** fills the box with water. It copies a small ready-made box of
   216 water molecules side by side until the big box is full, then removes
-  every molecule that overlaps the protein. That small box was made for a
-  slightly different three-point water model, but any three-point model
+  every water molecule that overlaps the protein. That small box was made
+  for a slightly different three-point water model. Any three-point model
   can start from it, and the minimisation in box 5 settles the difference.
-  Solvate also adds the water to the topology's `[ molecules ]` list, so the
-  topology and the structure keep agreeing.
+  Solvate also adds the water to the topology's `[ molecules ]` list, so
+  that the topology still lists everything the structure holds.
 
-The block's own box shape is a *rhombic dodecahedron*, a shape with twelve
-faces that needs about 30% less water for the same distance. The published
-tutorial uses a cube, which is easier to picture, so the list below changes
-it.
+A fresh block's box shape is a *rhombic dodecahedron*, a shape with twelve
+faces. It needs about 30% less water than a cube for the same 1.2 nm gap
+around the protein. The published tutorial uses a cube, which is easier to
+picture, so the list below changes the shape to a cube.
 
 ## What you will build
 
@@ -34,15 +35,16 @@ it.
 
 ## Build it
 
-Both blocks take wires from the topology block of box *1. Topology
-(pdb2gmx)*: the tables say *in box 1. Topology (pdb2gmx)* beside them.
+Both blocks take wires from **Topology (pdb2gmx)**, block ④ of the previous
+box. In the tables below, a wire that comes from another box says so beside
+the block's name: in box *1. Topology (pdb2gmx)*.
 
 --8<-- "_generated/lysozyme/box-2-build.md"
 
 ## Run it, and look
 
-Press **Run**. Box 1 is marked **cached**, since nothing in it changed, and
-this box takes about a second.
+Press **Run**. The blocks of box 1 are marked **cached** and not run again,
+since nothing in them changed. This box takes about a second.
 
 [![The box after the run](../pictures/lysozyme/box-2-results.webp){ .canvas }](../pictures/lysozyme/box-2-results.webp)
 
@@ -52,7 +54,8 @@ Click each block and read the end of its **Log** on the right:
   widest (`diameter`), so the cube is 5.01 + 2 × 1.2 = 7.41 nm wide
   (`new box vectors`).
 - **Solvate**: `Number of solvent molecules: 12597`. The box now holds
-  39,751 atoms, and almost all of them are water: the protein is 1960.
+  39,751 atoms, and almost all of them are water: only 1960 belong to the
+  protein.
 
 ## Under the hood
 

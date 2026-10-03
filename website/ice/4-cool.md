@@ -7,20 +7,22 @@
 
 ## What it does, and why
 
-- **Run parameters (.mdp)** cools along the heating's schedule backwards:
-  fast from 1000 K to 400 K over the first 100 picoseconds, then slowly to
-  200 K over the next 100.
-- **Preprocess (grompp)** starts from the heating run's last picture, the
-  *final conf* of box 2's **Run MD (mdrun)**. That file holds where every
-  molecule was and how fast it was moving, so the cooling picks up exactly
-  where the heating left off: nothing jumps.
+- **Run parameters (.mdp)** runs the heating schedule backwards: fast from
+  1000 K to 400 K over the first 100 picoseconds, then slowly to 200 K over
+  the next 100 picoseconds.
+- **Preprocess (grompp)** starts from the heating run's last picture, which
+  comes out of the dot called *final conf* on box 2's **Run MD (mdrun)**.
+  That file holds where every molecule was and how fast it was moving, so
+  the cooling picks up exactly where the heating left off: nothing jumps.
 - **Run MD (mdrun)** runs it.
 - **Count the ice** and **Water in the drop**, each with a **Preview plot**,
-  follow it, as in the heating.
+  measure the cooling run, just as they measured the heating.
 - **Preview trajectory** makes the movie. Its *Periodic boundary* is set to
-  **lump**: the drop forms wherever the gas happens to gather, often across
-  an edge of the box, and the usual setting would draw it cut in two. lump
-  moves every picture so the drop sits whole in the middle.
+  **lump**, for this reason: the drop forms wherever the gas happens to
+  gather, often across an edge of the box, and because the box repeats in
+  every direction, the usual setting would draw the drop cut in two, half at
+  each side. Set to **lump**, the block moves every picture so that the drop
+  sits whole in the middle.
 
 ## What you will build
 
@@ -42,7 +44,8 @@ Press **Run**. Only this box runs: the heating is reused.
 
     **The gas turns back into one body of water.** As the molecules slow
     down, the ones that meet stick together again, and by about 400 K nearly
-    all of them are back. It comes back at a lower temperature than it left.
+    all of them are back. The water gathers again at a lower temperature
+    than the one at which it boiled away.
 
 === "Count the ice"
 

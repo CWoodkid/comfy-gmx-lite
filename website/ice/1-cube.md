@@ -14,24 +14,25 @@ they make a honeycomb of six-sided rings.
 
 - **Ice crystal** puts 768 water molecules where ordinary ice puts them, and
   chooses which way each one points its hydrogens. The computer's rules for
-  how the molecules push and pull on each other are a *water model*. This one
-  is called TIP4P/Ice: it draws each molecule as four points (an oxygen, two
-  hydrogens, and an invisible point that carries the negative charge), and
-  its numbers were chosen so that its ice melts at 272 K, close to real ice
-  at 273 K.
+  how the molecules push and pull on each other are a *water model*. The
+  water model used here is called TIP4P/Ice: it draws each molecule as four
+  points (an oxygen, two hydrogens, and an invisible point that carries the
+  negative charge), and its numbers were chosen so that its ice melts at
+  272 K, close to real ice at 273 K.
 - **Define box (editconf)** puts the cube in the middle of a box 5.5 nm
-  wide, full of nothing. A simulation box repeats in every direction, like
-  tiles, so the box has to be big enough that the cube never feels the copy
-  of itself next door.
+  (nanometres) wide, full of nothing. A simulation box repeats in every
+  direction, like tiles, so the box has to be big enough that the cube never
+  feels the copy of itself next door.
 - **Preview structure** shows the cube, so you can look at it before
   anything else happens.
-- The second row lets the cube settle. A crystal built from a recipe is never
-  quite right: a hydrogen a little too close to a neighbour here, a molecule
-  a little twisted there. A *minimisation* walks every molecule downhill in
-  energy until nothing is pushing hard any more. **Run parameters (.mdp)**
-  holds its settings, **Preprocess (grompp)** puts the cube, the list of what
-  is in it (the *topology*) and the settings together into one run file, and
-  **Run MD (mdrun)** does the work.
+- The other three blocks let the cube settle. A crystal built from a recipe
+  is never quite right: a hydrogen a little too close to a neighbour here, a
+  molecule a little twisted there. A *minimisation* walks every molecule
+  downhill in energy until nothing is pushing hard any more. **Run
+  parameters (.mdp)** holds the minimisation's settings. **Preprocess
+  (grompp)** puts three things together into one run file: the cube, the
+  list of what is in it (the *topology*), and the settings. **Run MD
+  (mdrun)** does the work.
 
 ## What you will build
 
@@ -48,10 +49,10 @@ says where to find it, which settings to change, and which wires go into it.
 
 --8<-- "_generated/ice_melting/box-1-build.md"
 
-When all six are in, you can draw the box around them
-([how](../basics.md#draw-a-box-around-blocks)) and call it
-*1. An ice cube in empty space*. It is optional, but box 2 is easier to wire
-with box 1 tidily in one place.
+When all six are in, you can draw the box around them (see
+[Draw a box around blocks](../basics.md#draw-a-box-around-blocks)) and call
+it *1. An ice cube in empty space*. The box is optional, but box 2 is easier
+to wire with box 1 tidily in one place.
 
 ## Run it, and look
 
@@ -61,9 +62,10 @@ like: it says if a wire is missing.
 [![The box after the run](../pictures/ice_melting/box-1-results.webp){ .canvas }](../pictures/ice_melting/box-1-results.webp)
 
 **Define box (editconf)** now shows an orange note: the box shape was set to
-*triclinic*, because an explicit size was typed in. That is fine here. A
-triclinic box with three equal edges at right angles is the same 5.5 nm
-cube, as the line under **Preview structure** says.
+*triclinic*, because a size was typed into **Explicit box (nm)**. That is
+fine here. *Triclinic* only means a box whose edges may have any lengths and
+meet at any angles. One with three equal edges at right angles is the same
+5.5 nm cube, as the line under **Preview structure** says.
 
 **Preview structure** now shows the cube: oxygens red, hydrogens white.
 Drag the picture to turn it. Seen from one direction, straight down the
@@ -78,8 +80,8 @@ how strong the biggest push left over is.
 
 ## Under the hood
 
-Each block runs a program, mostly GROMACS. These are the exact commands, the
+Most blocks run a program, usually GROMACS. These are the exact commands, the
 same ones **Export scripts** in the toolbar writes out for a whole graph.
-The **Command** tab on the right shows them for the block you click.
+The **Command** tab on the right shows the command of the block you click.
 
 --8<-- "_generated/ice_melting/box-1-commands.md"

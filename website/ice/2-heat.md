@@ -7,22 +7,23 @@
 
 ## What it does, and why
 
-The first three blocks are the run itself, the same three as for the
-minimisation in box 1, with other settings.
+The first three blocks are the heating run itself. They are the same three
+kinds of block as the minimisation in box 1, with other settings.
 
 - **Run parameters (.mdp)** says what the run does. Every molecule is given
   a speed that matches 200 K, picked at random the way speeds are spread at
   that temperature. A *thermostat* then keeps the temperature at a target,
   by speeding the molecules up or slowing them down a little at every step.
   The target climbs as the run goes: slowly to 400 K over the first 100
-  picoseconds, then fast to 1000 K over the next 100. GROMACS calls a target
-  that moves *annealing*. The run is 100,000 steps of 2 femtoseconds each,
-  200 picoseconds in all; a femtosecond is a millionth of a billionth of a
-  second.
+  picoseconds (ps), then fast to 1000 K over the next 100 picoseconds.
+  GROMACS calls a target that moves *annealing*. The run is 100,000 steps of
+  2 femtoseconds each, 200 picoseconds in all. A femtosecond is a millionth
+  of a billionth of a second, and a picosecond is a thousand femtoseconds.
 - **Preprocess (grompp)** puts the settled cube from box 1, its topology and
   these settings together into the run file.
-- **Run MD (mdrun)** runs it, and writes a *trajectory*: a picture of every
-  molecule every half picosecond, some 400 in all.
+- **Run MD (mdrun)** runs it, and writes a *trajectory*: a series of
+  pictures of the run, one every half picosecond, some 400 in all. Each
+  picture records where every molecule is at that moment.
 
 The other eleven blocks turn the trajectory into something you can see:
 
@@ -35,21 +36,23 @@ The other eleven blocks turn the trajectory into something you can see:
 | ⑫ ⑬ water in the drop | the share of the water still in the liquid drop |
 | ⑭ movie | every second picture of the run, played inside the block |
 
-Each pair is a block that measures and a **Preview plot** that draws its
-answer inside the canvas, so you need not go looking for a file.
+Each pair in the table is one block that measures and one **Preview plot**
+that draws the answer on the canvas, so you need not go looking for a file.
 
 ## What you will build
 
 [![The finished box: fourteen blocks, each with its number](../pictures/ice_melting/box-2.webp){ .canvas }](../pictures/ice_melting/box-2.webp)
 
 This box is tall. Click the picture to see it full size. The yellow note in
-the middle of it is optional: it holds the same explanation as this page.
+the middle of the box is optional: it holds the same explanation as this
+page.
 
 ## Build it
 
 Several wires come from box 1: the settled cube from its ⑥ **Run MD
-(mdrun)**, and the topology and the groups of molecules from its ① **Ice
-crystal**. The tables below say *in box 1* beside them.
+(mdrun)**, and the topology and the list of molecule groups (the dot called
+*index*) from its ① **Ice crystal**. In the wire tables below, those two
+blocks are marked in box *1. An ice cube in empty space*.
 
 --8<-- "_generated/ice_melting/box-2-build.md"
 
@@ -78,18 +81,19 @@ How each graph shows it:
 
     [![Temperature](../pictures/ice_melting/temp_plot.webp){ .canvas }](../pictures/ice_melting/temp_plot.webp)
 
-    It follows the thermostat's target: a gentle slope, then a steep one.
-    Use it to read off how hot it was at any moment in the other graphs.
+    The line follows the thermostat's target: a gentle slope, then a steep
+    one. Use it to read off how hot the water was at any moment shown in
+    the other graphs.
 
 === "Count the ice"
 
     [![Molecules counted as ice](../pictures/ice_melting/count_plot.webp){ .canvas }](../pictures/ice_melting/count_plot.webp)
 
-    It starts well below 768, because a molecule on the surface has too few
-    neighbours to pass the test for ice, and it drops within the first
-    picosecond, as the shivering makes some molecules fail the strict test
-    though the crystal is still there. Its fall to zero, between 60 and
-    70 ps, is the melting.
+    The count starts well below 768: a molecule on the surface of the cube
+    has too few neighbours around it to be counted as ice. It then drops
+    within the first picosecond, when the molecules start to shiver and
+    some of them fail the strict test even though the crystal is still
+    there. Its fall to zero, between 60 and 70 ps, is the melting.
 
 === "Size"
 
@@ -107,16 +111,18 @@ How each graph shows it:
 
     [![Potential energy](../pictures/ice_melting/energy_plot.webp){ .canvas }](../pictures/ice_melting/energy_plot.webp)
 
-    It climbs the whole way, and fastest while the drop boils: warming only
-    makes the molecules shake harder, but boiling pulls them apart
-    altogether. That is why a pan of boiling water stays at 100 °C until it
-    is dry.
+    The energy climbs the whole way, and fastest while the drop boils:
+    warming only makes the molecules shake harder, but boiling pulls them
+    apart altogether. That is why a pan of boiling water stays at 100 °C
+    until it is dry: the heat goes into pulling molecules apart, not into
+    making the water hotter.
 
 === "Water in the drop"
 
     [![Share of the water in the drop](../pictures/ice_melting/drop_plot.webp){ .canvas }](../pictures/ice_melting/drop_plot.webp)
 
-    Near all of it until the drop starts to boil, then down to nothing.
+    Nearly all the water is in the drop until the drop starts to boil. Then
+    the share falls to nothing.
 
 === "Movie"
 
@@ -126,8 +132,9 @@ How each graph shows it:
     picture to turn it: a cube, then a ball, then a cloud.
 
 !!! question "Why does it melt and boil so late?"
-    This water's ice melts at 272 K, and real water boils at 373 K. Here the
-    crystal is gone only at 320 to 340 K, and the drop boils above 400 K.
+    The water model's ice melts at 272 K, and real water boils at 373 K.
+    Here the crystal is gone only at 320 to 340 K, and the drop boils above
+    400 K.
     The heat arrives far faster than in any kitchen, 2 degrees every
     picosecond and later 6, and a crystal needs time to come apart. So the
     ice is briefly warmer than its melting point, and the drop warmer than

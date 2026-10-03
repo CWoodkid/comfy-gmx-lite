@@ -7,21 +7,23 @@
 
 ## What it does, and why
 
-Salt in water falls apart into ions, and each ion holds on to the water
-molecules around it. A molecule held by an ion is less free to fly off, so
-salty water has to be hotter before it boils. The ions also get in the way of
-the molecules locking into the pattern of ice, so salty water has to be
-colder before it freezes. That is why roads are salted in winter.
+Salt in water falls apart into *ions*, atoms that carry an electric charge,
+and each ion holds on to the water molecules around it. A molecule held by
+an ion is less free to fly off, so salty water has to be hotter before it
+boils. The ions also get in the way of the molecules locking into the
+pattern of ice, so salty water has to be colder before it freezes. That is
+why roads are salted in winter.
 
-This box asks whether the simulation shows it.
+This box asks whether the simulation shows both of those effects.
 
 - **Ice crystal** builds the same cube, with 26 water molecules swapped for
   sodium ions (Na⁺) and 26 for chloride ions (Cl⁻). That is 2 moles of salt
   per kilogram of water, over three times as salty as the sea.
-- The next five blocks settle it and heat it, exactly as boxes 1 and 2 do,
-  with copies of the same two **Run parameters (.mdp)**. A fair comparison
-  needs the same treatment: if you change the heating in box 2, change it
-  here too.
+- The next seven blocks put it in a box of empty space, settle it and heat
+  it, exactly as boxes 1 and 2 do, with copies of the same two **Run
+  parameters (.mdp)** blocks. A fair
+  comparison needs the same treatment for both cubes: if you change the
+  heating in box 2, change it here too.
 - **Count the ice** and **Water in the drop** measure the salty run, and two
   **Compare graphs** blocks draw each next to its pure-water partner from
   box 2.
@@ -35,17 +37,19 @@ This box asks whether the simulation shows it.
 
 The first eight blocks are copies of blocks you already have: ① and ② are
 like ① and ② of box 1, ③ to ⑤ like ④ to ⑥ of box 1, and ⑥ to ⑧ like ① to ③
-of box 2. The quickest way to them is to copy those eight:
+of box 2. The quickest way to get them is to copy those eight blocks:
 
-1. Click the first of them, then hold ++shift++ and click each of the others.
+1. Click the first of the eight, then hold ++shift++ and click each of the
+   other seven.
 2. Press ++ctrl+d++ (on a Mac, ++cmd+d++). Copies appear a little below and to
    the right, already selected, with the same settings and with the wires
    that ran between the eight.
 3. Drag any one of the copies by its title bar: all of them move together.
    Put them in an empty spot.
 
-Then change what the list below changes, and draw the wires it lists that
-are still missing. Building the eight one by one works just as well.
+Then go through the list below: change the settings it names, and draw any
+wire it lists that the copies do not have yet. Building the eight one by one
+works just as well.
 
 --8<-- "_generated/ice_melting/box-3-build.md"
 
@@ -81,11 +85,12 @@ reused.
 !!! warning "The right direction, not the right size"
     In a kitchen, this much salt raises the boiling point by about 2 degrees
     and lowers the freezing point by about 7. Here both shifts are tens of
-    degrees. The heating is very fast, which stretches every difference; the
-    tiny drop gets saltier as it boils, until the last water molecules are all
-    held by ions; and real ice pushes salt out as it freezes, so a crystal
-    with ions all through it is weaker than any nature makes. The simulation
-    shows which way salt pushes, and why, but not by how much.
+    degrees, for three reasons. The heating is very fast, which stretches
+    every difference. The tiny drop gets saltier as it boils, until the last
+    water molecules are all held by ions. And real ice pushes salt out as it
+    freezes, so a crystal with ions all through it is weaker than any that
+    nature makes. The simulation shows which way salt pushes, and why, but
+    not by how much.
 
 ## Under the hood
 

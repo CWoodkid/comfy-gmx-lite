@@ -15,25 +15,28 @@ things must settle, the temperature and then the pressure. This box does the
 temperature. *NVT* is short for what stays fixed: the Number of atoms, the
 Volume of the box and the Temperature.
 
-- At the start every atom gets a random speed, drawn the way speeds are
-  spread at 298 K. A *thermostat* then keeps the temperature at 298 K, by
-  speeding the atoms up or slowing them down a little at every step.
-- The heavy atoms of the protein are held in place by *position restraints*:
-  springs that pull each atom back to where it was after the minimisation.
-  The water was placed around a protein that did not move, so it needs time
-  to arrange itself. Without the springs, the first rough moments could push
-  the protein out of shape. This is the list of atoms box 1 wrote; the
-  setting `define = -DPOSRES` in the preset switches it on.
+- At the start every atom gets a random speed, chosen so that all the
+  speeds together match a temperature of 298 K. A *thermostat*, the part of
+  the run that keeps the temperature at its target, then holds it at 298 K
+  by speeding the atoms up or slowing them down a little at every step.
+- The protein's heavy atoms, every atom but the hydrogens, are held in
+  place by *position restraints*: springs that pull each atom back to where
+  it was after the minimisation. The water was placed around a protein that
+  did not move, so it needs time to arrange itself. Without the springs, the
+  first rough moments could push the protein out of shape. Which atoms get
+  a spring is the list that box 1 wrote; the line `define = -DPOSRES` in
+  the preset's settings file switches the springs on.
 
 The blocks:
 
 - **Run parameters (.mdp)** starts from the preset `lysozyme_nvt`, the
   published `nvt.mdp`, and changes three values. The run is 2,500 steps of
-  2 femtoseconds, 5 ps in all, where the published run is 100 ps. The
-  thermostat corrects within 0.1 ps instead of 1 ps: with the published
-  value, the temperature was still at 278 K after 5 ps, short of the target.
-  And the energies are saved every 50 steps instead of every 2,500, so that
-  the short run still gives a curve.
+  2 femtoseconds (a femtosecond is a thousandth of a picosecond), 5 ps in
+  all, where the published run is 100 ps. The thermostat is given 0.1 ps
+  instead of 1 ps to pull the temperature back: with the published value,
+  the temperature was still at 278 K after 5 ps, short of the target. And
+  the energies are saved every 50 steps instead of every 2,500, so that
+  even this short run gives enough points for a curve.
 - **Preprocess (grompp)** takes the minimised structure twice: once as the
   starting positions, and once, on its **restraint (-r)** dot, as the
   positions the springs pull towards.
@@ -65,12 +68,13 @@ our run. Then it climbs back. From about 1.3 ps on it stays within 5 K of
     Temperature measures how fast the atoms move. After the minimisation,
     every atom sits where the pulls on it balance. The speeds handed out at
     the start carry the atoms away from those places, and the pulls slow
-    them down again: part of the energy given out as speed goes into
+    them down again. Part of the energy handed out as speed goes into
     stretching and squeezing the system instead. So the temperature drops,
     and the thermostat has to put the missing energy back in.
 
 ## Under the hood
 
-The run's whole settings file is under ①.
+The run's whole settings file, `nvt.mdp`, is folded away under ① below:
+click its name to open it.
 
 --8<-- "_generated/lysozyme/box-5-commands.md"
