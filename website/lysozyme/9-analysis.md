@@ -96,7 +96,7 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     [![The radius of gyration](../pictures/lysozyme/plot_rg.webp){ .canvas }](../pictures/lysozyme/plot_rg.webp)
 
-    The top line, `Rg`, is the one to read: flat near 1.42 nm (from 1.40 to
+    The top line, `Rg`, is the one to read: flat near 1.42 nm (from 1.41 to
     1.43 in our run). The published tutorial finds 1.41 nm over its 10 ns.
     The protein stays folded. The three lower lines are the same measure
     taken around each of the three axes, one at a time. Their names are
@@ -121,16 +121,16 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     | shape | share of the amino acids |
     | --- | --- |
-    | α-helix (H) | 30.0% |
-    | 3₁₀-helix (G) | 5.3% |
-    | polyproline helix (P) | 0.4% |
-    | strand (E) and bridge (B) | 6.8% and 4.1% |
-    | turn (T) and bend (S) | 24.8% and 12.5% |
-    | none | 16.1% |
+    | α-helix (H) | 29.5% |
+    | 3₁₀-helix (G) | 7.3% |
+    | polyproline helix (P) | 0.3% |
+    | strand (E) and bridge (B) | 6.1% and 4.3% |
+    | turn (T) and bend (S) | 23.5% and 12.6% |
+    | none | 16.3% |
 
-    In our run the four big helices sit at amino acids 5–14, 25–34, 89–99
-    and 109–114, and all four hold in every one of the 101 pictures. Two
-    short ones, at 80–83 and 121–124, come and go. The small sheet is three
+    In our run the four big helices sit at amino acids 5–14, 25–35, 89–99
+    and 109–114, and all four hold in every one of the 101 pictures. Three
+    short ones, at 80–84, 104–107 and 121–124, come and go. The small sheet is three
     short strands, at 43–45, 51–53 and 58–59.
 
 === "Shapes per picture"
@@ -147,7 +147,7 @@ Press **Run**. The analysis takes about 20 seconds online.
 
     [![Hydrogen bonds inside the protein](../pictures/lysozyme/plot_hb.webp){ .canvas }](../pictures/lysozyme/plot_hb.webp)
 
-    The protein has between 90 and 114 hydrogen bonds at any moment, 100 on
+    The protein has between 88 and 111 hydrogen bonds at any moment, 98 on
     average in our run. The published tutorial counts them in two parts
     instead: about 55 between backbone atoms, and about 20 between side
     chains, the parts of the amino acids that stick out from the backbone.

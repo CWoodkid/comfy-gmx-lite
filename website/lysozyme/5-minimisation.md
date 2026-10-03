@@ -62,10 +62,10 @@ minimisation worked:
 | line in the log | in our run | what it should be |
 | --- | --- | --- |
 | `Potential Energy` | −6.24 × 10⁵ kJ/mol | negative, and large: for a protein in water, between about 10⁵ and 10⁶ |
-| `Maximum force` | 826 kJ/mol/nm | below 1000, the stopping value |
+| `Maximum force` | 880 kJ/mol/nm | below 1000, the stopping value |
 
-The log also says `Steepest Descents converged to Fmax < 1000 in 490
-steps`: it reached its goal in 490 steps. Your count will differ a little:
+The log also says `Steepest Descents converged to Fmax < 1000 in 500
+steps`: it reached its goal in 500 steps. Your count will differ a little:
 the published tutorial needed 566. If the maximum force does not get below
 1000, something in the structure is badly wrong, and no amount of warming
 up later will rescue it.

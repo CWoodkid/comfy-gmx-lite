@@ -60,9 +60,9 @@ Press **Run**. The run takes almost 2 minutes online.
 
 [![The temperature over the 5 ps](../pictures/lysozyme/plot_temp.webp){ .canvas }](../pictures/lysozyme/plot_temp.webp)
 
-The temperature starts at 299 K and falls at once, to 207 K after 0.1 ps in
-our run. Then it climbs back. From about 1.3 ps on it stays within 5 K of
-298 K: over the second half of the run it averaged 298.4 K.
+The temperature starts at 300 K and falls at once, to 210 K after 0.1 ps in
+our run. Then it climbs back. From 0.9 ps on it stays within 5 K of
+298 K: over the second half of the run it averaged 298.5 K.
 
 !!! question "Why does the temperature fall first?"
     Temperature measures how fast the atoms move. After the minimisation,
