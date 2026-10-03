@@ -2213,10 +2213,13 @@ def check_website() -> None:
     pages = [p for p in sorted((ROOT / "website").rglob("*.md"))
              if "_generated" not in p.parts and p.name != "README.md"]
     # A picture is named twice on a page, shown and as what a click opens.
+    # One fetched from the web, such as the Binder button, is not in the folder.
     missing = {}
     for page in pages:
         text = page.read_text()
         for target in re.findall(r"\]\(([^)\s]+\.(?:webp|png|jpg|svg))\)", text):
+            if target.startswith(("http://", "https://")):
+                continue
             if not (page.parent / target).is_file():
                 missing[f"{page.relative_to(ROOT)}: {target}"] = True
         for target in re.findall(r'--8<-- "([^"]+)"', text):

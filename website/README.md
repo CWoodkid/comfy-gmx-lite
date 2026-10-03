@@ -14,8 +14,9 @@ not one of the pages.
 | `ice/`, `lysozyme/` | one page for each tutorial, and one for each of its boxes |
 | `pictures/` | the pictures, one folder for each tutorial and one for `basics.md` |
 | `_generated/` | the lists of blocks, settings, wires and commands; written by a script, never by hand |
-| `stylesheets/extra.css` | the coloured dots in the wire tables, and the frames around pictures |
-| `../mkdocs.yml` | the menu, the look, and the settings of MkDocs |
+| `stylesheets/extra.css` | the coloured dots in the wire tables, the frames around pictures, and the size of the two buttons |
+| `../mkdocs.yml` | the menu, the look, and the settings of MkDocs; its `copyright` line is the footer, with the "Made with ♥" button that leads to the author's LinkedIn page |
+| `../overrides/main.html` | the bar along the top of every page, with the Binder button that opens Comfy-gmx lite on mybinder.org |
 
 ## The words, and the facts
 
@@ -47,7 +48,9 @@ three kinds:
 - **`results`**: it presses **Run**, waits for the whole tutorial, and takes
   each box again with its results (`box-1-results.webp`, ...), and every
   graph and movie block on its own. Take these on mybinder.org, where the
-  run costs your own computer nothing.
+  run costs your own computer nothing, or, for a change not yet pushed, in
+  the Docker copy (`binder/build-image.sh`, then `binder/try-image.sh`):
+  the same image, on one processor.
 - **`screen`**: the whole editor with its four parts numbered, for
   `basics.md`. Take it online too: the **Command** tab in it shows the run
   folder, which on your own computer is a path that names you.
@@ -70,8 +73,8 @@ then open <http://127.0.0.1:8000>. The pages change as you save them.
 ## Publishing
 
 `.github/workflows/website.yml` builds the pages and publishes them after
-every push to `main` that changes `website/` or `mkdocs.yml`. It builds with
-`--strict`, so a broken link or a missing picture stops it rather than
-publishing a broken page. GitHub Pages has to be switched on once, in the
-repository's **Settings**, **Pages**, with **Source** set to **GitHub
-Actions**.
+every push to `main` that changes `website/`, `overrides/` or `mkdocs.yml`.
+It builds with `--strict`, so a broken link or a missing picture stops it
+rather than publishing a broken page. GitHub Pages is switched on for the
+repository (since 2026-10-03), with **Settings**, **Pages**, **Source** set
+to **GitHub Actions**.

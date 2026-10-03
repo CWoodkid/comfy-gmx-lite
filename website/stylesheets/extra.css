@@ -24,3 +24,15 @@
 .md-typeset h3 {
   margin-top: 1.4em;
 }
+
+/* The Binder button in the bar along the top, and the "Made with" badge in
+   the footer: small pictures that sit on the line of text beside them. */
+.binder-button img,
+.love-button img {
+  height: 20px;
+  vertical-align: middle;
+}
+.binder-button {
+  margin-left: 0.4em;
+  white-space: nowrap;
+}

@@ -8,6 +8,8 @@ with salt in the ice, and cool both back down.
 
 [![The whole tutorial on the canvas: five boxes](../pictures/ice_melting/whole.webp){ .canvas }](../pictures/ice_melting/whole.webp)
 
+To build along, open Comfy-gmx lite in another tab: [![Open in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/){ .binder-button }
+
 ## The boxes
 
 | box | what it does | blocks |

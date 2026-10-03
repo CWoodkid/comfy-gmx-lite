@@ -33,13 +33,14 @@ the end, and the GROMACS commands behind every block.
 
 ## Open Comfy-gmx lite
 
-**Online**, with nothing to install:
-[open it on mybinder.org](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/).
-The first start takes a minute or two, longer just after the program has
-changed. Each person gets a copy of their own. It closes after 10 minutes
-without activity, and nothing in it is kept. To keep a graph you built,
-press **Export JSON**: it saves the graph as a file on your own computer.
-**Import JSON** brings it back into a new copy later.
+**Online**, with nothing to install: [![Open in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/){ .binder-button }
+
+The button opens it on mybinder.org; the same button is in the bar at the top
+of every page. The first start takes a minute or two, longer just after the
+program has changed. Each person gets a copy of their own. It closes after
+10 minutes without activity, and nothing in it is kept. To keep a graph you
+built, press **Export JSON**: it saves the graph as a file on your own
+computer. **Import JSON** brings it back into a new copy later.
 
 **On your own computer**: the
 [README](https://github.com/CWoodkid/comfy-gmx-lite#running-on-a-local-computer)

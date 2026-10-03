@@ -14,6 +14,8 @@ every run is cut short, so the whole tutorial takes minutes instead of days.
 
 [![The whole tutorial on the canvas: eight boxes](../pictures/lysozyme/whole.webp){ .canvas }](../pictures/lysozyme/whole.webp)
 
+To build along, open Comfy-gmx lite in another tab: [![Open in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/){ .binder-button }
+
 ## The boxes
 
 The boxes are numbered after the steps of the published tutorial, so that

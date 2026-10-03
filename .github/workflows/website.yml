@@ -18,6 +18,7 @@ on:
     branches: [main]
     paths:
       - "website/**"
+      - "overrides/**"
       - "mkdocs.yml"
       - ".github/workflows/website.yml"
   workflow_dispatch:

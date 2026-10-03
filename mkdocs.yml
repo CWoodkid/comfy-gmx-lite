@@ -23,7 +23,12 @@ site_description: >-
 repo_url: https://github.com/CWoodkid/comfy-gmx-lite
 repo_name: CWoodkid/comfy-gmx-lite
 edit_uri: ""
-copyright: Comfy-gmx lite · MIT licence
+# The footer of every page; the badge leads to the author's LinkedIn page.
+copyright: >-
+  Comfy-gmx lite · MIT licence ·
+  <a class="love-button" href="https://www.linkedin.com/in/mehmet-can-karakurt-39756668/"
+  title="Mehmet Can Karakurt on LinkedIn"><img
+  src="https://img.shields.io/badge/Made%20with-%E2%99%A5-ff69b4" alt="Made with love"></a>
 
 docs_dir: website
 # The generated parts are pulled into pages, not pages of their own, and
@@ -34,6 +39,8 @@ exclude_docs: |
 
 theme:
   name: material
+  # overrides/main.html adds the bar with the Binder button to every page.
+  custom_dir: overrides
   language: en
   # The computer's own fonts, so that opening a page asks nothing of Google.
   font: false
@@ -56,6 +63,7 @@ theme:
         icon: material/weather-sunny
         name: Light pages
   features:
+    - announce.dismiss
     - navigation.footer
     - navigation.indexes
     - navigation.sections

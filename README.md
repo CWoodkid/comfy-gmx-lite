@@ -8,6 +8,8 @@ measuring the result. Each block also shows the command it runs, the files it
 writes and the numbers it produces. GROMACS does the computing underneath.
 
 [![Open in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/)
+[![Tutorials website](https://img.shields.io/badge/Tutorials-website-4f9dd8?logo=materialformkdocs&logoColor=white)](https://cwoodkid.github.io/comfy-gmx-lite/)
+[![Made with love](https://img.shields.io/badge/Made%20with-%E2%99%A5-ff69b4)](https://www.linkedin.com/in/mehmet-can-karakurt-39756668/)
 
 ## Purpose
 

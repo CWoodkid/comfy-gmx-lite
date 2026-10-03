@@ -1,0 +1,13 @@
+{#- Additions to the Material look for the tutorial website (mkdocs.yml,
+    custom_dir). The bar along the top of every page opens Comfy-gmx lite
+    on mybinder.org, so a reader can start building from any page. The x on
+    its right puts it away; the browser remembers that. -#}
+{% extends "base.html" %}
+
+{% block announce %}
+  Build along in your browser, with nothing to install:
+  <a class="binder-button" href="https://mybinder.org/v2/gh/CWoodkid/comfy-gmx-lite/main?urlpath=comfygmx/"
+     title="Open Comfy-gmx lite on mybinder.org">
+    <img src="https://mybinder.org/badge_logo.svg" alt="Open in Binder">
+  </a>
+{% endblock %}
