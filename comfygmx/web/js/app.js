@@ -2218,6 +2218,13 @@ const App = {
         TrajectoryFacts.show(path);
         return;
       }
+      // A picture is not text either, and its bytes in the Log tell nobody
+      // anything. A block that makes one shows it; the arrow keeps it.
+      if (/\.(png|jpe?g|gif|webp)$/i.test(lower)) {
+        UI.toast(`${path.split('/').pop()} is a picture — download it with the ↓ `
+                 + 'beside it to look at it', 'info', 6000);
+        return;
+      }
       if (/\.(tpr|edr|cpt|npz|gsd|dcd|h5|bin)$/i.test(lower)) {
         UI.toast(`${path.split('/').pop()} is a binary file — download it or `
                  + 'point a node at it', 'info', 6000);

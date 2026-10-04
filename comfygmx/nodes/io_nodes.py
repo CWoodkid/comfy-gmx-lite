@@ -476,6 +476,11 @@ FILE_GUIDE: Dict[str, Dict[str, str]] = {
         "what": "How big each kind of atom counts as for this measurement. Left "
                 "out, GROMACS uses its own list.",
     },
+    "picture": {
+        "name": "Picture", "endings": ".png",
+        "what": "A picture, ready to look at or to keep. Any browser or picture "
+                "viewer opens it.",
+    },
     "file": {
         "name": "A file", "endings": "any",
         "what": "Any file at all. What is inside depends on the block that "

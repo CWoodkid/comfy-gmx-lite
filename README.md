@@ -21,17 +21,18 @@ does and why, instead of treating it as a black box.
 
 It is the teaching edition of Comfy-gmx, a larger research tool. It keeps
 what its two tutorials need, plus a few everyday GROMACS tools, so a
-first-time user sees 27 blocks rather than hundreds.
+first-time user sees 28 blocks rather than hundreds.
 
 ## Capabilities
 
-- Simulations are graphs of blocks joined by wires. The 27 blocks cover
+- Simulations are graphs of blocks joined by wires. The 28 blocks cover
   loading and downloading files, preparing a structure, building a system
   (box, water, ions, added molecules, an ice crystal), preparing and running
   GROMACS, processing trajectories, analysis (energies, RMSD, radius of
   gyration, secondary structure, hydrogen bonds, density, ice counting, the
   water left in a drop) and previews, including one that sets two or three
-  graphs side by side.
+  graphs side by side. One more block grows a snowflake in a simple model of
+  water vapour freezing, not of molecules, and shows it as a picture.
 - Every block and every setting carries a plain-language explanation. Each
   tutorial also explains its steps in notes on the canvas.
 - The first time the page opens in a browser tab, a two-minute tour shows how
@@ -170,7 +171,7 @@ On Windows, use WSL (Linux inside Windows), or Docker with the files in
 
 ## What is included
 
-The editor has 27 blocks, two tutorials and seven chunks. Compared with the
+The editor has 28 blocks, two tutorials and seven chunks. Compared with the
 full Comfy-gmx, this edition leaves out coarse-grained (Martini) simulations,
 membrane builders, ligands, and installers for programs other than GROMACS.
 

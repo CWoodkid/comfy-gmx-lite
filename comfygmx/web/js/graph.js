@@ -33,6 +33,7 @@ const PORT_COLORS = {
   index:     '#4fb8c8',
   xvg:       '#c88fd0',
   posre:     '#c0a060',
+  picture:   '#9cc7ec',
   file:      '#8d97a5',
   text:      '#7a8a99',
   any:       '#8d97a5',

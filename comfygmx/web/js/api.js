@@ -127,6 +127,18 @@ const API = (() => {
     trajFacts:   (path, scan) => get(`api/traj?path=${encodeURIComponent(path)}`
       + (scan ? '&scan=1' : '')),
     xvg:         (path) => get(`api/viz/xvg?path=${encodeURIComponent(path)}`),
+    /* A picture file, loaded by the browser itself: it reads PNG and the
+       like without any help. The time on the end makes it fetch the file
+       again after a new run, rather than show the picture it remembers. */
+    image:       (path) => new Promise((resolve) => {
+      const name = String(path).split('/').pop();
+      const picture = new Image();
+      picture.onload = () => resolve({ name, image: picture,
+                                       width: picture.naturalWidth,
+                                       height: picture.naturalHeight });
+      picture.onerror = () => resolve({ name, error: 'this is not a picture the browser can read' });
+      picture.src = `${API.downloadUrl(path)}&t=${Date.now()}`;
+    }),
     mdlog:       (path) => get(`api/viz/log?path=${encodeURIComponent(path)}`),
     versions: (tool) => get(`api/environment/versions?tool=${encodeURIComponent(tool)}`),
     cancelJob: (job) => post(`api/jobs/${encodeURIComponent(job)}/cancel`, {}),

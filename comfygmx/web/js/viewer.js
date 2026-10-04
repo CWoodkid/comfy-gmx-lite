@@ -550,13 +550,26 @@ const NodePreview = {
   MIN_SIZE: [236, 110],
   MAX_SIZE: [900, 700],
 
-  /* What this node draws. Four kinds now: a structure, a structure that
-     moves, a curve, and dssp's residue-by-frame picture. They share the
-     plumbing -- a path, a fetch, a canvas, a caption -- and differ only in
-     which reader is called and what is drawn with the result. */
+  /* What this node draws. Five kinds now: a structure, a structure that
+     moves, a curve, dssp's residue-by-frame picture, and a picture file. They
+     share the plumbing -- a path, a fetch, a canvas, a caption -- and differ
+     only in which reader is called and what is drawn with the result. */
   kindOf(node) {
     const def = Editor.defs[node.type];
     return (def && def.preview && def.preview.kind) || 'structure';
+  },
+
+  /* The kinds drawn flat: nothing to turn, a canvas and a caption. */
+  isFlat(kind) {
+    return kind === 'plot' || kind === 'dssp' || kind === 'image';
+  },
+
+  /* What the preview says before there is anything to draw. Only a node
+     with a file box of its own can be given a file. */
+  waiting(node) {
+    const def = Editor.defs[node.type];
+    const ownFile = def && (def.params || []).some((param) => param.name === 'path');
+    return ownFile ? 'run the node, or set a file' : 'run the node';
   },
 
   /* Build the block that goes into the node body. */
@@ -564,11 +577,12 @@ const NodePreview = {
     // The body is being rebuilt, so whatever was here is going away.
     this.detach(node.id);
     const kind = (def.preview && def.preview.kind) || 'structure';
-    if (kind === 'plot' || kind === 'dssp') return this.buildFlat(node, kind);
+    if (this.isFlat(kind)) return this.buildFlat(node, kind);
     return this.buildSpatial(node, def, kind);
   },
 
-  /* A curve or a dssp map: a canvas, a caption, and nothing to turn. */
+  /* A curve, a dssp map or a picture: a canvas, a caption, and nothing to
+     turn. */
   buildFlat(node, kind) {
     const display = this.display(node);
     const host = UI.el('div', { class: 'node-preview' });
@@ -582,7 +596,8 @@ const NodePreview = {
         class: 'mini', text: '⟳', title: 'Load the file again',
         onclick: (event) => { event.stopPropagation(); this.refresh(node, true); },
       }),
-      UI.el('button', {
+      // A picture has no bigger place to go; the node's corner makes it bigger.
+      kind === 'image' ? null : UI.el('button', {
         class: 'mini', text: '⤢',
         title: kind === 'plot' ? 'Open in the Plot tab' : 'Open in the Plot tab',
         onclick: (event) => { event.stopPropagation(); this.expand(node); },
@@ -621,7 +636,7 @@ const NodePreview = {
       caption.textContent = node.previewError;
     } else {
       const source = this.source(node);
-      caption.textContent = source ? 'loading…' : 'run the node, or set a file';
+      caption.textContent = source ? 'loading…' : this.waiting(node);
       if (source) this.refresh(node);
     }
     requestAnimationFrame(() => this.paint(node));
@@ -653,6 +668,7 @@ const NodePreview = {
     if (!data) return '';
     if (data.error) return data.error;
     if (kind === 'dssp') return dsspSummary(data);
+    if (kind === 'image') return `${data.name}, ${data.width} × ${data.height} pixels`;
     const rows = data.n_rows || 0;
     const shown = data.stride > 1 ? ` (every ${data.stride}th)` : '';
     return `${data.series.length} series, ${rows} rows${shown}`;
@@ -668,7 +684,10 @@ const NodePreview = {
     } else if (entry.kind === 'plot') {
       drawPlot(entry.canvas, node.previewData,
                { compact: true, hover: entry.hover,
-                 empty: node.previewError || 'run the node, or set a file' });
+                 empty: node.previewError || this.waiting(node) });
+    } else if (entry.kind === 'image') {
+      drawPicture(entry.canvas, node.previewData,
+                  { empty: node.previewError || this.waiting(node) });
     }
   },
 
@@ -802,7 +821,7 @@ const NodePreview = {
       caption.textContent = node.previewError;
     } else {
       const source = this.source(node);
-      caption.textContent = source ? 'loading…' : 'run the node, or set a file';
+      caption.textContent = source ? 'loading…' : this.waiting(node);
       if (source) this.refresh(node);
     }
     // Lay out first, draw second: the canvas has no width until it is in the DOM.
@@ -814,9 +833,11 @@ const NodePreview = {
      picture looks like must never invalidate the cache and re-run the graph. */
   display(node) {
     if (!node.display) {
+      // A picture starts square: a snowflake is as tall as it is wide.
       node.display = {
         style: 'auto', color: 'element',
-        width: this.DEFAULT_SIZE[0], height: this.DEFAULT_SIZE[1],
+        width: this.DEFAULT_SIZE[0],
+        height: this.kindOf(node) === 'image' ? this.DEFAULT_SIZE[0] : this.DEFAULT_SIZE[1],
       };
     }
     return node.display;
@@ -863,23 +884,23 @@ const NodePreview = {
       node.previewData = null;
       node.previewError = '';
       if (entry) {
-        entry.caption.textContent = 'run the node, or set a file';
-        if (entry.view) entry.view.clear('run the node, or set a file');
+        entry.caption.textContent = this.waiting(node);
+        if (entry.view) entry.view.clear(this.waiting(node));
         else this.paint(node);
       }
       return;
     }
     if (entry) entry.caption.textContent = 'loading…';
     const kind = this.kindOf(node);
-    const read = { plot: API.xvg, dssp: API.dssp,
-                   trajectory: API.trajectory }[kind] || API.structure;
+    const read = { plot: API.xvg, dssp: API.dssp, trajectory: API.trajectory,
+                   image: API.image }[kind] || API.structure;
     try {
       const data = await read(source);
       if (data.error) throw new Error(data.error);
       node.previewData = data;
       node.previewError = '';
       const current = this.views.get(node.id);
-      if (current && (kind === 'plot' || kind === 'dssp')) {
+      if (current && this.isFlat(kind)) {
         this.captionFlat(current.caption, kind, data);
         current.caption.title = source;
         this.paint(node);
@@ -895,7 +916,14 @@ const NodePreview = {
           current.frameControls.update();
         }
       }
-      if (announce) UI.toast(`${data.name}: ${describe(data)}`, 'ok');
+      // describe() reads atoms; a curve or a picture has none, and asking it
+      // to describe one threw, which wiped the preview the button reloaded.
+      if (announce) {
+        const said = this.isFlat(kind) ? this.describeFlat(kind, data) : describe(data);
+        const name = data.name || source.split('/').pop();
+        // A picture's description starts with its name already.
+        UI.toast(said.startsWith(name) ? said : `${name}: ${said}`, 'ok');
+      }
     } catch (err) {
       // A remembered preview outlives the run directory it points at, and the
       // server's bare "not a file" does not explain which file, or why.
@@ -920,6 +948,10 @@ const NodePreview = {
   expand(node) {
     if (!node.previewData) { this.refresh(node, true); return; }
     const kind = this.kindOf(node);
+    if (kind === 'image') {
+      UI.toast("drag the node's bottom right corner to make the picture bigger", 'info');
+      return;
+    }
     if (kind === 'plot') {
       App.activateTab('plot');
       Plot.show(node.previewData);

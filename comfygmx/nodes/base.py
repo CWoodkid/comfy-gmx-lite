@@ -565,7 +565,7 @@ class Node:
     #: When set, the editor draws the file this node produces inside the node
     #: body, the way an image node shows its image.  ``preview_kind`` says how
     #: to draw it and ``preview_port`` says which output holds the file.
-    preview_kind: str = ""     # "" | "structure" | "plot" | "dssp" | "trajectory"
+    preview_kind: str = ""     # "" | "structure" | "plot" | "dssp" | "trajectory" | "image"
     preview_port: str = ""
 
     def plan(self, ctx: PlanContext) -> Plan:  # pragma: no cover - interface

@@ -382,3 +382,36 @@ function dsspSummary(data) {
     .map((s) => `${s.label} ${(s.mean * 100).toFixed(0)}%`);
   return `${data.n_residues} residues, ${data.n_frames} frames — ${parts.join(', ')}`;
 }
+
+
+/* --------------------------------------------------------------- picture */
+
+/* A picture file inside a node: as large as fits, in the middle, on the same
+   dark ground as the plots. Its shape is kept, so nothing is cut off and
+   nothing is stretched; a snowflake drawn squashed is not a snowflake. */
+function drawPicture(canvas, data, options = {}) {
+  const { empty = 'run the node' } = options;
+  const ratio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (!width || !height) return;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#0d1014';
+  ctx.fillRect(0, 0, width, height);
+  if (!data || !data.image || !data.width || !data.height) {
+    ctx.fillStyle = '#626c7a';
+    ctx.font = '12px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(data && data.error ? data.error : empty, width / 2, height / 2);
+    return;
+  }
+  const scale = Math.min(width / data.width, height / data.height);
+  const w = data.width * scale;
+  const h = data.height * scale;
+  ctx.drawImage(data.image, (width - w) / 2, (height - h) / 2, w, h);
+}

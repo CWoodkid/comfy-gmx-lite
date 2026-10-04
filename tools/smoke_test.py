@@ -863,7 +863,9 @@ def check_viewer_turn() -> None:
     check(len(users) == 2,
           "the renderer is built in %d places, expected 2 -- the Viewer tab and "
           "the previews inside nodes:\n  %s" % (len(users), "\n  ".join(users)))
-    check("if (kind === 'plot' || kind === 'dssp') return this.buildFlat" in viewer,
+    # Graphs and the snowflake's picture are flat; everything else is turned.
+    check("if (this.isFlat(kind)) return this.buildFlat" in viewer
+          and "return kind === 'plot' || kind === 'dssp' || kind === 'image';" in viewer,
           "which previews are flat and which can be turned is decided somewhere "
           "else now -- check every turnable kind still goes through buildSpatial")
     for other in sorted(web.glob("*.js")):
@@ -880,7 +882,7 @@ def check_viewer_turn() -> None:
     # Every node that draws something you can turn, so a new one is noticed.
     spatial = sorted(spec["type"] for spec in REGISTRY.specs()
                      if (spec.get("preview") or {}).get("kind")
-                     not in (None, "plot", "dssp"))
+                     not in (None, "plot", "dssp", "image"))
     # Only the ones registered here: the lite version keeps two of them.
     expected = [name for name in (
         "analysis.conservation", "io.save_structure", "ligand.build", "ligand.martini3",
@@ -4867,6 +4869,169 @@ def check_box_maths() -> None:
           f"worst {worst * 100:.1f}% out")
 
 
+def check_snowflake() -> None:
+    """"Grow a snowflake": the block's command, the settings it refuses, and
+    the model it carries.
+
+    The model has to give what the block's help promises: arms that are the
+    same all round, a star that leaves most of its hexagon open to the air and
+    a plate that closes it off, and a setting too slow to finish that stops by
+    itself. The plate is measured by its outline, not by counting ice: deep
+    inside it, cells drain into their frozen neighbours and never quite
+    freeze, which leaves the plate full of tiny holes. The
+    picture is written by hand, with numpy and zlib only, because the online
+    copy has no drawing library, so the PNG is read back byte by byte."""
+    import struct as _struct
+    import tempfile as _tempfile
+    import zlib as _zlib
+
+    import numpy as np
+
+    before = len(failures)
+    settings = Settings()
+    cls = REGISTRY.get("model.snowflake")
+
+    def plan_for(**params):
+        values = dict(cls.defaults())
+        values.update(params)
+        ctx = PlanContext(
+            node_id="snow", node_type="model.snowflake", params=values, inputs={},
+            workdir=Path("/tmp/comfygmx-smoke"),
+            stage=lambda value, as_name=None: as_name or "in.dat",
+            settings=settings, dry=False,
+        )
+        return cls().plan(ctx)
+
+    plan = plan_for()
+    argv = [str(word) for word in plan.steps[-1].argv]
+    check(argv == ["python", "snowflake.py", "--gather", "0.6", "--extra", "0.001",
+                   "--size", "100", "--out", "snowflake.png"],
+          f"the snowflake's command is {argv}")
+    check(plan.outputs.get("picture") == "snowflake.png",
+          f"the snowflake hands out {plan.outputs}")
+    refused = 0
+    for bad in ({"gather": 0}, {"gather": 1}, {"gather": -0.2}, {"extra": -0.001},
+                {"extra": 0.5}, {"size": 30}, {"size": 300}, {"output": "flake.jpg"}):
+        try:
+            plan_for(**bad)
+        except NodeError:
+            refused += 1
+        else:
+            check(False, f"the snowflake block took {bad} without a word")
+
+    # The model itself, from the script the block carries.
+    model = {"__name__": "snowflake_model"}
+    exec(compile(plan.files["snowflake.py"], "snowflake.py", "exec"), model)
+
+    def grown(gather, extra, size=60, max_steps=0):
+        born, steps, reach = model["grow"](gather, extra, size, max_steps or 100 * size)
+        n = born.shape[0]
+        q, r = np.meshgrid(np.arange(n) - n // 2, np.arange(n) - n // 2, indexing="ij")
+        ice = born >= 0
+        # A sixth of a turn takes the cell (q, r) to (-r, q + r).
+        turned = np.zeros_like(ice)
+        tq, tr = -r + n // 2, q + r + n // 2
+        fits = (tq >= 0) & (tq < n) & (tr >= 0) & (tr < n)
+        turned[tq[fits], tr[fits]] = ice[fits]
+        differ = int((turned != ice).sum())
+        far = np.maximum.reduce([abs(q), abs(r), abs(q + r)])
+        hexagon = far <= reach
+        # The air: every cell that is not ice and can reach the edge of the
+        # flake's hexagon without crossing ice.
+        p = lambda a: np.pad(a, 1)
+        air = (far > reach) & ~ice
+        while True:
+            a = p(air)
+            spread = (air | a[2:, 1:-1] | a[:-2, 1:-1] | a[1:-1, 2:] | a[1:-1, :-2]
+                      | a[2:, :-2] | a[:-2, 2:]) & ~ice
+            if (spread == air).all():
+                break
+            air = spread
+        return {"reach": reach, "cells": int(ice.sum()), "differ": differ,
+                "filled": float((~air)[hexagon].mean())}
+
+    star = grown(0.6, 0.001)
+    plate = grown(0.05, 0.0)
+    slow = grown(0.9, 0.001, size=40, max_steps=2000)
+    for label, flake in (("star", star), ("plate", plate)):
+        check(flake["reach"] >= 54,
+              f"the {label} stopped {flake['reach']} cells from the middle, short of the edge")
+        check(flake["differ"] <= 0.01 * flake["cells"],
+              f"the {label} is not the same after a sixth of a turn: "
+              f"{flake['differ']} of {flake['cells']} cells differ")
+    check(star["filled"] < 0.5, f"the star closes off {star['filled']:.0%} of its hexagon")
+    check(plate["filled"] > 0.75,
+          f"the plate closes off only {plate['filled']:.0%} of its hexagon")
+    check(slow["reach"] < 34,
+          f"the slow one grew {slow['reach']} cells from the middle in 2000 steps")
+
+    # The picture, written by the script the way the block runs it.
+    width = height = 0
+    with _tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "snowflake.py").write_text(plan.files["snowflake.py"])
+        proc = subprocess.run([sys.executable, "snowflake.py", "--gather", "0.6",
+                               "--extra", "0.001", "--size", "50", "--out", "flake.png"],
+                              cwd=tmp, capture_output=True, text=True)
+        check(proc.returncode == 0 and "It grew" in proc.stdout,
+              f"the snowflake script failed:\n{proc.stdout}{proc.stderr}")
+        picture = Path(tmp) / "flake.png"
+        data = picture.read_bytes() if picture.exists() else b""
+    check(data[:8] == b"\x89PNG\r\n\x1a\n", "the snowflake's picture is not a PNG")
+    chunks, at = {}, 8
+    while at + 8 <= len(data):
+        length, kind = _struct.unpack(">I4s", data[at:at + 8])
+        body = data[at + 8:at + 8 + length]
+        crc = _struct.unpack(">I", data[at + 8 + length:at + 12 + length])[0]
+        check(crc == _zlib.crc32(kind + body) & 0xFFFFFFFF,
+              f"the PNG's {kind!r} part has a wrong checksum")
+        chunks[kind] = chunks.get(kind, b"") + body
+        at += 12 + length
+    if b"IHDR" in chunks and b"IDAT" in chunks:
+        width, height, depth, colour = _struct.unpack(">IIBB", chunks[b"IHDR"][:10])
+        check(depth == 8 and colour == 2, "the PNG is not 8-bit red, green and blue")
+        rows = np.frombuffer(_zlib.decompress(chunks[b"IDAT"]), dtype=np.uint8)
+        check(rows.size == height * (1 + 3 * width), "the PNG's rows are the wrong length")
+        if rows.size == height * (1 + 3 * width):
+            rows = rows.reshape(height, 1 + 3 * width)
+            pixels = rows[:, 1:].reshape(height, width, 3)
+            check(not rows[:, 0].any(), "the PNG's rows are not written plainly")
+            check(tuple(pixels[0, 0]) == (14, 26, 43), "the picture's corner is not the night sky")
+            check(tuple(pixels[height // 2, width // 2]) != (14, 26, 43),
+                  "there is no ice in the middle of the picture")
+            # The command must draw what the model grows with the settings
+            # it was given, not just any snowflake.
+            born = model["grow"](0.6, 0.001, 50, 5000)[0]
+            check(np.array_equal(pixels, model["picture"](born, 50)),
+                  "the command's picture is not the flake the model grows "
+                  "with water to gather 0.6 and ice from above and below 0.001")
+    else:
+        check(False, "the PNG has no header or no picture in it")
+    if len(failures) > before:
+        return
+    print(f"snowflake: the block's command, {refused} wrong settings refused, a star "
+          f"closing off {star['filled']:.0%} of its hexagon and a plate {plate['filled']:.0%}, "
+          f"both the same after a sixth of a turn, a slow one stopped by itself, "
+          f"and a {width} x {height} PNG read back")
+
+
+def check_picture_preview() -> None:
+    """A block that makes a picture shows it inside itself, as large as fits
+    without stretching it, with its name and size under it; and the reload
+    button on a curve keeps the curve, which it used to wipe.
+    `tools/picture_preview.js` loads api.js, plots.js and viewer.js with a
+    stand-in for the page."""
+    node = shutil.which("node")
+    if not node:
+        print("picture preview: skipped, node is not installed")
+        return
+    proc = subprocess.run([node, str(ROOT / "tools" / "picture_preview.js")],
+                          capture_output=True, text=True)
+    check(proc.returncode == 0,
+          "the picture preview is wrong:\n" + (proc.stdout or proc.stderr)[:2000])
+    if proc.returncode == 0:
+        print(proc.stdout.strip().splitlines()[-1])
+
+
 CHECKS = (
     check_registry,
     check_flag_hints,
@@ -4929,6 +5094,8 @@ CHECKS = (
     check_plot_labels,
     check_index_guard,
     check_box_shape_note,
+    check_snowflake,
+    check_picture_preview,
 )
 
 
